@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Escuadron {
+  ESCUADRON_OPERACIONES_AEREAS
+  ESCUADRON_MATERIAL
+  ESCUADRON_BASE
+  PLANA_MAYOR
+}
+
+enum Modulo {
+  PERSONAS
+  AERONAVES
+  TIPOS_MISIONES
+  ESCALAS
+  MANIFIESTO
+  SICEM
+  INFORMES
+  INSPECCION_PREVUELO
+}
+
+// ============================================
+// MÓDULO DE AUTENTICACIÓN Y ROLES
+// ============================================
+
+model Persona {
+  id                  Int       @id @default(autoincrement())
+  nombre              String
+  apellido            String
+  grado               String
+  nro_documento       String    @unique
+  escuadron           Escuadron
+  unidad              String
+  residencia          String?
+  telefono            String?
+  contacto_emergencia String?
+  activo              Boolean   @default(true)
+
+  // Auditoría
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  deleted_at          DateTime?
+  creado_por          Int?
+  editado_por         Int?
+  eliminado_por       Int?
+
+  // Relaciones
+  usuario             Usuario?
+  historial_grados    HistorialGrado[]
+}
+
+model HistorialGrado {
+  id          Int       @id @default(autoincrement())
+  grado       String
+  fecha_desde DateTime
+  fecha_hasta DateTime?
+
+  // Auditoría
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  // Relaciones
+  persona       Persona   @relation(fields: [persona_id], references: [id])
+  persona_id    Int
+}
+
+model Rol {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique
+  descripcion String?
+
+  // Auditoría
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  // Relaciones
+  usuarios      Usuario[]
+}
+
+model NivelAcceso {
+  id    Int    @id @default(autoincrement())
+  nivel String @unique
+
+  // Auditoría
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  // Relaciones
+  usuarios    Usuario[]
+  permisos    Permiso[]
+}
+
+model Usuario {
+  id         Int       @id @default(autoincrement())
+  username   String    @unique
+  password   String
+  activo     Boolean   @default(true)
+
+  // Auditoría
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  // Relaciones
+  persona       Persona     @relation(fields: [persona_id], references: [id])
+  persona_id    Int         @unique
+
+  rol           Rol         @relation(fields: [rol_id], references: [id])
+  rol_id        Int
+
+  nivel         NivelAcceso @relation(fields: [nivel_id], references: [id])
+  nivel_id      Int
+}
+
+model Permiso {
+  id              Int     @id @default(autoincrement())
+  modulo          Modulo
+  puede_ver       Boolean @default(false)
+  puede_crear     Boolean @default(false)
+  puede_editar    Boolean @default(false)
+  puede_eliminar  Boolean @default(false)
+  puede_reportes  Boolean @default(false)
+
+  // Auditoría
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  // Relaciones
+  nivel         NivelAcceso @relation(fields: [nivel_id], references: [id])
+  nivel_id      Int
+}
