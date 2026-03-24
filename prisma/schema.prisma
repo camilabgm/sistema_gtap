@@ -29,6 +29,11 @@ enum Modulo {
   INSPECCION_PREVUELO
 }
 
+enum CategoriaMision {
+  MILITAR
+  INSTITUCIONAL
+}
+
 // ============================================
 // MÓDULO DE AUTENTICACIÓN Y ROLES
 // ============================================
@@ -47,16 +52,18 @@ model Persona {
   activo              Boolean   @default(true)
 
   // Auditoría
-  created_at          DateTime  @default(now())
-  updated_at          DateTime  @updatedAt
-  deleted_at          DateTime?
-  creado_por          Int?
-  editado_por         Int?
-  eliminado_por       Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
 
   // Relaciones
-  usuario             Usuario?
-  historial_grados    HistorialGrado[]
+  usuario          Usuario?
+  historial_grados HistorialGrado[]
+
+  @@map("personas")
 }
 
 model HistorialGrado {
@@ -74,13 +81,15 @@ model HistorialGrado {
   eliminado_por Int?
 
   // Relaciones
-  persona       Persona   @relation(fields: [persona_id], references: [id])
-  persona_id    Int
+  persona    Persona @relation(fields: [persona_id], references: [id])
+  persona_id Int
+
+  @@map("historial_grados")
 }
 
 model Rol {
-  id          Int       @id @default(autoincrement())
-  nombre      String    @unique
+  id          Int     @id @default(autoincrement())
+  nombre      String  @unique
   descripcion String?
 
   // Auditoría
@@ -92,7 +101,9 @@ model Rol {
   eliminado_por Int?
 
   // Relaciones
-  usuarios      Usuario[]
+  usuarios Usuario[]
+
+  @@map("roles")
 }
 
 model NivelAcceso {
@@ -108,15 +119,17 @@ model NivelAcceso {
   eliminado_por Int?
 
   // Relaciones
-  usuarios    Usuario[]
-  permisos    Permiso[]
+  usuarios Usuario[]
+  permisos Permiso[]
+
+  @@map("niveles_acceso")
 }
 
 model Usuario {
-  id         Int       @id @default(autoincrement())
-  username   String    @unique
-  password   String
-  activo     Boolean   @default(true)
+  id       Int     @id @default(autoincrement())
+  username String  @unique
+  password String
+  activo   Boolean @default(true)
 
   // Auditoría
   created_at    DateTime  @default(now())
@@ -127,24 +140,26 @@ model Usuario {
   eliminado_por Int?
 
   // Relaciones
-  persona       Persona     @relation(fields: [persona_id], references: [id])
-  persona_id    Int         @unique
+  persona    Persona     @relation(fields: [persona_id], references: [id])
+  persona_id Int         @unique
 
-  rol           Rol         @relation(fields: [rol_id], references: [id])
-  rol_id        Int
+  rol    Rol @relation(fields: [rol_id], references: [id])
+  rol_id Int
 
-  nivel         NivelAcceso @relation(fields: [nivel_id], references: [id])
-  nivel_id      Int
+  nivel    NivelAcceso @relation(fields: [nivel_id], references: [id])
+  nivel_id Int
+
+  @@map("usuarios")
 }
 
 model Permiso {
-  id              Int     @id @default(autoincrement())
-  modulo          Modulo
-  puede_ver       Boolean @default(false)
-  puede_crear     Boolean @default(false)
-  puede_editar    Boolean @default(false)
-  puede_eliminar  Boolean @default(false)
-  puede_reportes  Boolean @default(false)
+  id             Int     @id @default(autoincrement())
+  modulo         Modulo
+  puede_ver      Boolean @default(false)
+  puede_crear    Boolean @default(false)
+  puede_editar   Boolean @default(false)
+  puede_eliminar Boolean @default(false)
+  puede_reportes Boolean @default(false)
 
   // Auditoría
   created_at    DateTime  @default(now())
@@ -155,6 +170,31 @@ model Permiso {
   eliminado_por Int?
 
   // Relaciones
-  nivel         NivelAcceso @relation(fields: [nivel_id], references: [id])
-  nivel_id      Int
+  nivel    NivelAcceso @relation(fields: [nivel_id], references: [id])
+  nivel_id Int
+
+  @@map("permisos")
+}
+
+// ============================================
+// MÓDULO TIPOS DE MISIONES
+// ============================================
+
+model TipoMision {
+  id          Int             @id @default(autoincrement())
+  codigo      String          @unique
+  nombre      String
+  categoria   CategoriaMision
+  descripcion String?
+  activo      Boolean         @default(true)
+
+  // Auditoría
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  @@map("tipos_misiones")
 }
