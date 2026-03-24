@@ -173,6 +173,8 @@ model Permiso {
   nivel    NivelAcceso @relation(fields: [nivel_id], references: [id])
   nivel_id Int
 
+  // Restricción única: un nivel no puede tener dos registros para el mismo módulo
+  @@unique([nivel_id, modulo])
   @@map("permisos")
 }
 
