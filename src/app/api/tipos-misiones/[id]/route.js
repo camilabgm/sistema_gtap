@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from "@/auth"
 import prisma from '@/lib/prisma'
 
 // PUT - Editar un tipo de misión
@@ -14,7 +14,8 @@ export async function PUT(request, { params }) {
       )
     }
 
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
     const body = await request.json()
     const { codigo, nombre, categoria, descripcion } = body
 
@@ -89,7 +90,8 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    const id = parseInt(params.id)
+    const { id: idParam } = await params
+    const id = parseInt(idParam)
 
     // Verificar que exista y no esté ya eliminado
     const existente = await prisma.tipoMision.findFirst({
