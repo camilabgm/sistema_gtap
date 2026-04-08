@@ -44,22 +44,40 @@ enum EstadoAeronave {
   NO_DISPONIBLE
 }
 
+enum EspecialidadPersona {
+  PILOTO
+  COPILOTO
+  TECNICO_DE_VUELO
+  MECANICO
+  ADMINISTRATIVO
+  OTRO
+}
+
 // ============================================
 // MÓDULO DE AUTENTICACIÓN Y ROLES
 // ============================================
 
 model Persona {
-  id                  Int       @id @default(autoincrement())
+  id                  Int                 @id @default(autoincrement())
   nombre              String
   apellido            String
   grado               String
-  nro_documento       String    @unique
+  nro_documento       String              @unique
+  fecha_nacimiento    DateTime?
   escuadron           Escuadron
   unidad              String
+  especialidad        EspecialidadPersona?
   residencia          String?
   telefono            String?
   contacto_emergencia String?
-  activo              Boolean   @default(true)
+
+  // Habilitaciones con fecha de vencimiento
+  nro_pasaporte          String?
+  hab_medica_vence       DateTime?
+  nivel_operacional      String?
+  nivel_operacional_vence DateTime?
+
+  activo Boolean @default(true)
 
   // Auditoría
   created_at    DateTime  @default(now())
@@ -193,6 +211,8 @@ model Permiso {
 // ============================================
 
 model TipoMision {
+
+
   id          Int             @id @default(autoincrement())
   codigo      String          @unique
   nombre      String
