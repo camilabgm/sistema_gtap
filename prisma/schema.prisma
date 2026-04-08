@@ -34,6 +34,16 @@ enum CategoriaMision {
   INSTITUCIONAL
 }
 
+enum CategoriaAeronave {
+  PROPIA
+  INCAUTADA
+}
+
+enum EstadoAeronave {
+  DISPONIBLE
+  NO_DISPONIBLE
+}
+
 // ============================================
 // MÓDULO DE AUTENTICACIÓN Y ROLES
 // ============================================
@@ -199,4 +209,35 @@ model TipoMision {
   eliminado_por Int?
 
   @@map("tipos_misiones")
+}
+
+// ============================================
+// MÓDULO AERONAVES
+// ============================================
+
+model Aeronave {
+  id                  Int               @id @default(autoincrement())
+  matricula           String            @unique
+  tipo                String
+  fabricante          String
+  anio_fabricacion    Int
+  anio_incorporacion  Int
+  capacidad_pasajeros Int
+  tipo_combustible    String
+  velocidad_crucero   Int?
+  estela_turbulencia  String?
+  color               String?
+  categoria           CategoriaAeronave
+  estado              EstadoAeronave    @default(DISPONIBLE)
+  activo              Boolean           @default(true)
+
+  // Auditoría
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  @@map("aeronaves")
 }
