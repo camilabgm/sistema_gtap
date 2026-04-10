@@ -13,6 +13,7 @@ export async function GET() {
     const personas = await prisma.persona.findMany({
       where:   { activo: true },
       orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
+      include: { usuario: true },
     })
 
     return NextResponse.json(personas)

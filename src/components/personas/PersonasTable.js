@@ -2,16 +2,18 @@
 
 import { useState } from "react"
 import PersonasForm from "./PersonasForm"
+import UsuarioModal from "./UsuarioModal"
 
 export default function PersonasTable({ personas: datosIniciales }) {
 
-  const [personas, setPersonas]         = useState(datosIniciales)
-  const [busqueda, setBusqueda]         = useState("")
+  const [personas, setPersonas]             = useState(datosIniciales)
+  const [busqueda, setBusqueda]             = useState("")
   const [filtroEspecialidad, setFiltroEspecialidad] = useState("TODAS")
   const [filtroEscuadron, setFiltroEscuadron]       = useState("TODOS")
-  const [modalAbierto, setModalAbierto] = useState(false)
+  const [modalAbierto, setModalAbierto]     = useState(false)
+  const [modalUsuario, setModalUsuario]     = useState(false)
   const [personaSeleccionada, setPersonaSeleccionada] = useState(null)
-  const [eliminando, setEliminando]     = useState(null)
+  const [eliminando, setEliminando]         = useState(null)
 
   const personasFiltradas = personas.filter((p) => {
     const textoBusqueda = busqueda.toLowerCase()
@@ -45,8 +47,23 @@ export default function PersonasTable({ personas: datosIniciales }) {
     setPersonaSeleccionada(null)
   }
 
+  function handleAbrirUsuario(persona) {
+    setPersonaSeleccionada(persona)
+    setModalUsuario(true)
+  }
+
+  function handleCerrarUsuario() {
+    setModalUsuario(false)
+    setPersonaSeleccionada(null)
+  }
+
   async function handleGuardado() {
     handleCerrar()
+    await recargarDatos()
+  }
+
+  async function handleGuardadoUsuario() {
+    handleCerrarUsuario()
     await recargarDatos()
   }
 
@@ -68,16 +85,15 @@ export default function PersonasTable({ personas: datosIniciales }) {
     setEliminando(null)
   }
 
-  // Muestra la fecha de vencimiento con color según proximidad
   function badgeVencimiento(fecha) {
-    if (!fecha) return null
+    if (!fecha) return <span className="text-gray-300 text-xs">—</span>
 
-    const hoy      = new Date()
-    const vence    = new Date(fecha)
+    const hoy           = new Date()
+    const vence         = new Date(fecha)
     const diasRestantes = Math.ceil((vence - hoy) / (1000 * 60 * 60 * 24))
 
     let color = "bg-green-100 text-green-700"
-    if (diasRestantes < 0)   color = "bg-red-100 text-red-700"
+    if (diasRestantes < 0)        color = "bg-red-100 text-red-700"
     else if (diasRestantes <= 30) color = "bg-yellow-100 text-yellow-700"
 
     return (
@@ -173,13 +189,14 @@ export default function PersonasTable({ personas: datosIniciales }) {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Especialidad</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Escuadrón</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hab. médica</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceso</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {personasFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-400">
+                <td colSpan={7} className="text-center py-8 text-gray-400">
                   No se encontraron personas
                 </td>
               </tr>
@@ -204,6 +221,18 @@ export default function PersonasTable({ personas: datosIniciales }) {
                   <td className="px-6 py-4 text-sm">
                     {badgeVencimiento(persona.hab_medica_vence)}
                   </td>
+                  <td className="px-6 py-4 text-sm">
+                    {/* Badge que indica si la persona tiene acceso o no */}
+                    {persona.usuario ? (
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                        ✓ Con acceso
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                        Sin acceso
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-right">
                     <div className="flex justify-end gap-2">
                       <button
@@ -211,6 +240,12 @@ export default function PersonasTable({ personas: datosIniciales }) {
                         className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
                       >
                         Editar
+                      </button>
+                      <button
+                        onClick={() => handleAbrirUsuario(persona)}
+                        className="px-3 py-1 text-xs text-purple-600 border border-purple-200 rounded hover:bg-purple-50 transition-colors"
+                      >
+                        {persona.usuario ? "Acceso" : "Dar acceso"}
                       </button>
                       <button
                         onClick={() => handleEliminar(persona.id)}
@@ -235,12 +270,21 @@ export default function PersonasTable({ personas: datosIniciales }) {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal editar/crear persona */}
       {modalAbierto && (
         <PersonasForm
           persona={personaSeleccionada}
           onGuardado={handleGuardado}
           onCerrar={handleCerrar}
+        />
+      )}
+
+      {/* Modal gestión de acceso */}
+      {modalUsuario && personaSeleccionada && (
+        <UsuarioModal
+          persona={personaSeleccionada}
+          onGuardado={handleGuardadoUsuario}
+          onCerrar={handleCerrarUsuario}
         />
       )}
 

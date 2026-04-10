@@ -3,15 +3,15 @@
 import { useState } from "react"
 import AeronavesForm from "./AeronavesForm"
 
-export default function AeronavesTable({ aeronaves: datosIniciales }) {
+export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) {
 
-  const [aeronaves, setAeronaves]         = useState(datosIniciales)
-  const [busqueda, setBusqueda]           = useState("")
+  const [aeronaves, setAeronaves]             = useState(datosIniciales)
+  const [busqueda, setBusqueda]               = useState("")
   const [filtroCategoria, setFiltroCategoria] = useState("TODAS")
-  const [filtroEstado, setFiltroEstado]   = useState("TODOS")
-  const [modalAbierto, setModalAbierto]   = useState(false)
+  const [filtroEstado, setFiltroEstado]       = useState("TODOS")
+  const [modalAbierto, setModalAbierto]       = useState(false)
   const [aeronaveSeleccionada, setAeronaveSeleccionada] = useState(null)
-  const [eliminando, setEliminando]       = useState(null)
+  const [eliminando, setEliminando]           = useState(null)
 
   // Aplica los tres filtros combinados
   const aeronavesFiltradas = aeronaves.filter((a) => {
@@ -79,12 +79,15 @@ export default function AeronavesTable({ aeronaves: datosIniciales }) {
             Gestión de aeronaves del GTAP
           </p>
         </div>
-        <button
-          onClick={handleNuevo}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          + Nueva aeronave
-        </button>
+        {/* Solo se muestra si el usuario puede crear */}
+        {permisos?.puede_crear && (
+          <button
+            onClick={handleNuevo}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            + Nueva aeronave
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -172,19 +175,26 @@ export default function AeronavesTable({ aeronaves: datosIniciales }) {
                   </td>
                   <td className="px-6 py-4 text-sm text-right">
                     <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => handleEditar(aeronave)}
-                        className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleEliminar(aeronave.id)}
-                        disabled={eliminando === aeronave.id}
-                        className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        {eliminando === aeronave.id ? "..." : "Desactivar"}
-                      </button>
+                      {permisos?.puede_editar && (
+                        <button
+                          onClick={() => handleEditar(aeronave)}
+                          className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
+                        >
+                          Editar
+                        </button>
+                      )}
+                      {permisos?.puede_eliminar && (
+                        <button
+                          onClick={() => handleEliminar(aeronave.id)}
+                          disabled={eliminando === aeronave.id}
+                          className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {eliminando === aeronave.id ? "..." : "Desactivar"}
+                        </button>
+                      )}
+                      {!permisos?.puede_editar && !permisos?.puede_eliminar && (
+                        <span className="text-xs text-gray-300">Sin acciones</span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -201,7 +211,7 @@ export default function AeronavesTable({ aeronaves: datosIniciales }) {
         </div>
       </div>
 
-      {/* Modal — solo se muestra cuando modalAbierto es true */}
+      {/* Modal */}
       {modalAbierto && (
         <AeronavesForm
           aeronave={aeronaveSeleccionada}

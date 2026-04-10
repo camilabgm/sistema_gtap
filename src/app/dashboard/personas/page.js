@@ -11,6 +11,7 @@ export default async function PersonasPage() {
   const personas = await prisma.persona.findMany({
     where:   { activo: true },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
+    include: { usuario: true },
   })
 
   return (

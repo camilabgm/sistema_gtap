@@ -137,6 +137,7 @@ model Rol {
 model NivelAcceso {
   id    Int    @id @default(autoincrement())
   nivel String @unique
+  descripcion String?
 
   // Auditoría
   created_at    DateTime  @default(now())
