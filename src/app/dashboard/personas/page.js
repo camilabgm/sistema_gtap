@@ -14,6 +14,9 @@ export default async function PersonasPage() {
     include: { usuario: true },
   })
 
+  // Extraemos los permisos del módulo PERSONAS de la sesión
+  const permisos = session?.user?.permisos?.PERSONAS
+
   return (
     <div className="flex h-screen bg-gray-100">
       <Navbar
@@ -23,7 +26,7 @@ export default async function PersonasPage() {
         nivel={session?.user?.nivel}
       />
       <main className="flex-1 ml-64 overflow-y-auto">
-        <PersonasTable personas={personas} />
+        <PersonasTable personas={personas} permisos={permisos} />
       </main>
     </div>
   )

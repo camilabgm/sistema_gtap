@@ -16,16 +16,15 @@ export const authOptions = {
       async authorize(credentials) {
         const usuario = await prisma.usuario.findUnique({
           where: { username: credentials.username },
-          include: {
-            persona: true,
-            rol:     true,
-            nivel:   {
-              include: {
-                // Traemos los permisos del nivel del usuario
-                permisos: true,
-              },
-            },
-          },
+       include: {
+      persona: true,
+      rol:     true,
+      nivel:   {
+        include: {
+          permisos: true,
+        },
+      },
+    },
         });
 
         if (!usuario) return null;
@@ -56,6 +55,8 @@ export const authOptions = {
           }
         }
 
+        {/*console.log("PERMISOS ENCONTRADOS:", usuario.nivel.permisos)
+        console.log("NIVEL COMPLETO:", JSON.stringify(usuario.nivel))*/}
         return {
           id:       usuario.id,
           username: usuario.username,

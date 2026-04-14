@@ -4,7 +4,7 @@ import { useState } from "react"
 import PersonasForm from "./PersonasForm"
 import UsuarioModal from "./UsuarioModal"
 
-export default function PersonasTable({ personas: datosIniciales }) {
+export default function PersonasTable({ personas: datosIniciales, permisos }) {
 
   const [personas, setPersonas]             = useState(datosIniciales)
   const [busqueda, setBusqueda]             = useState("")
@@ -136,12 +136,14 @@ export default function PersonasTable({ personas: datosIniciales }) {
             Personal de la FAP registrado en el sistema
           </p>
         </div>
-        <button
-          onClick={handleNuevo}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          + Nueva persona
-        </button>
+        {permisos?.puede_crear && (
+          <button
+            onClick={handleNuevo}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            + Nueva persona
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -222,7 +224,6 @@ export default function PersonasTable({ personas: datosIniciales }) {
                     {badgeVencimiento(persona.hab_medica_vence)}
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    {/* Badge que indica si la persona tiene acceso o no */}
                     {persona.usuario ? (
                       <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                         ✓ Con acceso
@@ -235,25 +236,35 @@ export default function PersonasTable({ personas: datosIniciales }) {
                   </td>
                   <td className="px-6 py-4 text-sm text-right">
                     <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => handleEditar(persona)}
-                        className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleAbrirUsuario(persona)}
-                        className="px-3 py-1 text-xs text-purple-600 border border-purple-200 rounded hover:bg-purple-50 transition-colors"
-                      >
-                        {persona.usuario ? "Acceso" : "Dar acceso"}
-                      </button>
-                      <button
-                        onClick={() => handleEliminar(persona.id)}
-                        disabled={eliminando === persona.id}
-                        className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        {eliminando === persona.id ? "..." : "Desactivar"}
-                      </button>
+                      {permisos?.puede_editar && (
+                        <button
+                          onClick={() => handleEditar(persona)}
+                          className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
+                        >
+                          Editar
+                        </button>
+                      )}
+                      {/* El botón de acceso solo lo ve quien puede editar */}
+                      {permisos?.puede_editar && (
+                        <button
+                          onClick={() => handleAbrirUsuario(persona)}
+                          className="px-3 py-1 text-xs text-purple-600 border border-purple-200 rounded hover:bg-purple-50 transition-colors"
+                        >
+                          {persona.usuario ? "Acceso" : "Dar acceso"}
+                        </button>
+                      )}
+                      {permisos?.puede_eliminar && (
+                        <button
+                          onClick={() => handleEliminar(persona.id)}
+                          disabled={eliminando === persona.id}
+                          className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {eliminando === persona.id ? "..." : "Desactivar"}
+                        </button>
+                      )}
+                      {!permisos?.puede_editar && !permisos?.puede_eliminar && (
+                        <span className="text-xs text-gray-300">Sin acciones</span>
+                      )}
                     </div>
                   </td>
                 </tr>
