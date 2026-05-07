@@ -58,7 +58,6 @@ async function main() {
   // PERMISOS POR NIVEL — para todos los módulos
   // ============================================
 
-  // Definimos qué puede hacer cada nivel
   const permisosPorNivel = {
     I:   { puede_ver: true,  puede_crear: true,  puede_editar: true,  puede_eliminar: true,  puede_reportes: true  },
     II:  { puede_ver: true,  puede_crear: true,  puede_editar: true,  puede_eliminar: false, puede_reportes: true  },
@@ -67,7 +66,6 @@ async function main() {
     V:   { puede_ver: true,  puede_crear: false, puede_editar: false, puede_eliminar: false, puede_reportes: false },
   }
 
-  // Para cada nivel, cargamos sus permisos en todos los módulos
   for (const [nivelKey, permisos] of Object.entries(permisosPorNivel)) {
     const nivel = nivelesCreados[nivelKey]
 
@@ -93,16 +91,16 @@ async function main() {
   // ROLES DEL GTAP
   // ============================================
   const roles = [
-    { nombre: "Comandante",              descripcion: "Comandante del GTAP — acceso total al sistema" },
-    { nombre: "Jefe de Operaciones",     descripcion: "Gestión de escalas, manifiesto y tripulación" },
-    { nombre: "Jefe de Escuadrón",       descripcion: "Comandante del Escuadrón Aéreo" },
-    { nombre: "Jefe de Mantenimiento",   descripcion: "Gestión de aeronaves y SICEM" },
-    { nombre: "Jefe Administrativo",     descripcion: "Gestión de personal e informes" },
-    { nombre: "Piloto",                  descripcion: "Tripulante — visualización de sus vuelos asignados" },
-    { nombre: "Copiloto",                descripcion: "Tripulante — visualización de sus vuelos asignados" },
-    { nombre: "Técnico de Vuelo",        descripcion: "Tripulante — registro post-vuelo" },
-    { nombre: "Técnico de Mantenimiento",descripcion: "Registro de trabajos de mantenimiento" },
-    { nombre: "Estadística",             descripcion: "Generación de informes y reportes" },
+    { nombre: "Comandante",               descripcion: "Comandante del GTAP — acceso total al sistema" },
+    { nombre: "Jefe de Operaciones",      descripcion: "Gestión de escalas, manifiesto y tripulación" },
+    { nombre: "Jefe de Escuadrón",        descripcion: "Comandante del Escuadrón Aéreo" },
+    { nombre: "Jefe de Mantenimiento",    descripcion: "Gestión de aeronaves y SICEM" },
+    { nombre: "Jefe Administrativo",      descripcion: "Gestión de personal e informes" },
+    { nombre: "Piloto",                   descripcion: "Tripulante — visualización de sus vuelos asignados" },
+    { nombre: "Copiloto",                 descripcion: "Tripulante — visualización de sus vuelos asignados" },
+    { nombre: "Técnico de Vuelo",         descripcion: "Tripulante — registro post-vuelo" },
+    { nombre: "Técnico de Mantenimiento", descripcion: "Registro de trabajos de mantenimiento" },
+    { nombre: "Estadística",              descripcion: "Generación de informes y reportes" },
   ]
 
   for (const rol of roles) {
@@ -157,22 +155,22 @@ async function main() {
   // AERONAVES
   // ============================================
   const aeronaves = [
-    { matricula: "FAP0250", tipo: "C-208B Caravan",         fabricante: "Cessna",     anio_fabricacion: 1990, anio_incorporacion: 2000, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0251", tipo: "C-208B Caravan",         fabricante: "Cessna",     anio_fabricacion: 1991, anio_incorporacion: 2001, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0252", tipo: "C-208B Caravan",         fabricante: "Cessna",     anio_fabricacion: 1992, anio_incorporacion: 2002, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0253", tipo: "C-208B Caravan",         fabricante: "Cessna",     anio_fabricacion: 1993, anio_incorporacion: 2003, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0254", tipo: "C-208B Caravan",         fabricante: "Cessna",     anio_fabricacion: 1994, anio_incorporacion: 2004, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP3001", tipo: "C-680 Citation Sovereign",fabricante: "Cessna",    anio_fabricacion: 2005, anio_incorporacion: 2010, capacidad_pasajeros: 12, tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0235", tipo: "C-206",                  fabricante: "Cessna",     anio_fabricacion: 1985, anio_incorporacion: 1995, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0236", tipo: "C-206",                  fabricante: "Cessna",     anio_fabricacion: 1986, anio_incorporacion: 1996, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "PROPIA",    estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0814", tipo: "C-210",                  fabricante: "Cessna",     anio_fabricacion: 1980, anio_incorporacion: 2015, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
-    { matricula: "FAP0823", tipo: "C-206",                  fabricante: "Cessna",     anio_fabricacion: 1982, anio_incorporacion: 2016, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
-    { matricula: "FAP0824", tipo: "C-210",                  fabricante: "Cessna",     anio_fabricacion: 1981, anio_incorporacion: 2016, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0825", tipo: "C-172",                  fabricante: "Cessna",     anio_fabricacion: 1979, anio_incorporacion: 2017, capacidad_pasajeros: 3,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
-    { matricula: "FAP0901", tipo: "BE-90 King Air",         fabricante: "Beechcraft", anio_fabricacion: 1988, anio_incorporacion: 2018, capacidad_pasajeros: 7,  tipo_combustible: "JET-A1", categoria: "INCAUTADA", estado: "DISPONIBLE"    },
-    { matricula: "FAP0902", tipo: "B-58 Baron",             fabricante: "Beechcraft", anio_fabricacion: 1975, anio_incorporacion: 2019, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0903", tipo: "B-58 Baron",             fabricante: "Beechcraft", anio_fabricacion: 1976, anio_incorporacion: 2019, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0904", tipo: "B-55 Baron",             fabricante: "Beechcraft", anio_fabricacion: 1972, anio_incorporacion: 2020, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
+    { matricula: "FAP0250", tipo: "C-208B Caravan",          fabricante: "Cessna",     anio_fabricacion: 1990, anio_incorporacion: 2000, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
+    { matricula: "FAP0251", tipo: "C-208B Caravan",          fabricante: "Cessna",     anio_fabricacion: 1991, anio_incorporacion: 2001, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
+    { matricula: "FAP0252", tipo: "C-208B Caravan",          fabricante: "Cessna",     anio_fabricacion: 1992, anio_incorporacion: 2002, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
+    { matricula: "FAP0253", tipo: "C-208B Caravan",          fabricante: "Cessna",     anio_fabricacion: 1993, anio_incorporacion: 2003, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
+    { matricula: "FAP0254", tipo: "C-208B Caravan",          fabricante: "Cessna",     anio_fabricacion: 1994, anio_incorporacion: 2004, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
+    { matricula: "FAP3001", tipo: "C-680 Citation Sovereign", fabricante: "Cessna",    anio_fabricacion: 2005, anio_incorporacion: 2010, capacidad_pasajeros: 12, tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "NO_DISPONIBLE" },
+    { matricula: "FAP0235", tipo: "C-206",                   fabricante: "Cessna",     anio_fabricacion: 1985, anio_incorporacion: 1995, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "PROPIA",    estado: "DISPONIBLE"    },
+    { matricula: "FAP0236", tipo: "C-206",                   fabricante: "Cessna",     anio_fabricacion: 1986, anio_incorporacion: 1996, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "PROPIA",    estado: "NO_DISPONIBLE" },
+    { matricula: "FAP0814", tipo: "C-210",                   fabricante: "Cessna",     anio_fabricacion: 1980, anio_incorporacion: 2015, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
+    { matricula: "FAP0823", tipo: "C-206",                   fabricante: "Cessna",     anio_fabricacion: 1982, anio_incorporacion: 2016, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
+    { matricula: "FAP0824", tipo: "C-210",                   fabricante: "Cessna",     anio_fabricacion: 1981, anio_incorporacion: 2016, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
+    { matricula: "FAP0825", tipo: "C-172",                   fabricante: "Cessna",     anio_fabricacion: 1979, anio_incorporacion: 2017, capacidad_pasajeros: 3,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
+    { matricula: "FAP0901", tipo: "BE-90 King Air",          fabricante: "Beechcraft", anio_fabricacion: 1988, anio_incorporacion: 2018, capacidad_pasajeros: 7,  tipo_combustible: "JET-A1", categoria: "INCAUTADA", estado: "DISPONIBLE"    },
+    { matricula: "FAP0902", tipo: "B-58 Baron",              fabricante: "Beechcraft", anio_fabricacion: 1975, anio_incorporacion: 2019, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
+    { matricula: "FAP0903", tipo: "B-58 Baron",              fabricante: "Beechcraft", anio_fabricacion: 1976, anio_incorporacion: 2019, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
+    { matricula: "FAP0904", tipo: "B-55 Baron",              fabricante: "Beechcraft", anio_fabricacion: 1972, anio_incorporacion: 2020, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
   ]
 
   for (const aeronave of aeronaves) {
@@ -183,10 +181,42 @@ async function main() {
     })
   }
 
+  // ============================================
+  // TIPOS DE MISIONES
+  // ============================================
+  const tiposMisiones = [
+    // MILITARES
+    { codigo: "VFMM", nombre: "Vuelos Militares FFMM",       categoria: "MILITAR",       descripcion: "Vuelos a cargo de las Fuerzas Militares" },
+    { codigo: "VCOM", nombre: "Vuelos CONFAER",               categoria: "MILITAR",       descripcion: "Vuelos del Comando de la Fuerza Aérea" },
+    { codigo: "VINS", nombre: "Instrucción",                  categoria: "MILITAR",       descripcion: "Vuelos de instrucción y entrenamiento" },
+    { codigo: "VMAN", nombre: "Mantenimiento",                categoria: "MILITAR",       descripcion: "Vuelos de traslado por mantenimiento" },
+    { codigo: "VACS", nombre: "Acción Social",                categoria: "MILITAR",       descripcion: "Vuelos de acción social" },
+    { codigo: "VLPC", nombre: "Lanzamiento de PCD",           categoria: "MILITAR",       descripcion: "Vuelos de lanzamiento de paracaidistas" },
+    { codigo: "VSAR", nombre: "Búsqueda y Rescate",           categoria: "MILITAR",       descripcion: "Vuelos de búsqueda y rescate" },
+    // INSTITUCIONALES
+    { codigo: "CODI", nombre: "Apoyo al CODI",                categoria: "INSTITUCIONAL", descripcion: "Vuelo de apoyo al Comando de Defensa Interna" },
+    { codigo: "VAIP", nombre: "Apoyo a Instituciones Públicas",categoria: "INSTITUCIONAL", descripcion: "Vuelos de apoyo a instituciones del Estado" },
+    { codigo: "VPRE", nombre: "Vuelos Presidenciales",        categoria: "INSTITUCIONAL", descripcion: "Vuelos de apoyo presidencial y vicepresidencial" },
+    { codigo: "VRAL", nombre: "Vuelos Remunerados por Ley",   categoria: "INSTITUCIONAL", descripcion: "Vuelos remunerados autorizados por ley" },
+    { codigo: "VEAM", nombre: "Evaluación Aeromédica",        categoria: "INSTITUCIONAL", descripcion: "Vuelos de evacuación y evaluación aeromédica" },
+  ]
+
+  for (const tipo of tiposMisiones) {
+    await prisma.tipoMision.upsert({
+      where:  { codigo: tipo.codigo },
+      update: {},
+      create: {
+        ...tipo,
+        activo: true,
+      },
+    })
+  }
+
   console.log("✅ Seed completado exitosamente")
   console.log(`   → 5 niveles de acceso con permisos cargados`)
   console.log(`   → ${roles.length} roles del GTAP cargados`)
   console.log(`   → ${aeronaves.length} aeronaves cargadas`)
+  console.log(`   → ${tiposMisiones.length} tipos de misiones cargados`)
 }
 
 main()
