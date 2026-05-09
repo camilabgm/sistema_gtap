@@ -42,11 +42,10 @@ export async function POST(request) {
 
     const usuario = await prisma.usuario.create({
       data: {
-        username:   body.username,
+        username: String(body.username),
         password:   passwordHash,
         persona_id: Number(body.persona_id),
         rol_id:     Number(body.rol_id),
-        nivel_id:   Number(body.nivel_id),
         creado_por: session.user.id,
       },
     })

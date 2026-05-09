@@ -76,20 +76,26 @@ export default function Navbar({ nombre, apellido, rol }) {
       </nav>
 
       {/* Datos del usuario y botón de cerrar sesión */}
-      <div className="px-6 py-4 border-t border-gray-700">
-        <p className="text-sm font-medium text-white">
-          {nombre} {apellido}
-        </p>
-        <p className="text-xs text-gray-400 mt-0.5">
-          {rol}
-        </p>
-        <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          className="mt-3 w-full text-xs text-red-400 hover:text-red-300 text-left transition-colors"
-        >
-          Cerrar sesión
-        </button>
-      </div>
+    <div className="px-6 py-4 border-t border-gray-700 space-y-2">
+      <p className="text-sm font-medium text-white">
+        {nombre} {apellido}
+      </p>
+      <p className="text-xs text-gray-400">
+        {rol}
+      </p>
+      <Link
+        href="/dashboard/perfil"
+        className="block text-xs text-gray-400 hover:text-white transition-colors"
+      >
+        Cambiar contraseña
+      </Link>
+      <button
+        onClick={() => signOut({ callbackUrl: "/login" })}
+        className="w-full text-xs text-red-400 hover:text-red-300 text-left transition-colors"
+      >
+        Cerrar sesión
+      </button>
+    </div>
 
     </div>
   )

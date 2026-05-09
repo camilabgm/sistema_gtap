@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
+import { PrismaClient } from "@prisma/client"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import bcrypt from "bcryptjs"
+
+const prisma = new PrismaClient()
 
 export async function PUT(request, { params }) {
   try {
@@ -14,17 +16,23 @@ export async function PUT(request, { params }) {
     const { id } = await params
     const body   = await request.json()
 
-    // Construimos el objeto de datos a actualizar
-    // La contraseña solo se actualiza si el usuario mandó una nueva
     const data = {
-      rol_id:     Number(body.rol_id),
-      nivel_id:   Number(body.nivel_id),
+      rol_id:      Number(body.rol_id),
       editado_por: session.user.id,
     }
 
-    // Si mandaron contraseña nueva la encriptamos y la incluimos
     if (body.password && body.password.trim() !== "") {
       data.password = await bcrypt.hash(body.password, 10)
+    }
+
+    // Si cambia el rol invalidamos la sesión del usuario afectado
+    const usuarioActual = await prisma.usuario.findUnique({
+      where:  { id: Number(id) },
+      select: { rol_id: true },
+    })
+
+    if (usuarioActual?.rol_id !== Number(body.rol_id)) {
+      data.sesion_invalidada_en = new Date()
     }
 
     const usuario = await prisma.usuario.update({
