@@ -4,70 +4,52 @@ import { useState, useEffect } from "react"
 
 export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
 
-  // Si la persona ya tiene usuario, estamos en modo edición
   const modoEdicion = !!persona.usuario
 
-  const [roles, setRoles]     = useState([])
-  const [niveles, setNiveles] = useState([])
-
-  const [form, setForm] = useState({
+  const [roles, setRoles] = useState([])
+  const [form, setForm]   = useState({
     username: persona.usuario?.username || "",
     password: "",
     rol_id:   persona.usuario?.rol_id   || "",
-    nivel_id: persona.usuario?.nivel_id || "",
   })
 
   const [cargando, setCargando] = useState(false)
   const [error, setError]       = useState("")
 
-  // Al abrir el modal cargamos roles y niveles para los selects
   useEffect(() => {
-    async function cargarOpciones() {
-      const [resRoles, resNiveles] = await Promise.all([
-        fetch("/api/roles"),
-        fetch("/api/niveles"),
-      ])
-      const dataRoles   = await resRoles.json()
-      const dataNiveles = await resNiveles.json()
-      setRoles(dataRoles)
-      setNiveles(dataNiveles)
+    async function cargarRoles() {
+      const res  = await fetch("/api/roles")
+      const data = await res.json()
+      // Excluimos el rol Comandante — no se puede asignar desde acá
+      setRoles(data.filter((r) => r.nombre !== "Comandante"))
     }
-    cargarOpciones()
+    cargarRoles()
   }, [])
 
-  // Escape para cerrar
   useEffect(() => {
-    const manejarTecla = (e) => {
-      if (e.key === "Escape") onCerrar()
-    }
+    const manejarTecla = (e) => { if (e.key === "Escape") onCerrar() }
     document.addEventListener("keydown", manejarTecla)
     return () => document.removeEventListener("keydown", manejarTecla)
   }, [])
 
   async function handleGuardar() {
     if (cargando) return
-
     setCargando(true)
     setError("")
 
     let respuesta
 
     if (modoEdicion) {
-      // PUT — editamos el usuario existente
       respuesta = await fetch(`/api/usuarios/${persona.usuario.id}`, {
         method:  "PUT",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(form),
       })
     } else {
-      // POST — creamos usuario nuevo vinculado a esta persona
       respuesta = await fetch("/api/usuarios", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          ...form,
-          persona_id: persona.id,
-        }),
+        body:    JSON.stringify({ ...form, persona_id: persona.id }),
       })
     }
 
@@ -92,7 +74,6 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
         onClick={(e) => e.stopPropagation()}
       >
 
-        {/* Encabezado */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-lg font-semibold text-gray-800">
@@ -115,7 +96,6 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
 
         <div className="px-6 py-4 space-y-4">
 
-          {/* Username */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nombre de usuario <span className="text-red-500">*</span>
@@ -129,13 +109,10 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
             />
             {modoEdicion && (
-              <p className="text-xs text-gray-400 mt-1">
-                El nombre de usuario no se puede cambiar
-              </p>
+              <p className="text-xs text-gray-400 mt-1">El nombre de usuario no se puede cambiar</p>
             )}
           </div>
 
-          {/* Contraseña */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {modoEdicion ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña"}
@@ -150,7 +127,6 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Rol */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Rol <span className="text-red-500">*</span>
@@ -169,31 +145,8 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
             </select>
           </div>
 
-          {/* Nivel de acceso */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nivel de acceso <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={form.nivel_id}
-              onChange={(e) => setForm({ ...form, nivel_id: e.target.value })}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Seleccionar nivel...</option>
-              {niveles.map((nivel) => (
-                <option key={nivel.id} value={nivel.id}>
-                  Nivel {nivel.nivel}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              Nivel I = acceso total · Nivel V = solo visualización
-            </p>
-          </div>
-
         </div>
 
-        {/* Botones */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
           <button
             onClick={onCerrar}

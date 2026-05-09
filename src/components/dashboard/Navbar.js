@@ -53,6 +53,26 @@ export default function Navbar({ nombre, apellido, rol }) {
             )
           })}
         </ul>
+        {/* Sección administrativa — solo Comandante */}
+        {rol === "Comandante" && (
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <p className="text-xs font-semibold uppercase text-gray-500 px-4 mb-2">
+              Administración
+            </p>
+            <Link
+              href="/dashboard/administracion/permisos"
+              className={`
+                block px-4 py-2 rounded-md text-sm transition-colors
+                ${pathname === "/dashboard/administracion/permisos"
+                  ? "bg-blue-600 text-white font-medium"
+                  : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                }
+              `}
+            >
+              Gestión de Permisos
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Datos del usuario y botón de cerrar sesión */}
