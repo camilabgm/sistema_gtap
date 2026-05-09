@@ -3,8 +3,9 @@
 import { useState } from "react"
 import PersonasForm from "./PersonasForm"
 import UsuarioModal from "./UsuarioModal"
+import PermisosUsuarioModal from "./PermisosUsuarioModal"
 
-export default function PersonasTable({ personas: datosIniciales, permisos }) {
+export default function PersonasTable({ personas: datosIniciales, permisos, rolUsuario }) {
 
   const [personas, setPersonas]             = useState(datosIniciales)
   const [busqueda, setBusqueda]             = useState("")
@@ -14,6 +15,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos }) {
   const [modalUsuario, setModalUsuario]     = useState(false)
   const [personaSeleccionada, setPersonaSeleccionada] = useState(null)
   const [eliminando, setEliminando]         = useState(null)
+  const [modalPermisos, setModalPermisos] = useState(false)
 
   const personasFiltradas = personas.filter((p) => {
     const textoBusqueda = busqueda.toLowerCase()
@@ -56,6 +58,21 @@ export default function PersonasTable({ personas: datosIniciales, permisos }) {
     setModalUsuario(false)
     setPersonaSeleccionada(null)
   }
+
+  function handleAbrirPermisos(persona) {
+  setPersonaSeleccionada(persona)
+  setModalPermisos(true)
+}
+
+function handleCerrarPermisos() {
+  setModalPermisos(false)
+  setPersonaSeleccionada(null)
+}
+
+async function handleGuardadoPermisos() {
+  handleCerrarPermisos()
+  await recargarDatos()
+}
 
   async function handleGuardado() {
     handleCerrar()
@@ -253,6 +270,14 @@ export default function PersonasTable({ personas: datosIniciales, permisos }) {
                           {persona.usuario ? "Acceso" : "Dar acceso"}
                         </button>
                       )}
+                      {rolUsuario === "Comandante" && persona.usuario && (
+                        <button
+                          onClick={() => handleAbrirPermisos(persona)}
+                          className="px-3 py-1 text-xs text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-50 transition-colors"
+                        >
+                          Permisos
+                        </button>
+                      )}
                       {permisos?.puede_eliminar && (
                         <button
                           onClick={() => handleEliminar(persona.id)}
@@ -298,6 +323,14 @@ export default function PersonasTable({ personas: datosIniciales, permisos }) {
           onCerrar={handleCerrarUsuario}
         />
       )}
+
+      {modalPermisos && personaSeleccionada?.usuario && (
+        <PermisosUsuarioModal
+          persona={personaSeleccionada}
+          onGuardado={handleGuardadoPermisos}
+          onCerrar={handleCerrarPermisos}
+        />
+       )}
 
     </div>
   )
