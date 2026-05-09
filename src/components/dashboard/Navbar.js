@@ -4,8 +4,6 @@ import { signOut } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-// Estos son los módulos del sistema
-// A medida que avancemos, cada uno tendrá su ruta real
 const modulos = [
   { nombre: "Inicio",            ruta: "/dashboard" },
   { nombre: "Tipos de Misiones", ruta: "/dashboard/tipos-misiones" },
@@ -17,9 +15,7 @@ const modulos = [
   { nombre: "SICEM",             ruta: "/dashboard/sicem" },
 ]
 
-export default function Navbar({ nombre, apellido, rol, nivel }) {
-  // usePathname nos dice en qué página estamos ahora mismo
-  // Lo usamos para resaltar el módulo activo en el menú
+export default function Navbar({ nombre, apellido, rol }) {
   const pathname = usePathname()
 
   return (
@@ -37,7 +33,6 @@ export default function Navbar({ nombre, apellido, rol, nivel }) {
       <nav className="flex-1 px-4 py-4 overflow-y-auto">
         <ul className="space-y-1">
           {modulos.map((modulo) => {
-            // Verificamos si esta ruta es la página actual
             const estaActivo = pathname === modulo.ruta
 
             return (
@@ -66,7 +61,7 @@ export default function Navbar({ nombre, apellido, rol, nivel }) {
           {nombre} {apellido}
         </p>
         <p className="text-xs text-gray-400 mt-0.5">
-          {rol} — Nivel {nivel}
+          {rol}
         </p>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}

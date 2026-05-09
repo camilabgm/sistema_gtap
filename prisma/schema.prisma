@@ -23,10 +23,12 @@ enum Modulo {
   AERONAVES
   TIPOS_MISIONES
   ESCALAS
+  POST_VUELO
   MANIFIESTO
   SICEM
   INFORMES
   INSPECCION_PREVUELO
+
 }
 
 enum CategoriaMision {
@@ -129,36 +131,19 @@ model Rol {
   eliminado_por Int?
 
   // Relaciones
-  usuarios Usuario[]
+  usuarios        Usuario[]
+  permisos_rol    PermisoRol[]
 
   @@map("roles")
 }
 
-model NivelAcceso {
-  id    Int    @id @default(autoincrement())
-  nivel String @unique
-  descripcion String?
-
-  // Auditoría
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
-  deleted_at    DateTime?
-  creado_por    Int?
-  editado_por   Int?
-  eliminado_por Int?
-
-  // Relaciones
-  usuarios Usuario[]
-  permisos Permiso[]
-
-  @@map("niveles_acceso")
-}
 
 model Usuario {
-  id       Int     @id @default(autoincrement())
-  username String  @unique
-  password String
-  activo   Boolean @default(true)
+  id                    Int       @id @default(autoincrement())
+  username              String    @unique
+  password              String
+  activo                Boolean   @default(true)
+  sesion_invalidada_en  DateTime?
 
   // Auditoría
   created_at    DateTime  @default(now())
@@ -169,26 +154,23 @@ model Usuario {
   eliminado_por Int?
 
   // Relaciones
-  persona    Persona     @relation(fields: [persona_id], references: [id])
-  persona_id Int         @unique
-
-  rol    Rol @relation(fields: [rol_id], references: [id])
-  rol_id Int
-
-  nivel    NivelAcceso @relation(fields: [nivel_id], references: [id])
-  nivel_id Int
+  persona           Persona         @relation(fields: [persona_id], references: [id])
+  persona_id        Int             @unique
+  rol               Rol             @relation(fields: [rol_id], references: [id])
+  rol_id            Int
+  permisos_usuario  PermisoUsuario[]
 
   @@map("usuarios")
 }
 
-model Permiso {
-  id             Int     @id @default(autoincrement())
-  modulo         Modulo
-  puede_ver      Boolean @default(false)
-  puede_crear    Boolean @default(false)
-  puede_editar   Boolean @default(false)
-  puede_eliminar Boolean @default(false)
-  puede_reportes Boolean @default(false)
+model PermisoRol {
+  id              Int     @id @default(autoincrement())
+  modulo          Modulo
+  puede_ver       Boolean @default(false)
+  puede_crear     Boolean @default(false)
+  puede_editar    Boolean @default(false)
+  puede_eliminar  Boolean @default(false)
+  puede_reportes  Boolean @default(false)
 
   // Auditoría
   created_at    DateTime  @default(now())
@@ -199,12 +181,36 @@ model Permiso {
   eliminado_por Int?
 
   // Relaciones
-  nivel    NivelAcceso @relation(fields: [nivel_id], references: [id])
-  nivel_id Int
+  rol     Rol @relation(fields: [rol_id], references: [id])
+  rol_id  Int
 
-  // Restricción única: un nivel no puede tener dos registros para el mismo módulo
-  @@unique([nivel_id, modulo])
-  @@map("permisos")
+  @@unique([rol_id, modulo])
+  @@map("permisos_rol")
+}
+
+model PermisoUsuario {
+  id              Int     @id @default(autoincrement())
+  modulo          Modulo
+  puede_ver       Boolean @default(false)
+  puede_crear     Boolean @default(false)
+  puede_editar    Boolean @default(false)
+  puede_eliminar  Boolean @default(false)
+  puede_reportes  Boolean @default(false)
+
+  // Auditoría
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  // Relaciones
+  usuario     Usuario @relation(fields: [usuario_id], references: [id])
+  usuario_id  Int
+
+  @@unique([usuario_id, modulo])
+  @@map("permisos_usuario")
 }
 
 // ============================================

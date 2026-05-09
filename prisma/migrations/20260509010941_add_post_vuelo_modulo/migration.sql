@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "Modulo" ADD VALUE 'POST_VUELO';
