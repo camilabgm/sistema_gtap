@@ -22,7 +22,14 @@ export default function LoginPage() {
     });
 
     if (resultado?.error) {
-      setError("Usuario o contraseña incorrectos");
+      // "CredentialsSignin" es el error genérico que NextAuth devuelve
+      // cuando authorize() retorna null (contraseña incorrecta, usuario no existe, etc.)
+      // Cualquier OTRO valor es un mensaje personalizado nuestro (como el de bloqueo)
+      if (resultado.error === "CredentialsSignin") {
+        setError("Usuario o contraseña incorrectos");
+      } else {
+        setError(resultado.error);
+      }
       setCargando(false);
       return;
     }
