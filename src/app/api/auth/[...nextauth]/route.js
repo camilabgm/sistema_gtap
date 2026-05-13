@@ -7,10 +7,52 @@ const prisma = new PrismaClient()
 
 // ============================================
 // CONFIGURACIÓN DE BLOQUEO POR INTENTOS FALLIDOS
-// Cambiar estos valores para ajustar la severidad
 // ============================================
 const MAX_INTENTOS_FALLIDOS = 3
-const MINUTOS_BLOQUEO = 1
+const MINUTOS_BLOQUEO = 15
+
+// ============================================
+// FUNCIONES AUXILIARES DE SEGURIDAD
+// ============================================
+
+// Extrae la dirección IP del request
+// En desarrollo local será "desconocida" o "127.0.0.1"
+// En producción (con Nginx) será la IP real del usuario
+function obtenerIP(req) {
+  try {
+    if (req?.headers?.get) {
+      return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+             req.headers.get('x-real-ip') ||
+             'desconocida'
+    }
+    if (req?.headers?.['x-forwarded-for']) {
+      return req.headers['x-forwarded-for'].split(',')[0].trim()
+    }
+    return 'desconocida'
+  } catch {
+    return 'desconocida'
+  }
+}
+
+// Registra un intento de login en la tabla log_intentos_login
+// Envuelto en try-catch: si falla el log, el login sigue funcionando
+async function registrarIntentoLogin(username, resultado, ip) {
+  try {
+    await prisma.logIntentoLogin.create({
+      data: {
+        username,
+        resultado,
+        ip,
+      },
+    })
+  } catch (error) {
+    console.error('Error al registrar intento de login:', error)
+  }
+}
+
+// ============================================
+// CONFIGURACIÓN DE NEXTAUTH
+// ============================================
 
 const handler = NextAuth({
   providers: [
@@ -20,7 +62,9 @@ const handler = NextAuth({
         username: { label: "Usuario", type: "text" },
         password: { label: "Contraseña", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
+        const ip = obtenerIP(req)
+
         // 1. Buscar el usuario en la base de datos
         const usuario = await prisma.usuario.findUnique({
           where: { username: credentials.username },
@@ -35,16 +79,21 @@ const handler = NextAuth({
           },
         })
 
-        // 2. Si no existe, rechazar
-        if (!usuario) return null
+        // 2. Si no existe, rechazar y registrar
+        if (!usuario) {
+          await registrarIntentoLogin(credentials.username, 'USUARIO_NO_EXISTE', ip)
+          return null
+        }
 
-        // 3. Si está inactivo, rechazar
-        if (!usuario.activo) return null
+        // 3. Si está inactivo, rechazar y registrar
+        if (!usuario.activo) {
+          await registrarIntentoLogin(credentials.username, 'CUENTA_INACTIVA', ip)
+          return null
+        }
 
-        // 4. NUEVO — Verificar si la cuenta está bloqueada
-        // Si bloqueado_hasta tiene una fecha y esa fecha todavía no llegó,
-        // el usuario NO puede intentar entrar, ni siquiera con la contraseña correcta
+        // 4. Si está bloqueado, rechazar y registrar
         if (usuario.bloqueado_hasta && usuario.bloqueado_hasta > new Date()) {
+          await registrarIntentoLogin(credentials.username, 'CUENTA_BLOQUEADA', ip)
           const horas   = usuario.bloqueado_hasta.getHours().toString().padStart(2, '0')
           const minutos = usuario.bloqueado_hasta.getMinutes().toString().padStart(2, '0')
           throw new Error(
@@ -58,21 +107,22 @@ const handler = NextAuth({
           usuario.password
         )
 
-        // 6. NUEVO — Si la contraseña es incorrecta, actualizar el contador
+        // 6. Si la contraseña es incorrecta, actualizar contador y registrar
         if (!passwordValido) {
           const nuevosIntentos = usuario.intentos_fallidos + 1
 
           if (nuevosIntentos >= MAX_INTENTOS_FALLIDOS) {
-            // Llegó al límite: bloquear la cuenta por X minutos
             const bloqueoHasta = new Date(Date.now() + MINUTOS_BLOQUEO * 60 * 1000)
 
             await prisma.usuario.update({
               where: { id: usuario.id },
               data: {
-                intentos_fallidos: 0,        // resetear el contador para el próximo ciclo
+                intentos_fallidos: 0,
                 bloqueado_hasta:   bloqueoHasta,
               },
             })
+
+            await registrarIntentoLogin(credentials.username, 'CREDENCIALES_INVALIDAS', ip)
 
             const horas   = bloqueoHasta.getHours().toString().padStart(2, '0')
             const minutos = bloqueoHasta.getMinutes().toString().padStart(2, '0')
@@ -80,22 +130,20 @@ const handler = NextAuth({
               `Cuenta bloqueada por ${MINUTOS_BLOQUEO} minutos tras ${MAX_INTENTOS_FALLIDOS} intentos fallidos. Podes reintentar a las ${horas}:${minutos}.`
             )
           } else {
-            // Todavía tiene intentos disponibles: solo incrementar el contador
             await prisma.usuario.update({
               where: { id: usuario.id },
               data: {
                 intentos_fallidos: nuevosIntentos,
               },
             })
+
+            await registrarIntentoLogin(credentials.username, 'CREDENCIALES_INVALIDAS', ip)
           }
 
           return null
         }
 
-        // 7. NUEVO — Contraseña correcta: limpiar intentos acumulados si los había
-        // Esto cubre dos casos:
-        //   a) El usuario falló 1-2 veces y después acertó → resetear el contador
-        //   b) El usuario tenía un bloqueo vencido → limpiar la fecha vieja
+        // 7. Contraseña correcta: limpiar intentos acumulados si los había
         if (usuario.intentos_fallidos > 0 || usuario.bloqueado_hasta !== null) {
           await prisma.usuario.update({
             where: { id: usuario.id },
@@ -106,7 +154,10 @@ const handler = NextAuth({
           })
         }
 
-        // 8. Cargar permisos base del ROL
+        // 8. Registrar login exitoso
+        await registrarIntentoLogin(credentials.username, 'EXITOSO', ip)
+
+        // 9. Cargar permisos base del ROL
         const permisos = {}
         for (const permiso of usuario.rol.permisos_rol) {
           permisos[permiso.modulo] = {
@@ -118,8 +169,7 @@ const handler = NextAuth({
           }
         }
 
-        // 9. Aplicar overrides individuales del USUARIO
-        // Si existe un PermisoUsuario para ese módulo, reemplaza al del rol
+        // 10. Aplicar overrides individuales del USUARIO
         for (const permiso of usuario.permisos_usuario) {
           permisos[permiso.modulo] = {
             puede_ver:      permiso.puede_ver,
@@ -130,7 +180,7 @@ const handler = NextAuth({
           }
         }
 
-        // 10. Retornar datos del usuario para la sesión
+        // 11. Retornar datos del usuario para la sesión
         return {
           id:                   usuario.id,
           username:             usuario.username,

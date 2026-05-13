@@ -272,3 +272,25 @@ model Aeronave {
 
   @@map("aeronaves")
 }
+
+// ============================================
+// REGISTRO DE INTENTOS DE LOGIN (Seguridad)
+// ============================================
+
+enum ResultadoLogin {
+  EXITOSO
+  USUARIO_NO_EXISTE
+  CUENTA_INACTIVA
+  CREDENCIALES_INVALIDAS
+  CUENTA_BLOQUEADA
+}
+
+model LogIntentoLogin {
+  id         Int             @id @default(autoincrement())
+  username   String
+  resultado  ResultadoLogin
+  ip         String          @default("desconocida")
+  created_at DateTime        @default(now())
+
+  @@map("log_intentos_login")
+}
