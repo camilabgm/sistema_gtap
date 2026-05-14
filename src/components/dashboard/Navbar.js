@@ -71,6 +71,18 @@ export default function Navbar({ nombre, apellido, rol }) {
             >
               Gestión de Permisos
             </Link>
+             <Link
+              href="/dashboard/administracion/log-intentos"
+              className={`
+                block px-4 py-2 rounded-md text-sm transition-colors
+                ${pathname === "/dashboard/administracion/log-intentos"
+                  ? "bg-blue-600 text-white font-medium"
+                  : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                }
+              `}
+            >
+              Registro de Accesos
+            </Link>
           </div>
         )}
       </nav>
