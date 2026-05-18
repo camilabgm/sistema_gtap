@@ -5,6 +5,7 @@ import { PrismaClient } from "@prisma/client"
 import Navbar from "@/components/dashboard/Navbar"
 import SesionInvalidadaBanner from "@/components/shared/SesionInvalidadaBanner"
 import DetectorInactividad from "@/components/shared/DetectorInactividad"
+import CambioContrasenaObligatorio from "@/components/shared/CambioContrasenaObligatorio"
 
 const prisma = new PrismaClient()
 
@@ -17,7 +18,7 @@ export default async function DashboardLayout({ children }) {
 
   const usuario = await prisma.usuario.findUnique({
     where:  { id: sesion.user.id },
-    select: { sesion_invalidada_en: true },
+    select: { sesion_invalidada_en: true, password_temporal: true },
   })
 
   const sesionDesactualizada = (() => {
@@ -42,6 +43,7 @@ export default async function DashboardLayout({ children }) {
       </main>
 
       <DetectorInactividad />
+      {usuario?.password_temporal && <CambioContrasenaObligatorio />}
 
     </div>
   )

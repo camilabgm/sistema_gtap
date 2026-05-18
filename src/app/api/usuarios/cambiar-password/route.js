@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
+import { validarContrasena } from "@/lib/validarContrasena"
 
 const prisma = new PrismaClient()
 
@@ -19,14 +20,15 @@ export async function PUT(request) {
     return NextResponse.json({ error: "Completá todos los campos" }, { status: 400 })
   }
 
-  if (password_nuevo.length < 6) {
+  // Validar reglas de contraseña (misma función que usa el frontend)
+  const { valida, errores } = validarContrasena(password_nuevo)
+  if (!valida) {
     return NextResponse.json(
-      { error: "La contraseña nueva debe tener al menos 6 caracteres" },
+      { error: errores.join(". ") + "." },
       { status: 400 }
     )
   }
 
-  // Verificamos que la contraseña actual sea correcta
   const usuario = await prisma.usuario.findUnique({
     where: { id: sesion.user.id },
   })
@@ -45,8 +47,9 @@ export async function PUT(request) {
   await prisma.usuario.update({
     where: { id: sesion.user.id },
     data:  {
-      password:    passwordHash,
-      editado_por: sesion.user.id,
+      password:          passwordHash,
+      password_temporal: false,
+      editado_por:       sesion.user.id,
     },
   })
 

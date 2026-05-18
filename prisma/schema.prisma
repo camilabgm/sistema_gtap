@@ -148,6 +148,7 @@ model Usuario {
   // Seguridad - control de intentos fallidos de login
   intentos_fallidos     Int       @default(0)
   bloqueado_hasta       DateTime?
+  password_temporal     Boolean   @default(true)
 
   // Auditoría
   created_at    DateTime  @default(now())
