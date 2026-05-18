@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { validarContrasena } from "@/lib/validarContrasena"
 
 export default function PerfilForm() {
   const [form, setForm] = useState({
-    password_actual: "",
-    password_nuevo:  "",
+    password_actual:  "",
+    password_nuevo:   "",
     password_confirm: "",
   })
 
@@ -20,8 +21,10 @@ export default function PerfilForm() {
       return
     }
 
-    if (form.password_nuevo.length < 6) {
-      setMensaje({ tipo: "error", texto: "La contraseña nueva debe tener al menos 6 caracteres." })
+    // Validar reglas de contraseña
+    const { valida, errores } = validarContrasena(form.password_nuevo)
+    if (!valida) {
+      setMensaje({ tipo: "error", texto: errores.join(". ") + "." })
       return
     }
 
@@ -90,7 +93,7 @@ export default function PerfilForm() {
             type="password"
             value={form.password_nuevo}
             onChange={(e) => setForm({ ...form, password_nuevo: e.target.value })}
-            placeholder="Mínimo 6 caracteres"
+            placeholder="Mínimo 10 caracteres"
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

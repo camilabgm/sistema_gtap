@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { validarContrasena } from "@/lib/validarContrasena"
 
 export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
 
@@ -20,7 +21,6 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
     async function cargarRoles() {
       const res  = await fetch("/api/roles")
       const data = await res.json()
-      // Excluimos el rol Comandante — no se puede asignar desde acá
       setRoles(data.filter((r) => r.nombre !== "Comandante"))
     }
     cargarRoles()
@@ -36,6 +36,22 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
     if (cargando) return
     setCargando(true)
     setError("")
+
+    // Validar contraseña: obligatoria en creación, opcional en edición
+    if (!modoEdicion && !form.password) {
+      setError("La contraseña es obligatoria")
+      setCargando(false)
+      return
+    }
+
+    if (form.password) {
+      const { valida, errores } = validarContrasena(form.password)
+      if (!valida) {
+        setError(errores.join(". ") + ".")
+        setCargando(false)
+        return
+      }
+    }
 
     let respuesta
 
@@ -122,7 +138,7 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder={modoEdicion ? "••••••••" : "Mínimo 6 caracteres"}
+              placeholder={modoEdicion ? "••••••••" : "Mínimo 10 caracteres"}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
