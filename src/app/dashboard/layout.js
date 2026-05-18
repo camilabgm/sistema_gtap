@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { PrismaClient } from "@prisma/client"
 import Navbar from "@/components/dashboard/Navbar"
 import SesionInvalidadaBanner from "@/components/shared/SesionInvalidadaBanner"
+import DetectorInactividad from "@/components/shared/DetectorInactividad"
 
 const prisma = new PrismaClient()
 
@@ -14,8 +15,6 @@ export default async function DashboardLayout({ children }) {
     redirect("/login")
   }
 
-  // Verificamos si los permisos del usuario fueron actualizados
-  // después de que se emitió su token actual
   const usuario = await prisma.usuario.findUnique({
     where:  { id: sesion.user.id },
     select: { sesion_invalidada_en: true },
@@ -38,12 +37,11 @@ export default async function DashboardLayout({ children }) {
       />
 
       <main className="ml-64 flex-1 p-6">
-
-        {/* Banner visible solo cuando los permisos fueron actualizados */}
         {sesionDesactualizada && <SesionInvalidadaBanner />}
-
         {children}
       </main>
+
+      <DetectorInactividad />
 
     </div>
   )

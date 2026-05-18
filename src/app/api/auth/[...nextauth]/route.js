@@ -224,6 +224,7 @@ const handler = NextAuth({
   },
   session: {
     strategy: "jwt",
+     maxAge: 8 * 60 * 60, // 8 horas máximo total de sesión
   },
 })
 
