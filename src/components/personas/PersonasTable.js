@@ -5,6 +5,7 @@ import { useState } from "react"
 import PersonasForm from "./PersonasForm"
 import UsuarioModal from "./UsuarioModal"
 import PermisosUsuarioModal from "./PermisosUsuarioModal"
+import HabilitacionesModal from "./HabilitacionesModal"
 
 const ETIQUETAS_ESCUADRON = {
   ESCUADRON_OPERACIONES_AEREAS: "Esc. Operaciones",
@@ -24,15 +25,16 @@ const ETIQUETAS_ESPECIALIDAD = {
 
 export default function PersonasTable({ personas: datosIniciales, permisos, rolUsuario }) {
 
-  const [personas,            setPersonas]            = useState(datosIniciales)
-  const [busqueda,            setBusqueda]            = useState("")
-  const [filtroEspecialidad,  setFiltroEspecialidad]  = useState("TODAS")
-  const [filtroEscuadron,     setFiltroEscuadron]     = useState("TODOS")
-  const [modalAbierto,        setModalAbierto]        = useState(false)
-  const [modalUsuario,        setModalUsuario]        = useState(false)
-  const [personaSeleccionada, setPersonaSeleccionada] = useState(null)
-  const [eliminando,          setEliminando]          = useState(null)
-  const [modalPermisos,       setModalPermisos]       = useState(false)
+  const [personas,              setPersonas]              = useState(datosIniciales)
+  const [busqueda,              setBusqueda]              = useState("")
+  const [filtroEspecialidad,    setFiltroEspecialidad]    = useState("TODAS")
+  const [filtroEscuadron,       setFiltroEscuadron]       = useState("TODOS")
+  const [modalAbierto,          setModalAbierto]          = useState(false)
+  const [modalUsuario,          setModalUsuario]          = useState(false)
+  const [modalHabilitaciones,   setModalHabilitaciones]   = useState(false)
+  const [personaSeleccionada,   setPersonaSeleccionada]   = useState(null)
+  const [eliminando,            setEliminando]            = useState(null)
+  const [modalPermisos,         setModalPermisos]         = useState(false)
 
   const personasFiltradas = personas.filter((p) => {
     const texto = busqueda.toLowerCase()
@@ -48,22 +50,30 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
     return pasaBusqueda && pasaEspecialidad && pasaEscuadron
   })
 
-  function handleNuevo()           { setPersonaSeleccionada(null);  setModalAbierto(true) }
-  function handleEditar(p)         { setPersonaSeleccionada(p);     setModalAbierto(true) }
-  function handleCerrar()          { setModalAbierto(false);        setPersonaSeleccionada(null) }
-  function handleAbrirUsuario(p)   { setPersonaSeleccionada(p);     setModalUsuario(true) }
-  function handleCerrarUsuario()   { setModalUsuario(false);        setPersonaSeleccionada(null) }
-  function handleAbrirPermisos(p)  { setPersonaSeleccionada(p);     setModalPermisos(true) }
-  function handleCerrarPermisos()  { setModalPermisos(false);       setPersonaSeleccionada(null) }
+  function handleNuevo()                { setPersonaSeleccionada(null);  setModalAbierto(true) }
+  function handleEditar(p)              { setPersonaSeleccionada(p);     setModalAbierto(true) }
+  function handleCerrar()               { setModalAbierto(false);        setPersonaSeleccionada(null) }
+  function handleAbrirUsuario(p)        { setPersonaSeleccionada(p);     setModalUsuario(true) }
+  function handleCerrarUsuario()        { setModalUsuario(false);        setPersonaSeleccionada(null) }
+  function handleAbrirPermisos(p)       { setPersonaSeleccionada(p);     setModalPermisos(true) }
+  function handleCerrarPermisos()       { setModalPermisos(false);       setPersonaSeleccionada(null) }
+  function handleAbrirHabilitaciones(p) { setPersonaSeleccionada(p);     setModalHabilitaciones(true) }
+  function handleCerrarHabilitaciones() { setModalHabilitaciones(false); setPersonaSeleccionada(null) }
 
   async function recargarDatos() {
     const res = await fetch("/api/personas")
     setPersonas(await res.json())
   }
 
-  async function handleGuardado()         { handleCerrar();         await recargarDatos() }
-  async function handleGuardadoUsuario()  { handleCerrarUsuario();  await recargarDatos() }
-  async function handleGuardadoPermisos() { handleCerrarPermisos(); await recargarDatos() }
+  async function handleGuardado()         { handleCerrar();                await recargarDatos() }
+  async function handleGuardadoUsuario()  { handleCerrarUsuario();         await recargarDatos() }
+  async function handleGuardadoPermisos() { handleCerrarPermisos();        await recargarDatos() }
+
+  // Al cerrar el modal de habilitaciones recargamos para actualizar los badges
+  async function handleCerradoHabilitaciones() {
+    handleCerrarHabilitaciones()
+    await recargarDatos()
+  }
 
   async function handleEliminar(id) {
     if (!window.confirm("¿Estás segura de que querés desactivar esta persona?")) return
@@ -73,21 +83,49 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
     setEliminando(null)
   }
 
+  // Badge para la habilitación médica (usa el historial semestral)
   function badgeMedica(persona) {
-    const fecha = persona.hab_medica_vence
-    if (!fecha) return <span className="text-gray-300 text-xs">—</span>
-    const hoy           = new Date()
-    const vence         = new Date(fecha)
-    const diasRestantes = Math.ceil((vence - hoy) / (1000 * 60 * 60 * 24))
-    let color = "bg-green-100 text-green-700"
-    if (diasRestantes < 0)        color = "bg-red-100 text-red-700"
-    else if (diasRestantes <= 30) color = "bg-yellow-100 text-yellow-700"
-    const periodoLabel = persona.hab_medica_periodo ? ` (${persona.hab_medica_periodo})` : ""
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>
-        {vence.toLocaleDateString("es-PY")}{periodoLabel}
-      </span>
-    )
+    const habs = persona.habilitaciones_medicas || []
+    const hoy  = new Date()
+
+    // Buscar la habilitación semestral vigente más reciente
+    const vigente = habs
+      .filter((h) => !h.deleted_at && new Date(h.vence) >= hoy)
+      .sort((a, b) => new Date(b.vence) - new Date(a.vence))[0]
+
+    if (vigente) {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+          ✓ {vigente.periodo}/{vigente.anio}
+        </span>
+      )
+    }
+
+    // Buscar la más reciente aunque esté vencida
+    const masReciente = habs
+      .filter((h) => !h.deleted_at)
+      .sort((a, b) => new Date(b.vence) - new Date(a.vence))[0]
+
+    if (masReciente) {
+      const dias = Math.ceil((new Date(masReciente.vence) - hoy) / (1000 * 60 * 60 * 24))
+      const color = dias <= 30 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
+      return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>
+          {masReciente.periodo}/{masReciente.anio} — vencida
+        </span>
+      )
+    }
+
+    // También puede tener habilitación anual
+    if (persona.hab_anual_habilitada) {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+          ✓ Anual
+        </span>
+      )
+    }
+
+    return <span className="text-gray-300 text-xs">Sin habilitación</span>
   }
 
   function badgeOperacional(habilitado) {
@@ -189,6 +227,12 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
                         </button>
                       )}
                       {permisos?.puede_editar && (
+                        <button onClick={() => handleAbrirHabilitaciones(persona)}
+                          className="px-3 py-1 text-xs text-teal-600 border border-teal-200 rounded hover:bg-teal-50 transition-colors">
+                          Habilitaciones
+                        </button>
+                      )}
+                      {permisos?.puede_editar && (
                         <button onClick={() => handleAbrirUsuario(persona)}
                           className="px-3 py-1 text-xs text-purple-600 border border-purple-200 rounded hover:bg-purple-50 transition-colors">
                           {persona.usuario ? "Acceso" : "Dar acceso"}
@@ -226,6 +270,9 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
 
       {modalAbierto && (
         <PersonasForm persona={personaSeleccionada} onGuardado={handleGuardado} onCerrar={handleCerrar} />
+      )}
+      {modalHabilitaciones && personaSeleccionada && (
+        <HabilitacionesModal persona={personaSeleccionada} onCerrar={handleCerradoHabilitaciones} />
       )}
       {modalUsuario && personaSeleccionada && (
         <UsuarioModal persona={personaSeleccionada} onGuardado={handleGuardadoUsuario} onCerrar={handleCerrarUsuario} />

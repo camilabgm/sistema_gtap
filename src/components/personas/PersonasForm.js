@@ -3,14 +3,6 @@
 
 import { useState, useEffect } from "react"
 
-function getFechaVencimiento(periodo, anio) {
-  if (!periodo || !anio) return ""
-  const a = parseInt(anio)
-  if (periodo === "1P") return `${a}-09-30`
-  if (periodo === "2P") return `${a + 1}-03-31`
-  return ""
-}
-
 export default function PersonasForm({ persona, onGuardado, onCerrar }) {
 
   const modoEdicion = !!persona
@@ -29,22 +21,10 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
     telefono:            persona?.telefono            || "",
     contacto_emergencia: persona?.contacto_emergencia || "",
     nro_pasaporte:       persona?.nro_pasaporte       || "",
-    hab_medica_vence:    persona?.hab_medica_vence
-      ? new Date(persona.hab_medica_vence).toISOString().slice(0, 10) : "",
-    hab_medica_periodo:  persona?.hab_medica_periodo  || "",
-    hab_medica_anio:     persona?.hab_medica_anio     ? String(persona.hab_medica_anio) : "",
-    nivel_operacional_habilitado: persona?.nivel_operacional_habilitado || false,
   })
 
   const [cargando, setCargando] = useState(false)
   const [error,    setError]    = useState("")
-
-  useEffect(() => {
-    const fechaCalculada = getFechaVencimiento(form.hab_medica_periodo, form.hab_medica_anio)
-    if (fechaCalculada) {
-      setForm((prev) => ({ ...prev, hab_medica_vence: fechaCalculada }))
-    }
-  }, [form.hab_medica_periodo, form.hab_medica_anio])
 
   useEffect(() => {
     const manejarTecla = (e) => { if (e.key === "Escape") onCerrar() }
@@ -228,59 +208,6 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
                   placeholder="AA123456"
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-            </div>
-          </div>
-
-          {/* ── Habilitaciones ───────────────────────────────── */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Habilitaciones
-            </h3>
-            <div className="border border-gray-200 rounded-lg p-4 mb-4">
-              <p className="text-sm font-medium text-gray-700 mb-3">Habilitación médica semestral</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Período</label>
-                  <select value={form.hab_medica_periodo}
-                    onChange={(e) => setForm({ ...form, hab_medica_periodo: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Sin período</option>
-                    <option value="1P">1P — abr. a sep.</option>
-                    <option value="2P">2P — oct. a mar.</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Año de inicio</label>
-                  <input type="number" value={form.hab_medica_anio}
-                    onChange={(e) => setForm({ ...form, hab_medica_anio: e.target.value })}
-                    placeholder="2026" min={2020} max={2099}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              {form.hab_medica_vence && (
-                <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
-                  Vencimiento calculado: <strong>
-                    {new Date(form.hab_medica_vence + "T12:00:00").toLocaleDateString("es-PY", {
-                      day: "2-digit", month: "2-digit", year: "numeric"
-                    })}
-                  </strong>
-                </div>
-              )}
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-gray-700 mb-3">Habilitación operacional</p>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox"
-                  checked={form.nivel_operacional_habilitado}
-                  onChange={(e) => setForm({ ...form, nivel_operacional_habilitado: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded" />
-                <div>
-                  <span className="text-sm font-medium text-gray-700">Habilitado por Operaciones</span>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    El Jefe de Operaciones confirma que el tripulante está habilitado para volar.
-                  </p>
-                </div>
-              </label>
             </div>
           </div>
 

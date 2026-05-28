@@ -14,7 +14,13 @@ export async function GET() {
     const personas = await prisma.persona.findMany({
       where:   { activo: true },
       orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
-      include: { usuario: true },
+      include: {
+        usuario: true,
+        habilitaciones_medicas: {
+          where:   { deleted_at: null },
+          orderBy: [{ anio: "desc" }, { periodo: "desc" }],
+        },
+      },
     })
 
     return NextResponse.json(personas)
@@ -50,7 +56,7 @@ export async function POST(request) {
         apellido:            body.apellido,
         grado:               body.grado,
         nro_documento:       body.nro_documento,
-        fecha_nacimiento:    body.fecha_nacimiento    ? new Date(body.fecha_nacimiento)    : null,
+        fecha_nacimiento:    body.fecha_nacimiento    ? new Date(body.fecha_nacimiento) : null,
         escuadron:           body.escuadron,
         unidad:              body.unidad,
         especialidad:        body.especialidad        || null,
@@ -58,16 +64,7 @@ export async function POST(request) {
         telefono:            body.telefono            || null,
         contacto_emergencia: body.contacto_emergencia || null,
         nro_pasaporte:       body.nro_pasaporte       || null,
-
-        // Habilitación médica
-        hab_medica_vence:    body.hab_medica_vence    ? new Date(body.hab_medica_vence)    : null,
-        hab_medica_periodo:  body.hab_medica_periodo  || null,
-        hab_medica_anio:     body.hab_medica_anio     ? parseInt(body.hab_medica_anio)     : null,
-
-        // Habilitación operacional
-        nivel_operacional_habilitado: body.nivel_operacional_habilitado || false,
-
-        creado_por: session.user.id,
+        creado_por:          session.user.id,
       },
     })
 

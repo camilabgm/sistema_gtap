@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 
+// PUT — actualiza datos personales e institucionales completos
 export async function PUT(request, { params }) {
   try {
     const session = await getServerSession(authOptions)
@@ -21,7 +22,7 @@ export async function PUT(request, { params }) {
         apellido:            body.apellido,
         grado:               body.grado,
         nro_documento:       body.nro_documento,
-        fecha_nacimiento:    body.fecha_nacimiento    ? new Date(body.fecha_nacimiento)    : null,
+        fecha_nacimiento:    body.fecha_nacimiento    ? new Date(body.fecha_nacimiento) : null,
         escuadron:           body.escuadron,
         unidad:              body.unidad,
         especialidad:        body.especialidad        || null,
@@ -29,21 +30,7 @@ export async function PUT(request, { params }) {
         telefono:            body.telefono            || null,
         contacto_emergencia: body.contacto_emergencia || null,
         nro_pasaporte:       body.nro_pasaporte       || null,
-
-        // Habilitación médica
-        hab_medica_vence:    body.hab_medica_vence    ? new Date(body.hab_medica_vence)    : null,
-        hab_medica_periodo:  body.hab_medica_periodo  || null,
-        hab_medica_anio:     body.hab_medica_anio     ? parseInt(body.hab_medica_anio)     : null,
-
-        // Habilitación operacional
-        nivel_operacional_habilitado: body.nivel_operacional_habilitado || false,
-        // Si alguien habilita operacionalmente, registramos quién y cuándo
-        ...(body.nivel_operacional_habilitado && {
-          nivel_operacional_aprobado_por: session.user.personaId || null,
-          nivel_operacional_fecha:        new Date(),
-        }),
-
-        editado_por: session.user.id,
+        editado_por:         session.user.id,
       },
     })
 
@@ -54,6 +41,52 @@ export async function PUT(request, { params }) {
   }
 }
 
+// PATCH — actualiza solo los campos enviados (usado por el modal de habilitaciones)
+export async function PATCH(request, { params }) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+    }
+
+    const { id } = await params
+    const body   = await request.json()
+
+    // Solo campos permitidos por PATCH para evitar updates masivos accidentales
+    const camposPermitidos = ["hab_anual_habilitada", "nivel_operacional_habilitado"]
+    const data = {}
+
+    for (const campo of camposPermitidos) {
+      if (campo in body) {
+        data[campo] = body[campo]
+
+        // Registrar quién y cuándo habilitó operacionalmente
+        if (campo === "nivel_operacional_habilitado" && body[campo] === true) {
+          data.nivel_operacional_aprobado_por = session.user.personaId || null
+          data.nivel_operacional_fecha        = new Date()
+        }
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: "No hay campos válidos para actualizar" }, { status: 400 })
+    }
+
+    data.editado_por = session.user.id
+
+    const persona = await prisma.persona.update({
+      where: { id: Number(id) },
+      data,
+    })
+
+    return NextResponse.json(persona)
+  } catch (error) {
+    console.error("Error PATCH personas:", error)
+    return NextResponse.json({ error: "Error al actualizar persona" }, { status: 500 })
+  }
+}
+
+// DELETE — soft delete
 export async function DELETE(request, { params }) {
   try {
     const session = await getServerSession(authOptions)

@@ -73,14 +73,17 @@ model Persona {
   residencia          String?
   telefono            String?
   contacto_emergencia String?
+  nro_pasaporte       String?
 
-  nro_pasaporte                   String?
-  hab_medica_vence                DateTime?
-  hab_medica_periodo              String?
-  hab_medica_anio                 Int?
+  // Habilitación médica anual — check manual de Operaciones
+  hab_anual_habilitada            Boolean   @default(false)
+
+  // Habilitación operacional — check manual de Operaciones
   nivel_operacional_habilitado    Boolean   @default(false)
   nivel_operacional_aprobado_por  Int?
   nivel_operacional_fecha         DateTime?
+
+  // Campos legacy — se mantienen para no perder datos históricos
   nivel_operacional               String?
   nivel_operacional_vence         DateTime?
 
@@ -92,11 +95,36 @@ model Persona {
   editado_por   Int?
   eliminado_por Int?
 
-  usuario          Usuario?
-  historial_grados HistorialGrado[]
-  partes_diarios   ParteDiario[]
+  usuario                Usuario?
+  historial_grados       HistorialGrado[]
+  partes_diarios         ParteDiario[]
+  habilitaciones_medicas HabilitacionMedica[]
 
   @@map("personas")
+}
+
+// Historial de habilitaciones médicas semestrales (1P y 2P)
+// Un registro por período por persona — no sobreescribe, acumula.
+model HabilitacionMedica {
+  id           Int      @id @default(autoincrement())
+  persona_id   Int
+  fecha_examen DateTime @db.Date
+  periodo      String   // "1P" | "2P"
+  anio         Int      // año de inicio del período
+  vence        DateTime @db.Date
+
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+
+  persona Persona @relation(fields: [persona_id], references: [id])
+
+  // No se puede cargar dos veces el mismo período para la misma persona
+  @@unique([persona_id, periodo, anio])
+  @@map("habilitaciones_medicas")
 }
 
 model HistorialGrado {
