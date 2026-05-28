@@ -101,7 +101,7 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
 
         <div className="px-6 py-4 space-y-6">
 
-          {/* Datos personales */}
+          {/* ── Datos personales ─────────────────────────────── */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Datos personales
@@ -168,7 +168,7 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
             </div>
           </div>
 
-          {/* Datos institucionales */}
+          {/* ── Datos institucionales ─────────────────────────── */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Datos institucionales
@@ -220,7 +220,9 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nro. de pasaporte</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nro. de pasaporte
+                </label>
                 <input type="text" value={form.nro_pasaporte}
                   onChange={(e) => setForm({ ...form, nro_pasaporte: e.target.value })}
                   placeholder="AA123456"
@@ -229,7 +231,7 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
             </div>
           </div>
 
-          {/* Habilitaciones */}
+          {/* ── Habilitaciones ───────────────────────────────── */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Habilitaciones
