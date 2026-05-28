@@ -1,82 +1,83 @@
 "use client"
+// src/components/tipos-misiones/TiposMisionesForm.js
 
 import { useState, useEffect } from "react"
 
+const ETIQUETAS_CLASIFICACION = {
+  OPERACIONAL: "Operacional",
+  TIPO_VUELO:  "Tipo de Vuelo",
+  LOGISTICA:   "Logística",
+}
+
 export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) {
 
-  // Si viene tipoMision con datos, estamos en modo edición
-  // Si no viene nada, estamos en modo creación
   const modoEdicion = !!tipoMision
 
-  // Estados del formulario
-  // Si es edición, precargamos los valores existentes
-  // Si es creación, arrancamos con todo vacío
-  const [codigo, setCodigo]           = useState(tipoMision?.codigo      || "")
-  const [nombre, setNombre]           = useState(tipoMision?.nombre      || "")
-  const [categoria, setCategoria]     = useState(tipoMision?.categoria   || "")
-  const [descripcion, setDescripcion] = useState(tipoMision?.descripcion || "")
-  const [cargando, setCargando]       = useState(false)
-  const [error, setError]             = useState("")
+  const [codigo,        setCodigo]        = useState(tipoMision?.codigo        || "")
+  const [nombre,        setNombre]        = useState(tipoMision?.nombre        || "")
+  const [clasificacion, setClasificacion] = useState(tipoMision?.clasificacion || "")
+  const [descripcion,   setDescripcion]   = useState(tipoMision?.descripcion   || "")
+  const [tieneSubtipo,  setTieneSubtipo]  = useState(tipoMision?.tiene_subtipo || false)
+  const [subtipo,       setSubtipo]       = useState(tipoMision?.subtipo       || "")
+  const [cargando,      setCargando]      = useState(false)
+  const [error,         setError]         = useState("")
 
-  // Listener de teclado — Escape para cerrar, Enter para guardar
+  // Al cambiar de clasificación, si no es TIPO_VUELO limpiamos el subtipo
+  useEffect(() => {
+    if (clasificacion !== "TIPO_VUELO") {
+      setTieneSubtipo(false)
+      setSubtipo("")
+    }
+  }, [clasificacion])
+
   useEffect(() => {
     const manejarTecla = (e) => {
       if (e.key === "Escape") onCerrar()
       if (e.key === "Enter")  handleGuardar()
     }
-
     document.addEventListener("keydown", manejarTecla)
+    return () => document.removeEventListener("keydown", manejarTecla)
+  }, [codigo, nombre, clasificacion, descripcion, tieneSubtipo, subtipo])
 
-    // Función de limpieza — elimina el listener cuando el modal se cierra
-    return () => {
-      document.removeEventListener("keydown", manejarTecla)
-    }
-  }, [codigo, nombre, categoria, descripcion])
-  // ↑ Estas dependencias son importantes — le dicen al useEffect que
-  // se actualice cuando cambian los valores del form, así el Enter
-  // siempre guarda los datos más recientes
-
-  const handleGuardar = async () => {
-    // Evitar doble envío si ya está cargando
+  async function handleGuardar() {
     if (cargando) return
-
     setCargando(true)
     setError("")
 
-    // Definimos el método y la URL según si es creación o edición
     const metodo = modoEdicion ? "PUT" : "POST"
     const url    = modoEdicion
       ? `/api/tipos-misiones/${tipoMision.id}`
       : "/api/tipos-misiones"
 
     const respuesta = await fetch(url, {
-      method: metodo,
+      method:  metodo,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ codigo, nombre, categoria, descripcion })
+      body:    JSON.stringify({
+        codigo,
+        nombre,
+        clasificacion,
+        descripcion,
+        tiene_subtipo: tieneSubtipo,
+        subtipo:       tieneSubtipo ? subtipo : null,
+      }),
     })
 
     const datos = await respuesta.json()
 
     if (!respuesta.ok) {
-      // El servidor devolvió un error — lo mostramos en pantalla
       setError(datos.error || "Ocurrió un error inesperado")
       setCargando(false)
       return
     }
 
-    // Todo salió bien — avisamos al componente padre
     onGuardado()
   }
 
   return (
-    // Fondo oscuro detrás del modal
-    // Al hacer clic fuera del modal, se cierra
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       onClick={onCerrar}
     >
-      {/* Contenido del modal */}
-      {/* stopPropagation evita que al hacer clic dentro del modal se cierre */}
       <div
         className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
@@ -95,14 +96,13 @@ export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) 
           </button>
         </div>
 
-        {/* Mensaje de error */}
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
 
-        {/* Campo Código */}
+        {/* Código */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Código <span className="text-red-500">*</span>
@@ -111,16 +111,14 @@ export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) 
             type="text"
             value={codigo}
             onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-            placeholder="Ej: VMIL"
+            placeholder="Ej: AME, VMIL, FAP"
             maxLength={10}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-400 mt-1">
-            Se convierte a mayúsculas automáticamente
-          </p>
+          <p className="text-xs text-gray-400 mt-1">Se convierte a mayúsculas automáticamente</p>
         </div>
 
-        {/* Campo Nombre */}
+        {/* Nombre */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Nombre <span className="text-red-500">*</span>
@@ -129,28 +127,74 @@ export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) 
             type="text"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: Vuelos Militares"
+            placeholder="Ej: Aeromédico"
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
-        {/* Campo Categoría */}
+        {/* Clasificación */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Categoría <span className="text-red-500">*</span>
+            Clasificación <span className="text-red-500">*</span>
           </label>
           <select
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
+            value={clasificacion}
+            onChange={(e) => setClasificacion(e.target.value)}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Seleccionar categoría</option>
-            <option value="MILITAR">Militar</option>
-            <option value="INSTITUCIONAL">Institucional</option>
+            <option value="">Seleccionar clasificación</option>
+            <option value="OPERACIONAL">Operacional (VMIL, VAIP, VARA)</option>
+            <option value="TIPO_VUELO">Tipo de Vuelo (INS, AME, PRE...)</option>
+            <option value="LOGISTICA">Logística (FAP, IPE, ARE)</option>
           </select>
+          {clasificacion && (
+            <p className="text-xs text-blue-600 mt-1">
+              {clasificacion === "OPERACIONAL" && "Define la naturaleza del vuelo: militar, institucional o arrendamiento."}
+              {clasificacion === "TIPO_VUELO"  && "Define el propósito específico del vuelo."}
+              {clasificacion === "LOGISTICA"   && "Define quién cubre los gastos de la operación."}
+            </p>
+          )}
         </div>
 
-        {/* Campo Descripción */}
+        {/* Sub-tipo — solo si clasificación es TIPO_VUELO */}
+        {clasificacion === "TIPO_VUELO" && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-md border border-gray-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={tieneSubtipo}
+                onChange={(e) => {
+                  setTieneSubtipo(e.target.checked)
+                  if (!e.target.checked) setSubtipo("")
+                }}
+                className="w-4 h-4 text-blue-600 rounded"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                ¿Este tipo de vuelo tiene sub-tipo?
+              </span>
+            </label>
+
+            {tieneSubtipo && (
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Sub-tipo <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={subtipo}
+                  onChange={(e) => setSubtipo(e.target.value)}
+                  placeholder="Ej: Traslado de paciente, Trasplante de órganos"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Describí los sub-tipos posibles separados por comas.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Descripción */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Descripción
@@ -159,7 +203,7 @@ export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) 
           <textarea
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Descripción adicional..."
+            placeholder="Descripción del tipo de misión..."
             rows={3}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
@@ -182,7 +226,6 @@ export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) 
           </button>
         </div>
 
-        {/* Ayuda de teclado */}
         <p className="text-xs text-gray-400 text-center mt-4">
           Presioná <kbd className="bg-gray-100 px-1 rounded">Enter</kbd> para guardar
           o <kbd className="bg-gray-100 px-1 rounded">Esc</kbd> para cancelar

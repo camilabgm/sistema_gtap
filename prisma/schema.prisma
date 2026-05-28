@@ -7,13 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// ENUMS
-// ============================================
-
 enum Escuadron {
   ESCUADRON_OPERACIONES_AEREAS
-  ESCUADRON_MATERIAL
+  ESCUADRON_MANTENIMIENTO
   ESCUADRON_BASE
   PLANA_MAYOR
 }
@@ -28,12 +24,12 @@ enum Modulo {
   SICEM
   INFORMES
   INSPECCION_PREVUELO
-
 }
 
-enum CategoriaMision {
-  MILITAR
-  INSTITUCIONAL
+enum ClasificacionMision {
+  OPERACIONAL
+  TIPO_VUELO
+  LOGISTICA
 }
 
 enum CategoriaAeronave {
@@ -44,6 +40,7 @@ enum CategoriaAeronave {
 enum EstadoAeronave {
   DISPONIBLE
   NO_DISPONIBLE
+  ACCIDENTADA
 }
 
 enum EspecialidadPersona {
@@ -55,16 +52,20 @@ enum EspecialidadPersona {
   OTRO
 }
 
-// ============================================
-// MÓDULO DE AUTENTICACIÓN Y ROLES
-// ============================================
+enum ResultadoLogin {
+  EXITOSO
+  USUARIO_NO_EXISTE
+  CUENTA_INACTIVA
+  CREDENCIALES_INVALIDAS
+  CUENTA_BLOQUEADA
+}
 
 model Persona {
-  id                  Int                 @id @default(autoincrement())
+  id                  Int                  @id @default(autoincrement())
   nombre              String
   apellido            String
   grado               String
-  nro_documento       String              @unique
+  nro_documento       String               @unique
   fecha_nacimiento    DateTime?
   escuadron           Escuadron
   unidad              String
@@ -73,15 +74,17 @@ model Persona {
   telefono            String?
   contacto_emergencia String?
 
-  // Habilitaciones con fecha de vencimiento
-  nro_pasaporte          String?
-  hab_medica_vence       DateTime?
-  nivel_operacional      String?
-  nivel_operacional_vence DateTime?
+  nro_pasaporte                   String?
+  hab_medica_vence                DateTime?
+  hab_medica_periodo              String?
+  hab_medica_anio                 Int?
+  nivel_operacional_habilitado    Boolean   @default(false)
+  nivel_operacional_aprobado_por  Int?
+  nivel_operacional_fecha         DateTime?
+  nivel_operacional               String?
+  nivel_operacional_vence         DateTime?
 
-  activo Boolean @default(true)
-
-  // Auditoría
+  activo        Boolean   @default(true)
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -89,9 +92,9 @@ model Persona {
   editado_por   Int?
   eliminado_por Int?
 
-  // Relaciones
   usuario          Usuario?
   historial_grados HistorialGrado[]
+  partes_diarios   ParteDiario[]
 
   @@map("personas")
 }
@@ -102,7 +105,6 @@ model HistorialGrado {
   fecha_desde DateTime
   fecha_hasta DateTime?
 
-  // Auditoría
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -110,7 +112,6 @@ model HistorialGrado {
   editado_por   Int?
   eliminado_por Int?
 
-  // Relaciones
   persona    Persona @relation(fields: [persona_id], references: [id])
   persona_id Int
 
@@ -122,7 +123,6 @@ model Rol {
   nombre      String  @unique
   descripcion String?
 
-  // Auditoría
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -130,27 +130,22 @@ model Rol {
   editado_por   Int?
   eliminado_por Int?
 
-  // Relaciones
-  usuarios        Usuario[]
-  permisos_rol    PermisoRol[]
+  usuarios     Usuario[]
+  permisos_rol PermisoRol[]
 
   @@map("roles")
 }
 
-
 model Usuario {
-  id                    Int       @id @default(autoincrement())
-  username              String    @unique
-  password              String
-  activo                Boolean   @default(true)
-  sesion_invalidada_en  DateTime?
+  id                   Int       @id @default(autoincrement())
+  username             String    @unique
+  password             String
+  activo               Boolean   @default(true)
+  sesion_invalidada_en DateTime?
+  intentos_fallidos    Int       @default(0)
+  bloqueado_hasta      DateTime?
+  password_temporal    Boolean   @default(true)
 
-  // Seguridad - control de intentos fallidos de login
-  intentos_fallidos     Int       @default(0)
-  bloqueado_hasta       DateTime?
-  password_temporal     Boolean   @default(true)
-
-  // Auditoría
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -158,26 +153,24 @@ model Usuario {
   editado_por   Int?
   eliminado_por Int?
 
-  // Relaciones
-  persona           Persona         @relation(fields: [persona_id], references: [id])
-  persona_id        Int             @unique
-  rol               Rol             @relation(fields: [rol_id], references: [id])
-  rol_id            Int
-  permisos_usuario  PermisoUsuario[]
+  persona          Persona          @relation(fields: [persona_id], references: [id])
+  persona_id       Int              @unique
+  rol              Rol              @relation(fields: [rol_id], references: [id])
+  rol_id           Int
+  permisos_usuario PermisoUsuario[]
 
   @@map("usuarios")
 }
 
 model PermisoRol {
-  id              Int     @id @default(autoincrement())
-  modulo          Modulo
-  puede_ver       Boolean @default(false)
-  puede_crear     Boolean @default(false)
-  puede_editar    Boolean @default(false)
-  puede_eliminar  Boolean @default(false)
-  puede_reportes  Boolean @default(false)
+  id             Int     @id @default(autoincrement())
+  modulo         Modulo
+  puede_ver      Boolean @default(false)
+  puede_crear    Boolean @default(false)
+  puede_editar   Boolean @default(false)
+  puede_eliminar Boolean @default(false)
+  puede_reportes Boolean @default(false)
 
-  // Auditoría
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -185,24 +178,22 @@ model PermisoRol {
   editado_por   Int?
   eliminado_por Int?
 
-  // Relaciones
-  rol     Rol @relation(fields: [rol_id], references: [id])
-  rol_id  Int
+  rol    Rol @relation(fields: [rol_id], references: [id])
+  rol_id Int
 
   @@unique([rol_id, modulo])
   @@map("permisos_rol")
 }
 
 model PermisoUsuario {
-  id              Int     @id @default(autoincrement())
-  modulo          Modulo
-  puede_ver       Boolean @default(false)
-  puede_crear     Boolean @default(false)
-  puede_editar    Boolean @default(false)
-  puede_eliminar  Boolean @default(false)
-  puede_reportes  Boolean @default(false)
+  id             Int     @id @default(autoincrement())
+  modulo         Modulo
+  puede_ver      Boolean @default(false)
+  puede_crear    Boolean @default(false)
+  puede_editar   Boolean @default(false)
+  puede_eliminar Boolean @default(false)
+  puede_reportes Boolean @default(false)
 
-  // Auditoría
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -210,29 +201,23 @@ model PermisoUsuario {
   editado_por   Int?
   eliminado_por Int?
 
-  // Relaciones
-  usuario     Usuario @relation(fields: [usuario_id], references: [id])
-  usuario_id  Int
+  usuario    Usuario @relation(fields: [usuario_id], references: [id])
+  usuario_id Int
 
   @@unique([usuario_id, modulo])
   @@map("permisos_usuario")
 }
 
-// ============================================
-// MÓDULO TIPOS DE MISIONES
-// ============================================
-
 model TipoMision {
+  id            Int                 @id @default(autoincrement())
+  codigo        String              @unique
+  nombre        String
+  clasificacion ClasificacionMision
+  descripcion   String?
+  tiene_subtipo Boolean             @default(false)
+  subtipo       String?
+  activo        Boolean             @default(true)
 
-
-  id          Int             @id @default(autoincrement())
-  codigo      String          @unique
-  nombre      String
-  categoria   CategoriaMision
-  descripcion String?
-  activo      Boolean         @default(true)
-
-  // Auditoría
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -242,10 +227,6 @@ model TipoMision {
 
   @@map("tipos_misiones")
 }
-
-// ============================================
-// MÓDULO AERONAVES
-// ============================================
 
 model Aeronave {
   id                  Int               @id @default(autoincrement())
@@ -263,7 +244,6 @@ model Aeronave {
   estado              EstadoAeronave    @default(DISPONIBLE)
   activo              Boolean           @default(true)
 
-  // Auditoría
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -274,24 +254,30 @@ model Aeronave {
   @@map("aeronaves")
 }
 
-// ============================================
-// REGISTRO DE INTENTOS DE LOGIN (Seguridad)
-// ============================================
+model ParteDiario {
+  id          Int      @id @default(autoincrement())
+  fecha       DateTime @db.Date
+  persona_id  Int
+  observacion String?
+  creado_por  Int?
 
-enum ResultadoLogin {
-  EXITOSO
-  USUARIO_NO_EXISTE
-  CUENTA_INACTIVA
-  CREDENCIALES_INVALIDAS
-  CUENTA_BLOQUEADA
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  eliminado_por Int?
+
+  persona Persona @relation(fields: [persona_id], references: [id])
+
+  @@unique([fecha, persona_id])
+  @@map("parte_diario")
 }
 
 model LogIntentoLogin {
-  id         Int             @id @default(autoincrement())
+  id         Int            @id @default(autoincrement())
   username   String
   resultado  ResultadoLogin
-  ip         String          @default("desconocida")
-  created_at DateTime        @default(now())
+  ip         String         @default("desconocida")
+  created_at DateTime       @default(now())
 
   @@map("log_intentos_login")
 }

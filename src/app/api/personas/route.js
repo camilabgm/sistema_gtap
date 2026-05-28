@@ -1,3 +1,4 @@
+// src/app/api/personas/route.js
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
@@ -32,7 +33,6 @@ export async function POST(request) {
 
     const body = await request.json()
 
-    // Verificamos que el documento no exista ya
     const existe = await prisma.persona.findUnique({
       where: { nro_documento: body.nro_documento },
     })
@@ -46,22 +46,28 @@ export async function POST(request) {
 
     const persona = await prisma.persona.create({
       data: {
-        nombre:                  body.nombre,
-        apellido:                body.apellido,
-        grado:                   body.grado,
-        nro_documento:           body.nro_documento,
-        fecha_nacimiento:        body.fecha_nacimiento        ? new Date(body.fecha_nacimiento)        : null,
-        escuadron:               body.escuadron,
-        unidad:                  body.unidad,
-        especialidad:            body.especialidad            || null,
-        residencia:              body.residencia              || null,
-        telefono:                body.telefono                || null,
-        contacto_emergencia:     body.contacto_emergencia     || null,
-        nro_pasaporte:           body.nro_pasaporte           || null,
-        hab_medica_vence:        body.hab_medica_vence        ? new Date(body.hab_medica_vence)        : null,
-        nivel_operacional:       body.nivel_operacional       || null,
-        nivel_operacional_vence: body.nivel_operacional_vence ? new Date(body.nivel_operacional_vence) : null,
-        creado_por:              session.user.id,
+        nombre:              body.nombre,
+        apellido:            body.apellido,
+        grado:               body.grado,
+        nro_documento:       body.nro_documento,
+        fecha_nacimiento:    body.fecha_nacimiento    ? new Date(body.fecha_nacimiento)    : null,
+        escuadron:           body.escuadron,
+        unidad:              body.unidad,
+        especialidad:        body.especialidad        || null,
+        residencia:          body.residencia          || null,
+        telefono:            body.telefono            || null,
+        contacto_emergencia: body.contacto_emergencia || null,
+        nro_pasaporte:       body.nro_pasaporte       || null,
+
+        // Habilitación médica
+        hab_medica_vence:    body.hab_medica_vence    ? new Date(body.hab_medica_vence)    : null,
+        hab_medica_periodo:  body.hab_medica_periodo  || null,
+        hab_medica_anio:     body.hab_medica_anio     ? parseInt(body.hab_medica_anio)     : null,
+
+        // Habilitación operacional
+        nivel_operacional_habilitado: body.nivel_operacional_habilitado || false,
+
+        creado_por: session.user.id,
       },
     })
 

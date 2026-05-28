@@ -1,10 +1,10 @@
 "use client"
+// src/components/aeronaves/AeronavesForm.js
 
 import { useState, useEffect } from "react"
 
 export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
 
-  // Si viene aeronave con datos, estamos en modo edición
   const modoEdicion = !!aeronave
 
   const [form, setForm] = useState({
@@ -23,9 +23,8 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
   })
 
   const [cargando, setCargando] = useState(false)
-  const [error, setError]       = useState("")
+  const [error,    setError]    = useState("")
 
-  // Atajos de teclado — Escape cierra, Enter guarda
   useEffect(() => {
     const manejarTecla = (e) => {
       if (e.key === "Escape") onCerrar()
@@ -37,7 +36,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
 
   async function handleGuardar() {
     if (cargando) return
-
     setCargando(true)
     setError("")
 
@@ -64,18 +62,15 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
   }
 
   return (
-    // Fondo oscuro — clic fuera del modal lo cierra
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={onCerrar}
     >
-      {/* Contenido del modal — stopPropagation evita que se cierre al hacer clic adentro */}
       <div
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
 
-        {/* Encabezado */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-800">
             {modoEdicion ? "Editar aeronave" : "Nueva aeronave"}
@@ -88,17 +83,14 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
           </button>
         </div>
 
-        {/* Mensaje de error */}
         {error && (
           <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
 
-        {/* Formulario en grilla de 2 columnas */}
         <div className="px-6 py-4 grid grid-cols-2 gap-4">
 
-          {/* Matrícula */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Matrícula <span className="text-red-500">*</span>
@@ -112,7 +104,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Tipo */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tipo / Modelo <span className="text-red-500">*</span>
@@ -126,7 +117,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Fabricante */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fabricante <span className="text-red-500">*</span>
@@ -140,7 +130,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Tipo de combustible */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tipo de combustible <span className="text-red-500">*</span>
@@ -156,7 +145,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             </select>
           </div>
 
-          {/* Año de fabricación */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Año de fabricación <span className="text-red-500">*</span>
@@ -170,7 +158,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Año de incorporación */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Año de incorporación a la FAP <span className="text-red-500">*</span>
@@ -184,7 +171,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Capacidad de pasajeros */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Capacidad de pasajeros <span className="text-red-500">*</span>
@@ -198,7 +184,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Velocidad de crucero */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Velocidad de crucero (nudos)
@@ -212,7 +197,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Estela de turbulencia */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Estela de turbulencia
@@ -229,7 +213,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             </select>
           </div>
 
-          {/* Color */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Color / Descripción
@@ -243,7 +226,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             />
           </div>
 
-          {/* Categoría */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Categoría <span className="text-red-500">*</span>
@@ -258,7 +240,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             </select>
           </div>
 
-          {/* Estado */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Estado <span className="text-red-500">*</span>
@@ -270,12 +251,12 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             >
               <option value="DISPONIBLE">Disponible</option>
               <option value="NO_DISPONIBLE">No disponible</option>
+              <option value="ACCIDENTADA">Accidentada</option>
             </select>
           </div>
 
         </div>
 
-        {/* Botones */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
           <button
             onClick={onCerrar}

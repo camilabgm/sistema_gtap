@@ -1,53 +1,46 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+// src/app/api/tipos-misiones/[id]/route.js
+import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
-import prisma from '@/lib/prisma'
+import prisma from "@/lib/prisma"
 
-// PUT - Editar un tipo de misión
+const CLASIFICACIONES_VALIDAS = ["OPERACIONAL", "TIPO_VUELO", "LOGISTICA"]
+
 export async function PUT(request, { params }) {
   try {
     const sesion = await getServerSession(authOptions)
     if (!sesion) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    const { id: idParam } = await params
-    const id = parseInt(idParam)
-    const body = await request.json()
-    const { codigo, nombre, categoria, descripcion } = body
+    const { id } = await params
+    const body   = await request.json()
+    const { codigo, nombre, clasificacion, descripcion, tiene_subtipo, subtipo } = body
 
-    // Validaciones básicas
-    if (!codigo || !nombre || !categoria) {
+    if (!codigo || !nombre || !clasificacion) {
       return NextResponse.json(
-        { error: 'Código, nombre y categoría son obligatorios' },
+        { error: "Código, nombre y clasificación son obligatorios" },
         { status: 400 }
       )
     }
 
-    // Verificar que exista y no esté eliminado
-    const existente = await prisma.tipoMision.findFirst({
-      where: {
-        id,
-        deleted_at: null
-      }
-    })
-
-    if (!existente) {
+    if (!CLASIFICACIONES_VALIDAS.includes(clasificacion)) {
       return NextResponse.json(
-        { error: 'Tipo de misión no encontrado' },
-        { status: 404 }
+        { error: "Clasificación inválida" },
+        { status: 400 }
       )
     }
 
-    // Verificar que el código no lo use otro registro
+    if (tiene_subtipo && !subtipo?.trim()) {
+      return NextResponse.json(
+        { error: "Debés ingresar el sub-tipo si marcaste que tiene sub-tipo" },
+        { status: 400 }
+      )
+    }
+
+    // Verificar que no use un código ya existente en otro registro
     const codigoDuplicado = await prisma.tipoMision.findFirst({
-      where: {
-        codigo: codigo.toUpperCase(),
-        NOT: { id }
-      }
+      where: { codigo: codigo.toUpperCase(), NOT: { id: parseInt(id) } },
     })
 
     if (codigoDuplicado) {
@@ -58,72 +51,46 @@ export async function PUT(request, { params }) {
     }
 
     const actualizado = await prisma.tipoMision.update({
-      where: { id },
+      where: { id: parseInt(id) },
       data: {
-        codigo: codigo.toUpperCase(),
+        codigo:        codigo.toUpperCase(),
         nombre,
-        categoria,
-        descripcion: descripcion || null,
-        editado_por: sesion.user.id
-      }
+        clasificacion,
+        descripcion:   descripcion   || null,
+        tiene_subtipo: tiene_subtipo || false,
+        subtipo:       tiene_subtipo ? subtipo.trim() : null,
+        editado_por:   sesion.user.id,
+      },
     })
 
     return NextResponse.json(actualizado)
-
   } catch (error) {
-    console.error('Error al editar tipo de misión:', error)
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    )
+    console.error("Error PUT tipos-misiones:", error)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }
 
-// DELETE - Soft delete (desactivar)
 export async function DELETE(request, { params }) {
   try {
     const sesion = await getServerSession(authOptions)
     if (!sesion) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    const { id: idParam } = await params
-    const id = parseInt(idParam)
+    const { id } = await params
 
-    // Verificar que exista y no esté ya eliminado
-    const existente = await prisma.tipoMision.findFirst({
-      where: {
-        id,
-        deleted_at: null
-      }
-    })
-
-    if (!existente) {
-      return NextResponse.json(
-        { error: 'Tipo de misión no encontrado' },
-        { status: 404 }
-      )
-    }
-
-    const eliminado = await prisma.tipoMision.update({
-      where: { id },
+    await prisma.tipoMision.update({
+      where: { id: parseInt(id) },
       data: {
-        activo: false,
-        deleted_at: new Date(),
-        eliminado_por: sesion.user.id
-      }
+        activo:        false,
+        deleted_at:    new Date(),
+        eliminado_por: sesion.user.id,
+      },
     })
 
-    return NextResponse.json(eliminado)
-
+    return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Error al eliminar tipo de misión:', error)
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    )
+    console.error("Error DELETE tipos-misiones:", error)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }

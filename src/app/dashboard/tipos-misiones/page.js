@@ -10,7 +10,7 @@ export default async function TiposMisionesPage() {
 
   const tiposMisiones = await prisma.tipoMision.findMany({
     where:   { deleted_at: null },
-    orderBy: [{ categoria: "asc" }, { codigo: "asc" }],
+    orderBy: [{ clasificacion: "asc" }, { codigo: "asc" }],
   })
 
   // Extraemos los permisos del módulo TIPOS_MISIONES de la sesión

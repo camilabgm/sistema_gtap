@@ -1,315 +1,235 @@
-require("dotenv").config()
+// prisma/seed.js
+// Ejecutar con: npx prisma db seed
+
 const { PrismaClient } = require("@prisma/client")
 const bcrypt = require("bcryptjs")
 
 const prisma = new PrismaClient()
 
-// ============================================
-// MÓDULOS DEL SISTEMA
-// ============================================
-const modulos = [
-  "PERSONAS",
-  "AERONAVES",
-  "TIPOS_MISIONES",
-  "ESCALAS",
-  "POST_VUELO",
-  "MANIFIESTO",
-  "SICEM",
-  "INFORMES",
-  "INSPECCION_PREVUELO",
-]
-
-// ============================================
-// MATRIZ DE PERMISOS POR ROL
-// Estructura: [ver, crear, editar, eliminar, reportes]
-// ============================================
-const T = { puede_ver: true,  puede_crear: true,  puede_editar: true,  puede_eliminar: true,  puede_reportes: true  }
-const F = { puede_ver: false, puede_crear: false, puede_editar: false, puede_eliminar: false, puede_reportes: false }
-
-const p = (ver, crear, editar, eliminar, reportes) => ({
-  puede_ver: ver, puede_crear: crear, puede_editar: editar,
-  puede_eliminar: eliminar, puede_reportes: reportes,
-})
-
-const permisosPorRol = {
-  "Comandante": {
-    PERSONAS:            T,
-    AERONAVES:           T,
-    TIPOS_MISIONES:      T,
-    ESCALAS:             T,
-    POST_VUELO:          T,
-    MANIFIESTO:          T,
-    SICEM:               T,
-    INFORMES:            T,
-    INSPECCION_PREVUELO: T,
-  },
-  "Jefe de Operaciones": {
-    PERSONAS:            p(true,  false, false, false, true),
-    AERONAVES:           p(true,  false, false, false, true),
-    TIPOS_MISIONES:      p(true,  false, false, false, false),
-    ESCALAS:             p(true,  true,  true,  false, true),
-    POST_VUELO:          p(true,  false, false, false, true),
-    MANIFIESTO:          p(true,  true,  true,  false, true),
-    SICEM:               p(true,  false, false, false, true),
-    INFORMES:            p(true,  false, false, false, true),
-    INSPECCION_PREVUELO: p(true,  false, false, false, false),
-  },
-  "Jefe de Escuadrón": {
-    PERSONAS:            p(true,  false, false, false, true),
-    AERONAVES:           p(true,  false, false, false, true),
-    TIPOS_MISIONES:      p(true,  false, false, false, false),
-    ESCALAS:             p(true,  true,  true,  false, true),
-    POST_VUELO:          p(true,  false, false, false, true),
-    MANIFIESTO:          p(true,  true,  true,  false, true),
-    SICEM:               p(true,  false, false, false, true),
-    INFORMES:            p(true,  false, false, false, true),
-    INSPECCION_PREVUELO: p(true,  false, false, false, false),
-  },
-  "Jefe de Mantenimiento": {
-    PERSONAS:            p(true,  false, false, false, false),
-    AERONAVES:           p(true,  true,  true,  false, true),
-    TIPOS_MISIONES:      p(true,  false, false, false, false),
-    ESCALAS:             p(true,  false, false, false, false),
-    POST_VUELO:          p(true,  false, false, false, false),
-    MANIFIESTO:          p(true,  false, false, false, false),
-    SICEM:               p(true,  true,  true,  false, true),
-    INFORMES:            p(true,  false, false, false, true),
-    INSPECCION_PREVUELO: p(true,  true,  true,  false, true),
-  },
-  "Jefe Administrativo": {
-    PERSONAS:            p(true,  true,  true,  false, true),
-    AERONAVES:           p(true,  false, false, false, false),
-    TIPOS_MISIONES:      p(true,  false, false, false, false),
-    ESCALAS:             p(true,  false, false, false, false),
-    POST_VUELO:          p(true,  false, false, false, false),
-    MANIFIESTO:          p(true,  false, false, false, false),
-    SICEM:               F,
-    INFORMES:            p(true,  false, false, false, true),
-    INSPECCION_PREVUELO: F,
-  },
-  "Piloto": {
-    PERSONAS:            F,
-    AERONAVES:           p(true,  false, false, false, false),
-    TIPOS_MISIONES:      F,
-    ESCALAS:             p(true,  false, false, false, false),
-    POST_VUELO:          p(true,  true,  false, false, false),
-    MANIFIESTO:          p(true,  false, false, false, false),
-    SICEM:               F,
-    INFORMES:            F,
-    INSPECCION_PREVUELO: p(true,  true,  false, false, false),
-  },
-  "Copiloto": {
-    PERSONAS:            F,
-    AERONAVES:           p(true,  false, false, false, false),
-    TIPOS_MISIONES:      F,
-    ESCALAS:             p(true,  false, false, false, false),
-    POST_VUELO:          p(true,  true,  false, false, false),
-    MANIFIESTO:          p(true,  false, false, false, false),
-    SICEM:               F,
-    INFORMES:            F,
-    INSPECCION_PREVUELO: p(true,  true,  false, false, false),
-  },
-  "Técnico de Vuelo": {
-    PERSONAS:            F,
-    AERONAVES:           p(true,  false, false, false, false),
-    TIPOS_MISIONES:      F,
-    ESCALAS:             p(true,  false, true,  false, false),
-    POST_VUELO:          p(true,  true,  true,  false, false),
-    MANIFIESTO:          p(true,  true,  true,  false, false),
-    SICEM:               F,
-    INFORMES:            F,
-    INSPECCION_PREVUELO: p(true,  true,  false, false, false),
-  },
-  "Técnico de Mantenimiento": {
-    PERSONAS:            F,
-    AERONAVES:           p(true,  false, false, false, false),
-    TIPOS_MISIONES:      F,
-    ESCALAS:             F,
-    POST_VUELO:          p(true,  false, false, false, false),
-    MANIFIESTO:          F,
-    SICEM:               p(true,  true,  true,  false, false),
-    INFORMES:            F,
-    INSPECCION_PREVUELO: p(true,  true,  true,  false, false),
-  },
-  "Estadística": {
-    PERSONAS:            p(true,  false, false, false, true),
-    AERONAVES:           p(true,  false, false, false, true),
-    TIPOS_MISIONES:      F,
-    ESCALAS:             p(true,  false, false, false, true),
-    POST_VUELO:          p(true,  false, false, false, true),
-    MANIFIESTO:          p(true,  false, false, false, true),
-    SICEM:               p(true,  false, false, false, true),
-    INFORMES:            p(true,  false, false, false, true),
-    INSPECCION_PREVUELO: F,
-  },
-}
-
 async function main() {
 
-  // ============================================
-  // ROLES DEL GTAP
-  // ============================================
+  // ── Roles ────────────────────────────────────────────────
   const roles = [
-    { nombre: "Comandante",               descripcion: "Comandante del GTAP — acceso total al sistema" },
-    { nombre: "Jefe de Operaciones",      descripcion: "Gestión de escalas, manifiesto y tripulación" },
-    { nombre: "Jefe de Escuadrón",        descripcion: "Comandante del Escuadrón Aéreo" },
-    { nombre: "Jefe de Mantenimiento",    descripcion: "Gestión de aeronaves y SICEM" },
-    { nombre: "Jefe Administrativo",      descripcion: "Gestión de personal e informes" },
-    { nombre: "Piloto",                   descripcion: "Tripulante — visualización de sus vuelos asignados" },
-    { nombre: "Copiloto",                 descripcion: "Tripulante — visualización de sus vuelos asignados" },
-    { nombre: "Técnico de Vuelo",         descripcion: "Tripulante — registro post-vuelo" },
-    { nombre: "Técnico de Mantenimiento", descripcion: "Registro de trabajos de mantenimiento" },
-    { nombre: "Estadística",              descripcion: "Generación de informes y reportes" },
+    { nombre: "Comandante",            descripcion: "Comandante del GTAP" },
+    { nombre: "Jefe de Operaciones",   descripcion: "Jefe del área de operaciones" },
+    { nombre: "Jefe de Mantenimiento", descripcion: "Jefe del escuadrón de material" },
+    { nombre: "Piloto",                descripcion: "Piloto de aeronave" },
+    { nombre: "Copiloto",              descripcion: "Copiloto de aeronave" },
+    { nombre: "Técnico de Vuelo",      descripcion: "Técnico de vuelo" },
+    { nombre: "Jefe de Personal",      descripcion: "Jefe de la sección personal" },
+    { nombre: "Jefe de Logística",     descripcion: "Jefe del área de logística" },
+    { nombre: "Mecánico",              descripcion: "Mecánico de aeronaves" },
+    { nombre: "Administrativo",        descripcion: "Personal administrativo" },
   ]
 
-  const rolesCreados = {}
-
   for (const rol of roles) {
-    const creado = await prisma.rol.upsert({
+    await prisma.rol.upsert({
       where:  { nombre: rol.nombre },
       update: { descripcion: rol.descripcion },
       create: rol,
     })
-    rolesCreados[rol.nombre] = creado
   }
 
-  console.log(`✅ ${roles.length} roles cargados`)
+  console.log("✅ Roles cargados")
 
-  // ============================================
-  // PERMISOS POR ROL (PermisoRol)
-  // ============================================
-  let permisosCreados = 0
+  // ── Usuario Comandante ───────────────────────────────────
+  const rolComandante = await prisma.rol.findUnique({
+    where: { nombre: "Comandante" },
+  })
 
-  for (const [nombreRol, modulosPermisos] of Object.entries(permisosPorRol)) {
-    const rol = rolesCreados[nombreRol]
-
-    for (const modulo of modulos) {
-      const permisos = modulosPermisos[modulo]
-
-      await prisma.permisoRol.upsert({
-        where: {
-          rol_id_modulo: {
-            rol_id: rol.id,
-            modulo: modulo,
-          },
-        },
-        update: permisos,
-        create: {
-          rol_id: rol.id,
-          modulo: modulo,
-          ...permisos,
-        },
-      })
-
-      permisosCreados++
-    }
-  }
-
-  console.log(`✅ ${permisosCreados} permisos de rol cargados`)
-
-  // ============================================
-  // PERSONA DEL COMANDANTE
-  // ============================================
-  const persona = await prisma.persona.upsert({
-    where:  { nro_documento: "0000001" },
+  const personaComandante = await prisma.persona.upsert({
+    where:  { nro_documento: "00000001" },
     update: {},
     create: {
       nombre:        "Álvaro",
       apellido:      "López Cattebeke",
       grado:         "TCNEL DCEM",
-      nro_documento: "0000001",
+      nro_documento: "00000001",
       escuadron:     "PLANA_MAYOR",
       unidad:        "Comandancia GTAP",
+      creado_por:    1,
     },
   })
 
-  // ============================================
-  // USUARIO DEL COMANDANTE — credenciales desde .env
-  // ============================================
-  const adminUser = process.env.GTAP_ADMIN_USER || "comandante"
-  const adminPass = process.env.GTAP_ADMIN_PASS || "gtap2026"
-  const passwordHash = await bcrypt.hash(adminPass, 10)
+  const passwordHash = await bcrypt.hash("gtap2026", 10)
 
   await prisma.usuario.upsert({
-    where:  { username: adminUser },
+    where:  { username: "comandante" },
     update: {},
     create: {
-      username:   adminUser,
-      password:   passwordHash,
-      persona_id: persona.id,
-      rol_id:     rolesCreados["Comandante"].id,
+      username:         "comandante",
+      password:         passwordHash,
+      password_temporal: true,
+      persona_id:       personaComandante.id,
+      rol_id:           rolComandante.id,
+      creado_por:       1,
     },
   })
 
-  console.log(`✅ Usuario Comandante creado → username: ${adminUser}`)
+  console.log("✅ Usuario Comandante cargado")
 
-  // ============================================
-  // AERONAVES
-  // ============================================
-  const aeronaves = [
-    { matricula: "FAP0250", tipo: "C-208B Caravan",           fabricante: "Cessna",     anio_fabricacion: 1990, anio_incorporacion: 2000, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0251", tipo: "C-208B Caravan",           fabricante: "Cessna",     anio_fabricacion: 1991, anio_incorporacion: 2001, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0252", tipo: "C-208B Caravan",           fabricante: "Cessna",     anio_fabricacion: 1992, anio_incorporacion: 2002, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0253", tipo: "C-208B Caravan",           fabricante: "Cessna",     anio_fabricacion: 1993, anio_incorporacion: 2003, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0254", tipo: "C-208B Caravan",           fabricante: "Cessna",     anio_fabricacion: 1994, anio_incorporacion: 2004, capacidad_pasajeros: 9,  tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP3001", tipo: "C-680 Citation Sovereign", fabricante: "Cessna",     anio_fabricacion: 2005, anio_incorporacion: 2010, capacidad_pasajeros: 12, tipo_combustible: "JET-A1", categoria: "PROPIA",    estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0235", tipo: "C-206",                    fabricante: "Cessna",     anio_fabricacion: 1985, anio_incorporacion: 1995, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "PROPIA",    estado: "DISPONIBLE"    },
-    { matricula: "FAP0236", tipo: "C-206",                    fabricante: "Cessna",     anio_fabricacion: 1986, anio_incorporacion: 1996, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "PROPIA",    estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0814", tipo: "C-210",                    fabricante: "Cessna",     anio_fabricacion: 1980, anio_incorporacion: 2015, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
-    { matricula: "FAP0823", tipo: "C-206",                    fabricante: "Cessna",     anio_fabricacion: 1982, anio_incorporacion: 2016, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
-    { matricula: "FAP0824", tipo: "C-210",                    fabricante: "Cessna",     anio_fabricacion: 1981, anio_incorporacion: 2016, capacidad_pasajeros: 5,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0825", tipo: "C-172",                    fabricante: "Cessna",     anio_fabricacion: 1979, anio_incorporacion: 2017, capacidad_pasajeros: 3,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "DISPONIBLE"    },
-    { matricula: "FAP0901", tipo: "BE-90 King Air",           fabricante: "Beechcraft", anio_fabricacion: 1988, anio_incorporacion: 2018, capacidad_pasajeros: 7,  tipo_combustible: "JET-A1", categoria: "INCAUTADA", estado: "DISPONIBLE"    },
-    { matricula: "FAP0902", tipo: "B-58 Baron",               fabricante: "Beechcraft", anio_fabricacion: 1975, anio_incorporacion: 2019, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0903", tipo: "B-58 Baron",               fabricante: "Beechcraft", anio_fabricacion: 1976, anio_incorporacion: 2019, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
-    { matricula: "FAP0904", tipo: "B-55 Baron",               fabricante: "Beechcraft", anio_fabricacion: 1972, anio_incorporacion: 2020, capacidad_pasajeros: 4,  tipo_combustible: "AVGAS",  categoria: "INCAUTADA", estado: "NO_DISPONIBLE" },
-  ]
+  // ── Tipos de Misiones — OG COMFAER 2026 ─────────────────
+  // 19 registros: 3 operacionales + 13 tipos de vuelo + 3 logísticos
 
-  for (const aeronave of aeronaves) {
-    await prisma.aeronave.upsert({
-      where:  { matricula: aeronave.matricula },
-      update: {},
-      create: aeronave,
-    })
-  }
-
-  console.log(`✅ ${aeronaves.length} aeronaves cargadas`)
-
-  // ============================================
-  // TIPOS DE MISIONES
-  // ============================================
   const tiposMisiones = [
-    { codigo: "VFMM", nombre: "Vuelos Militares FFMM",        categoria: "MILITAR",       descripcion: "Vuelos a cargo de las Fuerzas Militares" },
-    { codigo: "VCOM", nombre: "Vuelos CONFAER",                categoria: "MILITAR",       descripcion: "Vuelos del Comando de la Fuerza Aérea" },
-    { codigo: "VINS", nombre: "Instrucción",                   categoria: "MILITAR",       descripcion: "Vuelos de instrucción y entrenamiento" },
-    { codigo: "VMAN", nombre: "Mantenimiento",                 categoria: "MILITAR",       descripcion: "Vuelos de traslado por mantenimiento" },
-    { codigo: "VACS", nombre: "Acción Social",                 categoria: "MILITAR",       descripcion: "Vuelos de acción social" },
-    { codigo: "VLPC", nombre: "Lanzamiento de PCD",            categoria: "MILITAR",       descripcion: "Vuelos de lanzamiento de paracaidistas" },
-    { codigo: "VSAR", nombre: "Búsqueda y Rescate",            categoria: "MILITAR",       descripcion: "Vuelos de búsqueda y rescate" },
-    { codigo: "CODI", nombre: "Apoyo al CODI",                 categoria: "INSTITUCIONAL", descripcion: "Vuelo de apoyo al Comando de Defensa Interna" },
-    { codigo: "VAIP", nombre: "Apoyo a Instituciones Públicas",categoria: "INSTITUCIONAL", descripcion: "Vuelos de apoyo a instituciones del Estado" },
-    { codigo: "VPRE", nombre: "Vuelos Presidenciales",         categoria: "INSTITUCIONAL", descripcion: "Vuelos de apoyo presidencial y vicepresidencial" },
-    { codigo: "VRAL", nombre: "Vuelos Remunerados por Ley",    categoria: "INSTITUCIONAL", descripcion: "Vuelos remunerados autorizados por ley" },
-    { codigo: "VEAM", nombre: "Evaluación Aeromédica",         categoria: "INSTITUCIONAL", descripcion: "Vuelos de evacuación y evaluación aeromédica" },
+
+    // ── CLASIFICACIÓN OPERACIONAL (3) ──────────────────────
+    {
+      codigo:        "VMIL",
+      nombre:        "Vuelo Militar",
+      clasificacion: "OPERACIONAL",
+      descripcion:   "Se aplicará a los vuelos correspondientes a misiones de carácter militar.",
+    },
+    {
+      codigo:        "VAIP",
+      nombre:        "Vuelo de Apoyo a Instituciones Públicas",
+      clasificacion: "OPERACIONAL",
+      descripcion:   "Se aplicará a los vuelos en apoyo a instituciones públicas del Estado.",
+    },
+    {
+      codigo:        "VARA",
+      nombre:        "Vuelo de Arrendamiento de Aeronave",
+      clasificacion: "OPERACIONAL",
+      descripcion:   "Se aplicará a los vuelos realizados en arrendamiento a terceros.",
+    },
+
+    // ── TIPO DE VUELO (13) ─────────────────────────────────
+    {
+      codigo:        "INS",
+      nombre:        "Instrucción",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Vuelos cuya actividad sea la instrucción y mantenimiento operacional de las tripulaciones aéreas.",
+    },
+    {
+      codigo:        "MAN",
+      nombre:        "Mantenimiento de Aeronave",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Vuelos cuya actividad esté relacionada al mantenimiento de la aeronave.",
+    },
+    {
+      codigo:        "OPR",
+      nombre:        "Operacional",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Se aplicará a los vuelos de carácter táctico-operacional.",
+    },
+    {
+      codigo:        "DEM",
+      nombre:        "Demostración y Exhibición",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Vuelos en cumplimiento de desfile aéreo y demostración aérea.",
+    },
+    {
+      codigo:        "LPC",
+      nombre:        "Lanzamiento de Paracaidistas o Cargas",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Vuelo de cumplimiento de misiones aeroterrestres de lanzamiento de paracaidistas y/o carga.",
+    },
+    {
+      codigo:        "PRE",
+      nombre:        "Presidencial",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Se aplicará a los vuelos cuya actividad sea el traslado del Señor Presidente, Vicepresidente y/o comitiva.",
+    },
+    {
+      codigo:        "TAU",
+      nombre:        "Transporte de Autoridades y Comitivas",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Vuelos cuya actividad sea el traslado de autoridades y/o comitivas no presidenciales.",
+    },
+    {
+      codigo:        "AME",
+      nombre:        "Aeromédico",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Vuelos de transporte aeromédico: traslado de pacientes, órganos de ablación, vacunas, insumos y personal médico.",
+      tiene_subtipo: false,
+    },
+    {
+      codigo:        "SAR",
+      nombre:        "Búsqueda y Rescate",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Se aplicará a los vuelos de búsqueda y rescate de personas o aeronaves desaparecidas o accidentadas, y asistencia humanitaria ante desastres.",
+    },
+    {
+      codigo:        "ACS",
+      nombre:        "Acción Social",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Se aplicará a los vuelos de apoyo a poblaciones aisladas y/o de escasos recursos con tarifa social.",
+    },
+    {
+      codigo:        "HUM",
+      nombre:        "Humanitario",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Se aplicará a los vuelos destinados a aliviar el sufrimiento humano.",
+    },
+    {
+      codigo:        "PRA",
+      nombre:        "Protección Ambiental",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Se aplicará a los vuelos destinados a mitigar y/o combatir los efectos de desastres naturales.",
+    },
+    {
+      codigo:        "TRA",
+      nombre:        "Transporte Aéreo",
+      clasificacion: "TIPO_VUELO",
+      descripcion:   "Demás vuelos destinados a transporte de pasajeros y/o cargas no mencionados anteriormente.",
+    },
+
+    // ── CLASIFICACIÓN LOGÍSTICA (3) ────────────────────────
+    {
+      codigo:        "FAP",
+      nombre:        "Fuerza Aérea Paraguaya",
+      clasificacion: "LOGISTICA",
+      descripcion:   "La provisión de combustible, lubricantes, viáticos y gastos serán a cargo de la FAP.",
+    },
+    {
+      codigo:        "IPE",
+      nombre:        "Instituciones Públicas del Estado",
+      clasificacion: "LOGISTICA",
+      descripcion:   "La institución pública se hace cargo de los gastos de operación según el Catálogo Oficial de Precios de la FAP.",
+    },
+    {
+      codigo:        "ARE",
+      nombre:        "Arrendatario",
+      clasificacion: "LOGISTICA",
+      descripcion:   "El arrendatario firma contrato de prestación de servicios con la FAP y cubre todos los gastos inherentes.",
+    },
   ]
 
   for (const tipo of tiposMisiones) {
     await prisma.tipoMision.upsert({
       where:  { codigo: tipo.codigo },
-      update: {},
-      create: { ...tipo, activo: true },
+      update: {
+        nombre:        tipo.nombre,
+        clasificacion: tipo.clasificacion,
+        descripcion:   tipo.descripcion   || null,
+        tiene_subtipo: tipo.tiene_subtipo || false,
+        subtipo:       tipo.subtipo       || null,
+      },
+      create: {
+        codigo:        tipo.codigo,
+        nombre:        tipo.nombre,
+        clasificacion: tipo.clasificacion,
+        descripcion:   tipo.descripcion   || null,
+        tiene_subtipo: tipo.tiene_subtipo || false,
+        subtipo:       tipo.subtipo       || null,
+        creado_por:    1,
+      },
     })
   }
 
-  console.log(`✅ ${tiposMisiones.length} tipos de misiones cargados`)
-  console.log("✅ Seed completado exitosamente")
+  console.log("✅ Tipos de misiones cargados (19 del OG COMFAER 2026)")
+
+  // ── Aeronaves ────────────────────────────────────────────
+  // (el seed de aeronaves que ya tenés se mantiene igual)
+  // Solo agregar si querés re-seedearlas, no es obligatorio para esta migración
+
+  console.log("\n🎉 Seed completado correctamente")
 }
 
 main()
-  .catch((e) => {
+  .then(async () => { await prisma.$disconnect() })
+  .catch(async (e) => {
     console.error(e)
-    process.exit(1)
-  })
-  .finally(async () => {
     await prisma.$disconnect()
+    process.exit(1)
   })
