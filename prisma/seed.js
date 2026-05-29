@@ -38,13 +38,13 @@ async function main() {
   })
 
   const personaComandante = await prisma.persona.upsert({
-    where:  { nro_documento: "00000001" },
+    where:  { nro_documento: "0000001" },
     update: {},
     create: {
       nombre:        "Álvaro",
       apellido:      "López Cattebeke",
       grado:         "TCNEL DCEM",
-      nro_documento: "00000001",
+      nro_documento: "0000001",
       escuadron:     "PLANA_MAYOR",
       unidad:        "Comandancia GTAP",
       creado_por:    1,

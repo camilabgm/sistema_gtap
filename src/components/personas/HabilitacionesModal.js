@@ -263,9 +263,15 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
                   checked={anualHabilitada}
                   disabled={guardandoCheck}
                   onChange={(e) => {
-                    setAnualHabilitada(e.target.checked)
-                    handleToggleCheck("hab_anual_habilitada", e.target.checked)
-                  }}
+                  const nuevoValor = e.target.checked
+                  const accion = nuevoValor ? "habilitar" : "quitar la habilitación de"
+                  const confirmar = window.confirm(
+                    `¿Confirmás ${accion} la habilitación médica anual de ${persona.apellido}, ${persona.nombre}?`
+                  )
+                  if (!confirmar) return
+                  setAnualHabilitada(nuevoValor)
+                  handleToggleCheck("hab_anual_habilitada", nuevoValor)
+                }}
                   className="w-4 h-4 text-blue-600 rounded" />
                 <div>
                   <span className="text-sm font-medium text-gray-700">Anual — habilitado por Operaciones</span>
@@ -288,9 +294,15 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
                   checked={operacionalHabilitada}
                   disabled={guardandoCheck}
                   onChange={(e) => {
-                    setOperacionalHabilitada(e.target.checked)
-                    handleToggleCheck("nivel_operacional_habilitado", e.target.checked)
-                  }}
+                  const nuevoValor = e.target.checked
+                  const accion = nuevoValor ? "habilitar operacionalmente" : "quitar la habilitación operacional de"
+                  const confirmar = window.confirm(
+                    `¿Confirmás ${accion} a ${persona.apellido}, ${persona.nombre}?`
+                  )
+                  if (!confirmar) return
+                  setOperacionalHabilitada(nuevoValor)
+                  handleToggleCheck("nivel_operacional_habilitado", nuevoValor)
+                }}
                   className="w-4 h-4 text-blue-600 rounded" />
                 <div>
                   <span className="text-sm font-medium text-gray-700">Habilitado por Operaciones</span>

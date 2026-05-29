@@ -143,9 +143,9 @@ export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) 
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Seleccionar clasificación</option>
-            <option value="OPERACIONAL">Operacional (VMIL, VAIP, VARA)</option>
-            <option value="TIPO_VUELO">Tipo de Vuelo (INS, AME, PRE...)</option>
-            <option value="LOGISTICA">Logística (FAP, IPE, ARE)</option>
+            <option value="OPERACIONAL">Operacional</option>
+            <option value="TIPO_VUELO">Tipo de Vuelo</option>
+            <option value="LOGISTICA">Logística</option>
           </select>
           {clasificacion && (
             <p className="text-xs text-blue-600 mt-1">
