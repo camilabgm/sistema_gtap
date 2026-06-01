@@ -1,50 +1,53 @@
-"use client";
+"use client"
+// src/app/login/page.js
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useState } from "react"
+import { signIn } from "next-auth/react"
+import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [cargando, setCargando] = useState(false);
 
-  const handleLogin = async () => {
-    setCargando(true);
-    setError("");
+  const router = useRouter()
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [error,    setError]    = useState("")
+  const [cargando, setCargando] = useState(false)
+
+  async function handleLogin() {
+    if (cargando) return
+    setCargando(true)
+    setError("")
 
     const resultado = await signIn("credentials", {
       username,
       password,
       redirect: false,
-    });
+    })
 
     if (resultado?.error) {
-      // "CredentialsSignin" es el error genérico que NextAuth devuelve
-      // cuando authorize() retorna null (contraseña incorrecta, usuario no existe, etc.)
-      // Cualquier OTRO valor es un mensaje personalizado nuestro (como el de bloqueo)
-      if (resultado.error === "CredentialsSignin") {
-        setError("Usuario o contraseña incorrectos");
-      } else {
-        setError(resultado.error);
-      }
-      setCargando(false);
-      return;
+      setError(
+        resultado.error === "CredentialsSignin"
+          ? "Usuario o contraseña incorrectos"
+          : resultado.error
+      )
+      setCargando(false)
+      return
     }
 
-    router.push("/dashboard");
-  };
+    router.push("/dashboard")
+  }
+
+  // Enter en cualquiera de los dos campos dispara el login
+  function handleKeyDown(e) {
+    if (e.key === "Enter") handleLogin()
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        
+
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">
-            Sistema GTAP
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-800">Sistema GTAP</h1>
           <p className="text-gray-500 text-sm mt-1">
             Grupo de Transporte Aéreo Presidencial
           </p>
@@ -58,8 +61,9 @@ export default function LoginPage() {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onKeyDown={handleKeyDown}
             placeholder="Ingrese su usuario"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -71,8 +75,9 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onKeyDown={handleKeyDown}
             placeholder="Ingrese su contraseña"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -92,5 +97,5 @@ export default function LoginPage() {
 
       </div>
     </div>
-  );
+  )
 }

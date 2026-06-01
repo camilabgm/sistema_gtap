@@ -3,6 +3,13 @@
 
 import { useState, useEffect } from "react"
 
+const MENSAJES_ESTADO = {
+  NO_DISPONIBLE: (matricula) =>
+    `¿Confirmás marcar ${matricula} como No disponible? La aeronave no podrá ser asignada a escalas.`,
+  ACCIDENTADA: (matricula) =>
+    `¿Confirmás marcar ${matricula} como Accidentada? Esta acción indica un evento grave.`,
+}
+
 export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
 
   const modoEdicion = !!aeronave
@@ -36,13 +43,21 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
 
   async function handleGuardar() {
     if (cargando) return
+
+    // Confirmación si el estado cambia a uno restrictivo
+    if (modoEdicion && form.estado !== aeronave.estado) {
+      const mensaje = MENSAJES_ESTADO[form.estado]
+      if (mensaje) {
+        const confirmar = window.confirm(mensaje(form.matricula))
+        if (!confirmar) return
+      }
+    }
+
     setCargando(true)
     setError("")
 
     const metodo = modoEdicion ? "PUT" : "POST"
-    const url    = modoEdicion
-      ? `/api/aeronaves/${aeronave.id}`
-      : "/api/aeronaves"
+    const url    = modoEdicion ? `/api/aeronaves/${aeronave.id}` : "/api/aeronaves"
 
     const respuesta = await fetch(url, {
       method:  metodo,
@@ -70,17 +85,11 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-800">
             {modoEdicion ? "Editar aeronave" : "Nueva aeronave"}
           </h2>
-          <button
-            onClick={onCerrar}
-            className="text-gray-400 hover:text-gray-600 text-xl font-bold"
-          >
-            ✕
-          </button>
+          <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
         </div>
 
         {error && (
@@ -95,50 +104,39 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Matrícula <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={form.matricula}
+            <input type="text" value={form.matricula}
               onChange={(e) => setForm({ ...form, matricula: e.target.value.toUpperCase() })}
               placeholder="FAP0254"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tipo / Modelo <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={form.tipo}
+            <input type="text" value={form.tipo}
               onChange={(e) => setForm({ ...form, tipo: e.target.value })}
               placeholder="C-208B Caravan"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fabricante <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={form.fabricante}
+            <input type="text" value={form.fabricante}
               onChange={(e) => setForm({ ...form, fabricante: e.target.value })}
               placeholder="Cessna"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tipo de combustible <span className="text-red-500">*</span>
             </label>
-            <select
-              value={form.tipo_combustible}
+            <select value={form.tipo_combustible}
               onChange={(e) => setForm({ ...form, tipo_combustible: e.target.value })}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Seleccionar...</option>
               <option value="JET-A1">JET-A1</option>
               <option value="AVGAS">AVGAS</option>
@@ -149,63 +147,49 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Año de fabricación <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
-              value={form.anio_fabricacion}
+            <input type="number" value={form.anio_fabricacion}
               onChange={(e) => setForm({ ...form, anio_fabricacion: e.target.value })}
               placeholder="1990"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Año de incorporación a la FAP <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
-              value={form.anio_incorporacion}
+            <input type="number" value={form.anio_incorporacion}
               onChange={(e) => setForm({ ...form, anio_incorporacion: e.target.value })}
               placeholder="2000"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Capacidad de pasajeros <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
-              value={form.capacidad_pasajeros}
+            <input type="number" value={form.capacidad_pasajeros}
               onChange={(e) => setForm({ ...form, capacidad_pasajeros: e.target.value })}
               placeholder="9"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Velocidad de crucero (nudos)
             </label>
-            <input
-              type="number"
-              value={form.velocidad_crucero}
+            <input type="number" value={form.velocidad_crucero}
               onChange={(e) => setForm({ ...form, velocidad_crucero: e.target.value })}
               placeholder="175"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Estela de turbulencia
             </label>
-            <select
-              value={form.estela_turbulencia}
+            <select value={form.estela_turbulencia}
               onChange={(e) => setForm({ ...form, estela_turbulencia: e.target.value })}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Seleccionar...</option>
               <option value="LIGERA">Ligera</option>
               <option value="MEDIA">Media</option>
@@ -217,24 +201,19 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Color / Descripción
             </label>
-            <input
-              type="text"
-              value={form.color}
+            <input type="text" value={form.color}
               onChange={(e) => setForm({ ...form, color: e.target.value })}
               placeholder="Blanco con franja azul"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Categoría <span className="text-red-500">*</span>
             </label>
-            <select
-              value={form.categoria}
+            <select value={form.categoria}
               onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="PROPIA">Propia</option>
               <option value="INCAUTADA">Incautada</option>
             </select>
@@ -244,11 +223,9 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Estado <span className="text-red-500">*</span>
             </label>
-            <select
-              value={form.estado}
+            <select value={form.estado}
               onChange={(e) => setForm({ ...form, estado: e.target.value })}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="DISPONIBLE">Disponible</option>
               <option value="NO_DISPONIBLE">No disponible</option>
               <option value="ACCIDENTADA">Accidentada</option>
@@ -258,17 +235,12 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-          <button
-            onClick={onCerrar}
-            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={onCerrar}
+            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
             Cancelar
           </button>
-          <button
-            onClick={handleGuardar}
-            disabled={cargando}
-            className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
+          <button onClick={handleGuardar} disabled={cargando}
+            className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50">
             {cargando ? "Guardando..." : modoEdicion ? "Guardar cambios" : "Crear aeronave"}
           </button>
         </div>

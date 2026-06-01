@@ -1,4 +1,5 @@
 "use client"
+// src/components/personas/UsuarioModal.js
 
 import { useState, useEffect } from "react"
 import { validarContrasena } from "@/lib/validarContrasena"
@@ -8,14 +9,14 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
   const modoEdicion = !!persona.usuario
 
   const [roles, setRoles] = useState([])
-  const [form, setForm]   = useState({
+  const [form,  setForm]  = useState({
     username: persona.usuario?.username || persona.nro_documento || "",
     password: "",
     rol_id:   persona.usuario?.rol_id   || "",
   })
 
   const [cargando, setCargando] = useState(false)
-  const [error, setError]       = useState("")
+  const [error,    setError]    = useState("")
 
   useEffect(() => {
     async function cargarRoles() {
@@ -27,17 +28,28 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
   }, [])
 
   useEffect(() => {
-    const manejarTecla = (e) => { if (e.key === "Escape") onCerrar() }
+    const manejarTecla = (e) => {
+      if (e.key === "Escape") onCerrar()
+      if (e.key === "Enter")  handleGuardar()
+    }
     document.addEventListener("keydown", manejarTecla)
     return () => document.removeEventListener("keydown", manejarTecla)
-  }, [])
+  }, [form])
 
   async function handleGuardar() {
     if (cargando) return
+
+    // Confirmación al dar acceso por primera vez
+    if (!modoEdicion) {
+      const confirmar = window.confirm(
+        `¿Confirmás dar acceso al sistema a ${persona.grado} ${persona.apellido}, ${persona.nombre}?`
+      )
+      if (!confirmar) return
+    }
+
     setCargando(true)
     setError("")
 
-    // Validar contraseña: obligatoria en creación, opcional en edición
     if (!modoEdicion && !form.password) {
       setError("La contraseña es obligatoria")
       setCargando(false)
@@ -53,21 +65,17 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
       }
     }
 
-    let respuesta
-
-    if (modoEdicion) {
-      respuesta = await fetch(`/api/usuarios/${persona.usuario.id}`, {
-        method:  "PUT",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(form),
-      })
-    } else {
-      respuesta = await fetch("/api/usuarios", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ ...form, persona_id: persona.id }),
-      })
-    }
+    const respuesta = modoEdicion
+      ? await fetch(`/api/usuarios/${persona.usuario.id}`, {
+          method:  "PUT",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(form),
+        })
+      : await fetch("/api/usuarios", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ ...form, persona_id: persona.id }),
+        })
 
     const datos = await respuesta.json()
 
@@ -89,7 +97,6 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
         className="bg-white rounded-lg shadow-xl w-full max-w-md"
         onClick={(e) => e.stopPropagation()}
       >
-
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-lg font-semibold text-gray-800">
@@ -131,7 +138,9 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {modoEdicion ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña"}
+              {modoEdicion
+                ? "Nueva contraseña (dejar vacío para no cambiar)"
+                : "Contraseña"}
               {!modoEdicion && <span className="text-red-500"> *</span>}
             </label>
             <input
