@@ -4,21 +4,21 @@
 import { useState } from "react"
 import AeronavesForm from "./AeronavesForm"
 
-const ESTADOS = {
-  DISPONIBLE:    { label: "Disponible",    color: "bg-green-100 text-green-700" },
-  NO_DISPONIBLE: { label: "No disponible", color: "bg-red-100 text-red-700"     },
-  ACCIDENTADA:   { label: "Accidentada",   color: "bg-orange-100 text-orange-700" },
+const MOTIVOS = {
+  ACCIDENTADA:      "Accidentada",
+  EN_MANTENIMIENTO: "En mantenimiento",
+  OTRO:             "Otro",
 }
 
 export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) {
 
-  const [aeronaves,          setAeronaves]          = useState(datosIniciales)
-  const [busqueda,           setBusqueda]           = useState("")
-  const [filtroCategoria,    setFiltroCategoria]    = useState("TODAS")
-  const [filtroEstado,       setFiltroEstado]       = useState("TODOS")
-  const [modalAbierto,       setModalAbierto]       = useState(false)
+  const [aeronaves,            setAeronaves]            = useState(datosIniciales)
+  const [busqueda,             setBusqueda]             = useState("")
+  const [filtroCategoria,      setFiltroCategoria]      = useState("TODAS")
+  const [filtroEstado,         setFiltroEstado]         = useState("TODOS")
+  const [modalAbierto,         setModalAbierto]         = useState(false)
   const [aeronaveSeleccionada, setAeronaveSeleccionada] = useState(null)
-  const [eliminando,         setEliminando]         = useState(null)
+  const [eliminando,           setEliminando]           = useState(null)
 
   const aeronavesFiltradas = aeronaves.filter((a) => {
     const texto = busqueda.toLowerCase()
@@ -33,9 +33,9 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
     return pasaBusqueda && pasaCategoria && pasaEstado
   })
 
-  function handleNuevo()          { setAeronaveSeleccionada(null);      setModalAbierto(true) }
-  function handleEditar(aeronave) { setAeronaveSeleccionada(aeronave);  setModalAbierto(true) }
-  function handleCerrar()         { setModalAbierto(false);             setAeronaveSeleccionada(null) }
+  function handleNuevo()          { setAeronaveSeleccionada(null);     setModalAbierto(true) }
+  function handleEditar(aeronave) { setAeronaveSeleccionada(aeronave); setModalAbierto(true) }
+  function handleCerrar()         { setModalAbierto(false);            setAeronaveSeleccionada(null) }
 
   async function handleGuardado() {
     handleCerrar()
@@ -43,7 +43,7 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
   }
 
   async function recargarDatos() {
-    const res   = await fetch("/api/aeronaves")
+    const res = await fetch("/api/aeronaves")
     setAeronaves(await res.json())
   }
 
@@ -54,6 +54,27 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
     await fetch(`/api/aeronaves/${id}`, { method: "DELETE" })
     await recargarDatos()
     setEliminando(null)
+  }
+
+  function renderEstado(aeronave) {
+    if (aeronave.estado === "DISPONIBLE") {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+          Disponible
+        </span>
+      )
+    }
+
+    const motivo = aeronave.motivo_no_disponible
+    const texto  = motivo === "OTRO"
+      ? (aeronave.motivo_otro || "No disponible")
+      : (MOTIVOS[motivo] || "No disponible")
+
+    return (
+      <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+        {texto}
+      </span>
+    )
   }
 
   return (
@@ -99,7 +120,6 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
           <option value="TODOS">Todos los estados</option>
           <option value="DISPONIBLE">Disponibles</option>
           <option value="NO_DISPONIBLE">No disponibles</option>
-          <option value="ACCIDENTADA">Accidentadas</option>
         </select>
       </div>
 
@@ -124,59 +144,54 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
                 </td>
               </tr>
             ) : (
-              aeronavesFiltradas.map((aeronave) => {
-                const estado = ESTADOS[aeronave.estado] || ESTADOS.NO_DISPONIBLE
-                return (
-                  <tr key={aeronave.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {aeronave.matricula}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{aeronave.tipo}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{aeronave.fabricante}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        aeronave.categoria === "PROPIA"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-purple-100 text-purple-700"
-                      }`}>
-                        {aeronave.categoria === "PROPIA" ? "Propia" : "Incautada"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${estado.color}`}>
-                        {estado.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {aeronave.capacidad_pasajeros}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-right">
-                      <div className="flex justify-end gap-2">
-                        {permisos?.puede_editar && (
-                          <button
-                            onClick={() => handleEditar(aeronave)}
-                            className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
-                          >
-                            Editar
-                          </button>
-                        )}
-                        {permisos?.puede_eliminar && (
-                          <button
-                            onClick={() => handleEliminar(aeronave.id)}
-                            disabled={eliminando === aeronave.id}
-                            className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                          >
-                            {eliminando === aeronave.id ? "..." : "Desactivar"}
-                          </button>
-                        )}
-                        {!permisos?.puede_editar && !permisos?.puede_eliminar && (
-                          <span className="text-xs text-gray-300">Sin acciones</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
+              aeronavesFiltradas.map((aeronave) => (
+                <tr key={aeronave.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                    {aeronave.matricula}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-700">{aeronave.tipo}</td>
+                  <td className="px-6 py-4 text-sm text-gray-700">{aeronave.fabricante}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      aeronave.categoria === "PROPIA"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-purple-100 text-purple-700"
+                    }`}>
+                      {aeronave.categoria === "PROPIA" ? "Propia" : "Incautada"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {renderEstado(aeronave)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-700">
+                    {aeronave.capacidad_pasajeros}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-right">
+                    <div className="flex justify-end gap-2">
+                      {permisos?.puede_editar && (
+                        <button
+                          onClick={() => handleEditar(aeronave)}
+                          className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
+                        >
+                          Editar
+                        </button>
+                      )}
+                      {permisos?.puede_eliminar && (
+                        <button
+                          onClick={() => handleEliminar(aeronave.id)}
+                          disabled={eliminando === aeronave.id}
+                          className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {eliminando === aeronave.id ? "..." : "Desactivar"}
+                        </button>
+                      )}
+                      {!permisos?.puede_editar && !permisos?.puede_eliminar && (
+                        <span className="text-xs text-gray-300">Sin acciones</span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
