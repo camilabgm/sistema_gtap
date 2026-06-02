@@ -3,7 +3,8 @@ import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
 import { PrismaClient } from "@prisma/client"
 import Navbar from "@/components/dashboard/Navbar"
-import SesionInvalidadaBanner from "@/components/shared/SesionInvalidadaBanner"
+import CerrarSesionAutomatico from "@/components/shared/CerrarSesionAutomatico"
+import VerificadorSesion from "@/components/shared/VerificadorSesion"
 import DetectorInactividad from "@/components/shared/DetectorInactividad"
 import CambioContrasenaObligatorio from "@/components/shared/CambioContrasenaObligatorio"
 
@@ -23,8 +24,8 @@ export default async function DashboardLayout({ children }) {
 
   const sesionDesactualizada = (() => {
     if (!usuario?.sesion_invalidada_en) return false
-    const invalidadaEn    = new Date(usuario.sesion_invalidada_en).getTime()
-    const tokenEmitidoEn  = (sesion.user.token_emitido_en || 0) * 1000
+    const invalidadaEn   = new Date(usuario.sesion_invalidada_en).getTime()
+    const tokenEmitidoEn = (sesion.user.token_emitido_en || 0) * 1000
     return invalidadaEn > tokenEmitidoEn
   })()
 
@@ -38,10 +39,11 @@ export default async function DashboardLayout({ children }) {
       />
 
       <main className="ml-64 flex-1 p-6">
-        {sesionDesactualizada && <SesionInvalidadaBanner />}
+        {sesionDesactualizada && <CerrarSesionAutomatico />}
         {children}
       </main>
 
+      <VerificadorSesion />
       <DetectorInactividad />
       {usuario?.password_temporal && <CambioContrasenaObligatorio />}
 

@@ -3,15 +3,14 @@
 import { useState } from "react"
 
 const MODULOS = [
-  { key: "PERSONAS",            label: "Personas" },
-  { key: "AERONAVES",           label: "Aeronaves" },
-  { key: "TIPOS_MISIONES",      label: "Tipos de Misiones" },
-  { key: "ESCALAS",             label: "Escalas de Vuelo" },
-  { key: "POST_VUELO",          label: "Post-Vuelo" },
-  { key: "MANIFIESTO",          label: "Manifiesto" },
-  { key: "SICEM",               label: "SICEM" },
-  { key: "INFORMES",            label: "Informes" },
-  { key: "INSPECCION_PREVUELO", label: "Inspección Pre-vuelo" },
+  { key: "PERSONAS",       label: "Personas" },
+  { key: "AERONAVES",      label: "Aeronaves" },
+  { key: "TIPOS_MISIONES", label: "Tipos de Misiones" },
+  { key: "ESCALAS",        label: "Escalas de Vuelo" },
+  { key: "POST_VUELO",     label: "Post-Vuelo" },
+  { key: "MANIFIESTO",     label: "Manifiesto" },
+  { key: "SICEM",          label: "SICEM" },
+  { key: "INFORMES",       label: "Informes" },
 ]
 
 const ACCIONES = [
@@ -43,7 +42,7 @@ export default function PermisosRolTable({ roles }) {
     () => buildPermisoInicial(roles[0].permisos_rol)
   )
   const [guardando, setGuardando] = useState(false)
-  const [mensaje, setMensaje] = useState(null)
+  const [mensaje, setMensaje]     = useState(null)
 
   function seleccionarRol(rol) {
     setRolSeleccionado(rol)
@@ -75,7 +74,7 @@ export default function PermisosRolTable({ roles }) {
         method:  "PUT",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          rol_id:  rolSeleccionado.id,
+          rol_id:   rolSeleccionado.id,
           permisos: permisosArray,
         }),
       })

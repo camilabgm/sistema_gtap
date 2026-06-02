@@ -3,7 +3,6 @@ import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
 import { PrismaClient } from "@prisma/client"
 import PermisosRolTable from "@/components/administracion/PermisosRolTable"
-import TransferirComandanteWrapper from "@/components/administracion/TransferirComandanteWrapper"
 
 const prisma = new PrismaClient()
 
@@ -22,15 +21,12 @@ export default async function PermisosPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Permisos</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Configurá qué puede hacer cada rol en cada módulo del sistema.
-            Los cambios toman efecto cuando el usuario vuelva a iniciar sesión.
-          </p>
-        </div>
-        <TransferirComandanteWrapper />
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Gestión de Permisos</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Configurá qué puede hacer cada rol en cada módulo del sistema.
+          Los cambios toman efecto cuando el usuario vuelva a iniciar sesión.
+        </p>
       </div>
 
       <PermisosRolTable roles={roles} />

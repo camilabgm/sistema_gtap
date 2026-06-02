@@ -25,7 +25,26 @@ export async function PUT(request, { params }) {
       data.password = await bcrypt.hash(body.password, 10)
     }
 
-    // Si cambia el rol invalidamos la sesión del usuario afectado
+    // Si el nuevo rol es Comandante, verificar que no haya otro activo
+    if (Number(body.rol_id) === await obtenerIdRolComandante()) {
+      const otroComandante = await prisma.usuario.findFirst({
+        where: {
+          rol:        { nombre: "Comandante" },
+          activo:     true,
+          deleted_at: null,
+          id:         { not: Number(id) },
+        },
+      })
+
+      if (otroComandante) {
+        return NextResponse.json(
+          { error: "Ya existe un Comandante activo en el sistema. Cambiá su rol primero antes de asignar uno nuevo." },
+          { status: 409 }
+        )
+      }
+    }
+
+    // Si cambia el rol, invalidamos la sesión del usuario afectado
     const usuarioActual = await prisma.usuario.findUnique({
       where:  { id: Number(id) },
       select: { rol_id: true },
@@ -45,6 +64,14 @@ export async function PUT(request, { params }) {
     console.error("Error PUT usuarios:", error)
     return NextResponse.json({ error: "Error al editar usuario" }, { status: 500 })
   }
+}
+
+async function obtenerIdRolComandante() {
+  const rol = await prisma.rol.findUnique({
+    where:  { nombre: "Comandante" },
+    select: { id: true },
+  })
+  return rol?.id ?? -1
 }
 
 export async function DELETE(request, { params }) {

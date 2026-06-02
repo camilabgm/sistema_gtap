@@ -40,7 +40,12 @@ enum CategoriaAeronave {
 enum EstadoAeronave {
   DISPONIBLE
   NO_DISPONIBLE
+}
+
+enum MotivoNoDisponible {
   ACCIDENTADA
+  EN_MANTENIMIENTO
+  OTRO
 }
 
 enum EspecialidadPersona {
@@ -270,6 +275,8 @@ model Aeronave {
   color               String?
   categoria           CategoriaAeronave
   estado              EstadoAeronave    @default(DISPONIBLE)
+  motivo_no_disponible  MotivoNoDisponible?
+  motivo_otro           String?
   activo              Boolean           @default(true)
 
   created_at    DateTime  @default(now())

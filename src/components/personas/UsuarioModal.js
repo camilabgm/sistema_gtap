@@ -8,13 +8,12 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
 
   const modoEdicion = !!persona.usuario
 
-  const [roles, setRoles] = useState([])
-  const [form,  setForm]  = useState({
+  const [roles,    setRoles]    = useState([])
+  const [form,     setForm]     = useState({
     username: persona.usuario?.username || persona.nro_documento || "",
     password: "",
     rol_id:   persona.usuario?.rol_id   || "",
   })
-
   const [cargando, setCargando] = useState(false)
   const [error,    setError]    = useState("")
 
@@ -22,7 +21,13 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
     async function cargarRoles() {
       const res  = await fetch("/api/roles")
       const data = await res.json()
-      setRoles(data.filter((r) => r.nombre !== "Comandante"))
+
+      // Si esta persona ya es Comandante no tiene sentido mostrarlo en el dropdown
+      // En cualquier otro caso sí aparece, para poder transferir el cargo
+      const rolComandante          = data.find((r) => r.nombre === "Comandante")
+      const estaPersonaEsComandante = persona.usuario?.rol_id === rolComandante?.id
+
+      setRoles(estaPersonaEsComandante ? data.filter((r) => r.nombre !== "Comandante") : data)
     }
     cargarRoles()
   }, [])
@@ -36,6 +41,10 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
     return () => document.removeEventListener("keydown", manejarTecla)
   }, [form])
 
+  // Detectar si se está seleccionando el rol Comandante
+  const rolSeleccionado       = roles.find((r) => r.id === Number(form.rol_id))
+  const asignandoComandante   = rolSeleccionado?.nombre === "Comandante"
+
   async function handleGuardar() {
     if (cargando) return
 
@@ -43,6 +52,14 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
     if (!modoEdicion) {
       const confirmar = window.confirm(
         `¿Confirmás dar acceso al sistema a ${persona.grado} ${persona.apellido}, ${persona.nombre}?`
+      )
+      if (!confirmar) return
+    }
+
+    // Confirmación extra al asignar el rol Comandante
+    if (asignandoComandante) {
+      const confirmar = window.confirm(
+        `Estás por asignar el rol de Comandante a ${persona.grado} ${persona.apellido}, ${persona.nombre}.\n\nEl Comandante actual debe tener otro rol asignado antes de confirmar este cambio.\n\n¿Confirmás?`
       )
       if (!confirmar) return
     }
@@ -168,6 +185,12 @@ export default function UsuarioModal({ persona, onGuardado, onCerrar }) {
                 </option>
               ))}
             </select>
+
+            {asignandoComandante && (
+              <p className="text-xs text-amber-600 mt-1.5 font-medium">
+                ⚠️ Asignar este rol transfiere el mando del GTAP. El Comandante actual debe tener otro rol antes de confirmar.
+              </p>
+            )}
           </div>
 
         </div>

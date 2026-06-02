@@ -5,19 +5,9 @@ import bcrypt from "bcryptjs"
 
 const prisma = new PrismaClient()
 
-// ============================================
-// CONFIGURACIÓN DE BLOQUEO POR INTENTOS FALLIDOS
-// ============================================
 const MAX_INTENTOS_FALLIDOS = 3
 const MINUTOS_BLOQUEO = 15
 
-// ============================================
-// FUNCIONES AUXILIARES DE SEGURIDAD
-// ============================================
-
-// Extrae la dirección IP del request
-// En desarrollo local será "desconocida" o "127.0.0.1"
-// En producción (con Nginx) será la IP real del usuario
 function obtenerIP(req) {
   try {
     if (req?.headers?.get) {
@@ -34,25 +24,15 @@ function obtenerIP(req) {
   }
 }
 
-// Registra un intento de login en la tabla log_intentos_login
-// Envuelto en try-catch: si falla el log, el login sigue funcionando
 async function registrarIntentoLogin(username, resultado, ip) {
   try {
     await prisma.logIntentoLogin.create({
-      data: {
-        username,
-        resultado,
-        ip,
-      },
+      data: { username, resultado, ip },
     })
   } catch (error) {
     console.error('Error al registrar intento de login:', error)
   }
 }
-
-// ============================================
-// CONFIGURACIÓN DE NEXTAUTH
-// ============================================
 
 const handler = NextAuth({
   providers: [
@@ -67,13 +47,11 @@ const handler = NextAuth({
 
         // 1. Buscar el usuario en la base de datos
         const usuario = await prisma.usuario.findUnique({
-          where: { username: credentials.username },
+          where: { username: credentials.username.trim() },
           include: {
-            persona:          true,
+            persona: true,
             rol: {
-              include: {
-                permisos_rol: true,
-              },
+              include: { permisos_rol: true },
             },
             permisos_usuario: true,
           },
@@ -102,8 +80,8 @@ const handler = NextAuth({
         }
 
         // 5. Comparar la contraseña con bcrypt
-        const passwordValido = await bcrypt.compare(
-          credentials.password,
+          const passwordValido = await bcrypt.compare(
+          credentials.password.trim(),
           usuario.password
         )
 
@@ -132,24 +110,26 @@ const handler = NextAuth({
           } else {
             await prisma.usuario.update({
               where: { id: usuario.id },
-              data: {
-                intentos_fallidos: nuevosIntentos,
-              },
+              data: { intentos_fallidos: nuevosIntentos },
             })
-
             await registrarIntentoLogin(credentials.username, 'CREDENCIALES_INVALIDAS', ip)
           }
 
           return null
         }
 
-        // 7. Contraseña correcta: limpiar intentos acumulados si los había
-        if (usuario.intentos_fallidos > 0 || usuario.bloqueado_hasta !== null) {
+        // 7. Login exitoso: limpiar intentos, bloqueo y sesión invalidada
+        if (
+          usuario.intentos_fallidos > 0     ||
+          usuario.bloqueado_hasta   !== null ||
+          usuario.sesion_invalidada_en !== null
+        ) {
           await prisma.usuario.update({
             where: { id: usuario.id },
             data: {
-              intentos_fallidos: 0,
-              bloqueado_hasta:   null,
+              intentos_fallidos:    0,
+              bloqueado_hasta:      null,
+              sesion_invalidada_en: null,
             },
           })
         }
@@ -181,13 +161,14 @@ const handler = NextAuth({
         }
 
         // 11. Retornar datos del usuario para la sesión
+        // sesion_invalidada_en siempre null al hacer login — ya se limpió arriba
         return {
           id:                   usuario.id,
           username:             usuario.username,
           nombre:               usuario.persona.nombre,
           apellido:             usuario.persona.apellido,
           rol:                  usuario.rol.nombre,
-          sesion_invalidada_en: usuario.sesion_invalidada_en,
+          sesion_invalidada_en: null,
           permisos,
         }
       },
@@ -224,7 +205,7 @@ const handler = NextAuth({
   },
   session: {
     strategy: "jwt",
-     maxAge: 8 * 60 * 60, // 8 horas máximo total de sesión
+    maxAge: 8 * 60 * 60,
   },
 })
 
