@@ -15,7 +15,15 @@ export async function GET() {
       where:   { activo: true },
       orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
       include: {
-        usuario: true,
+        usuario: {
+          select: {
+            id:       true,
+            username: true,
+            rol:      true,
+            activo:   true,
+            // NO incluimos password ni otros datos sensibles
+          },
+        },
         habilitaciones_medicas: {
           where:   { deleted_at: null },
           orderBy: [{ anio: "desc" }, { periodo: "desc" }],
@@ -39,6 +47,53 @@ export async function POST(request) {
 
     const body = await request.json()
 
+    // ==========================================
+    // VALIDACIONES
+    // ==========================================
+
+    // Nombre obligatorio
+    if (!body.nombre || body.nombre.trim() === "") {
+      return NextResponse.json(
+        { error: "El nombre es obligatorio" },
+        { status: 400 }
+      )
+    }
+
+    // Apellido obligatorio
+    if (!body.apellido || body.apellido.trim() === "") {
+      return NextResponse.json(
+        { error: "El apellido es obligatorio" },
+        { status: 400 }
+      )
+    }
+
+    // Nro documento obligatorio
+    if (!body.nro_documento || body.nro_documento.trim() === "") {
+      return NextResponse.json(
+        { error: "El número de documento es obligatorio" },
+        { status: 400 }
+      )
+    }
+
+    // Nro documento solo numérico (sin puntos, sin letras, sin guiones)
+    if (!/^\d+$/.test(body.nro_documento)) {
+      return NextResponse.json(
+        { error: "El número de documento debe contener solo números, sin puntos ni guiones" },
+        { status: 400 }
+      )
+    }
+
+    // Grado obligatorio
+    if (!body.grado || body.grado.trim() === "") {
+      return NextResponse.json(
+        { error: "El grado es obligatorio" },
+        { status: 400 }
+      )
+    }
+
+    // ==========================================
+    // VERIFICACIÓN DE DUPLICADO
+    // ==========================================
     const existe = await prisma.persona.findUnique({
       where: { nro_documento: body.nro_documento },
     })
@@ -50,12 +105,15 @@ export async function POST(request) {
       )
     }
 
+    // ==========================================
+    // CREACIÓN
+    // ==========================================
     const persona = await prisma.persona.create({
       data: {
-        nombre:              body.nombre,
-        apellido:            body.apellido,
-        grado:               body.grado,
-        nro_documento:       body.nro_documento,
+        nombre:              body.nombre.trim(),
+        apellido:            body.apellido.trim(),
+        grado:               body.grado.trim(),
+        nro_documento:       body.nro_documento.trim(),
         fecha_nacimiento:    body.fecha_nacimiento    ? new Date(body.fecha_nacimiento) : null,
         escuadron:           body.escuadron,
         unidad:              body.unidad,

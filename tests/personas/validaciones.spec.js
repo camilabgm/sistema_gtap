@@ -70,25 +70,44 @@ test('CI duplicado no permite crear persona', async ({ page }) => {
 
 // =================================================
 // TEST 4: Nombre vacío - BUG CONOCIDO
-// El sistema actualmente PERMITE crear sin nombre.
-// Cuando se corrija la validación, descomentar el test original.
-// =================================================
-test.skip('nombre vacio no permite crear persona', async ({ page }) => {
-  // Test deshabilitado hasta que se agregue validación de nombre obligatorio
+test('nombre vacio no permite crear persona', async ({ page }) => {
+  await page.getByRole('button', { name: '+ Nueva persona' }).click();
+  await page.getByRole('textbox', { name: 'López Cattebeke' }).fill('SoloApellido');
+  await page.getByRole('textbox', { name: '1234567' }).fill('55002002');
+  await page.locator('input[type="date"]').fill('1990-01-01');
+  await page.getByRole('textbox', { name: 'TCNEL DCEM' }).fill('Tte');
+  await page.getByRole('textbox', { name: 'Comandancia GTAP' }).fill('Test');
+  await page.getByRole('combobox').nth(3).selectOption('PILOTO');
+  await page.getByRole('button', { name: 'Crear persona' }).click();
+  await expect(page.getByText(/nombre es obligatorio/i)).toBeVisible({ timeout: 5000 });
 });
 
-// =================================================
-// TEST 5: Apellido vacío - BUG CONOCIDO
-// =================================================
-test.skip('apellido vacio no permite crear persona', async ({ page }) => {
-  // Test deshabilitado hasta que se agregue validación de apellido obligatorio
+test('apellido vacio no permite crear persona', async ({ page }) => {
+  await page.getByRole('button', { name: '+ Nueva persona' }).click();
+  await page.getByRole('textbox', { name: 'Álvaro' }).fill('SoloNombre');
+  await page.getByRole('textbox', { name: '1234567' }).fill('55003003');
+  await page.locator('input[type="date"]').fill('1990-01-01');
+  await page.getByRole('textbox', { name: 'TCNEL DCEM' }).fill('Tte');
+  await page.getByRole('textbox', { name: 'Comandancia GTAP' }).fill('Test');
+  await page.getByRole('combobox').nth(3).selectOption('PILOTO');
+  await page.getByRole('button', { name: 'Crear persona' }).click();
+  await expect(page.getByText(/apellido es obligatorio/i)).toBeVisible({ timeout: 5000 });
 });
 
-// =================================================
-// TEST 6: CI vacío - BUG CONOCIDO
-// =================================================
-test.skip('CI vacio no permite crear persona', async ({ page }) => {
-  // Test deshabilitado hasta que se agregue validación de CI obligatorio
+test('CI vacio no permite crear persona', async ({ page }) => {
+  await page.getByRole('button', { name: '+ Nueva persona' }).click();
+  await page.getByRole('textbox', { name: 'Álvaro' }).fill('SinCI');
+  await page.getByRole('textbox', { name: 'López Cattebeke' }).fill('Test');
+  await page.locator('input[type="date"]').fill('1990-01-01');
+  await page.getByRole('textbox', { name: 'TCNEL DCEM' }).fill('Tte');
+  await page.getByRole('textbox', { name: 'Comandancia GTAP' }).fill('Test');
+  await page.getByRole('combobox').nth(3).selectOption('PILOTO');
+  await page.getByRole('button', { name: 'Crear persona' }).click();
+
+  // El formulario debe seguir abierto (no se creó la persona)
+  await expect(page.getByRole('button', { name: 'Crear persona' })).toBeVisible({ timeout: 5000 });
+  // Y no debe aparecer "SinCI" en la lista de personas
+  await expect(page.getByText('SinCI')).not.toBeVisible({ timeout: 3000 });
 });
 /*
 // =================================================

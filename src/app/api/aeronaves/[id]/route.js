@@ -8,33 +8,97 @@ import { authOptions } from "@/auth"
 // ============================================
 export async function PUT(request, { params }) {
   try {
-    // Verificamos que el usuario esté logueado
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    // En Next.js 15 params debe ser esperado con await
     const { id } = await params
     const body = await request.json()
 
-    // Actualizamos la aeronave con el id recibido en la URL
+    // ==========================================
+    // VALIDACIONES
+    // ==========================================
+
+    if (!body.matricula || body.matricula.trim() === "") {
+      return NextResponse.json(
+        { error: "La matrícula es obligatoria" },
+        { status: 400 }
+      )
+    }
+
+    if (!body.tipo || body.tipo.trim() === "") {
+      return NextResponse.json(
+        { error: "El tipo de aeronave es obligatorio" },
+        { status: 400 }
+      )
+    }
+
+    if (!body.fabricante || body.fabricante.trim() === "") {
+      return NextResponse.json(
+        { error: "El fabricante es obligatorio" },
+        { status: 400 }
+      )
+    }
+
+    if (body.estado === "NO_DISPONIBLE") {
+      if (!body.motivo_no_disponible) {
+        return NextResponse.json(
+          { error: "Debe seleccionar un motivo de no disponibilidad" },
+          { status: 400 }
+        )
+      }
+
+      if (body.motivo_no_disponible === "OTRO") {
+        if (!body.motivo_otro || body.motivo_otro.trim() === "") {
+          return NextResponse.json(
+            { error: "Debe describir el motivo de no disponibilidad" },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
+    // ==========================================
+    // VERIFICACIÓN DE DUPLICADO (excluyendo la aeronave actual)
+    // ==========================================
+    const existe = await prisma.aeronave.findFirst({
+      where: {
+        matricula: body.matricula.trim(),
+        id: { not: Number(id) },
+      },
+    })
+
+    if (existe) {
+      return NextResponse.json(
+        { error: "Ya existe otra aeronave con esa matrícula" },
+        { status: 400 }
+      )
+    }
+
+    // ==========================================
+    // ACTUALIZACIÓN
+    // ==========================================
     const aeronave = await prisma.aeronave.update({
       where: { id: Number(id) },
       data: {
-        matricula:           body.matricula,
-        tipo:                body.tipo,
-        fabricante:          body.fabricante,
-        anio_fabricacion:    Number(body.anio_fabricacion),
-        anio_incorporacion:  Number(body.anio_incorporacion),
-        capacidad_pasajeros: Number(body.capacidad_pasajeros),
-        tipo_combustible:    body.tipo_combustible,
-        velocidad_crucero:   body.velocidad_crucero ? Number(body.velocidad_crucero) : null,
-        estela_turbulencia:  body.estela_turbulencia || null,
-        color:               body.color || null,
-        categoria:           body.categoria,
-        estado:              body.estado,
-        editado_por:         session.user.id,
+        matricula:            body.matricula.trim(),
+        tipo:                 body.tipo.trim(),
+        fabricante:           body.fabricante.trim(),
+        anio_fabricacion:     Number(body.anio_fabricacion),
+        anio_incorporacion:   Number(body.anio_incorporacion),
+        capacidad_pasajeros:  Number(body.capacidad_pasajeros),
+        tipo_combustible:     body.tipo_combustible,
+        velocidad_crucero:    body.velocidad_crucero ? Number(body.velocidad_crucero) : null,
+        estela_turbulencia:   body.estela_turbulencia || null,
+        color:                body.color || null,
+        categoria:            body.categoria,
+        estado:               body.estado,
+        motivo_no_disponible: body.estado === "NO_DISPONIBLE" ? body.motivo_no_disponible : null,
+        motivo_otro:          body.estado === "NO_DISPONIBLE" && body.motivo_no_disponible === "OTRO"
+                                ? body.motivo_otro.trim()
+                                : null,
+        editado_por:          session.user.id,
       },
     })
 
@@ -50,17 +114,13 @@ export async function PUT(request, { params }) {
 // ============================================
 export async function DELETE(request, { params }) {
   try {
-    // Verificamos que el usuario esté logueado
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    // En Next.js 15 params debe ser esperado con await
     const { id } = await params
 
-    // No borramos el registro — solo lo marcamos como inactivo
-    // Así conservamos el historial completo
     const aeronave = await prisma.aeronave.update({
       where: { id: Number(id) },
       data: {
