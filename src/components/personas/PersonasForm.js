@@ -37,6 +37,14 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
     setCargando(true)
     setError("")
 
+      // Validación del nro_documento
+     // Validación del nro_documento
+    if (!form.nro_documento || !/^\d+$/.test(form.nro_documento)) {
+      setError("El número de documento debe contener solo números")
+      setCargando(false)
+      return
+    }
+
     const metodo = modoEdicion ? "PUT" : "POST"
     const url    = modoEdicion ? `/api/personas/${persona.id}` : "/api/personas"
 
@@ -105,15 +113,25 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
                   placeholder="López Cattebeke"
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nro. de documento <span className="text-red-500">*</span>
-                </label>
-                <input type="text" value={form.nro_documento}
-                  onChange={(e) => setForm({ ...form, nro_documento: e.target.value })}
-                  placeholder="1234567"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
+         <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Nro. de documento <span className="text-red-500">*</span>
+  </label>
+  <input 
+    type="text"
+    inputMode="numeric"
+    pattern="[0-9]*"
+    value={form.nro_documento}
+    onChange={(e) => {
+      // Solo permite ingresar números
+      const soloNumeros = e.target.value.replace(/\D/g, "")
+      setForm({ ...form, nro_documento: soloNumeros })
+    }}
+    placeholder="1234567"
+    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  />
+  <p className="text-xs text-gray-400 mt-1">Solo números, sin puntos ni guiones</p>
+</div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Fecha de nacimiento
