@@ -32,9 +32,37 @@ test('crear tipo de mision nuevo', async ({ page }) => {
   await expect(page.getByText('ZZZ').first()).toBeVisible({ timeout: 10000 });
 });
 
-// Sub-tipos: skippeados hasta investigar cuándo aparece el checkbox
-test.skip('crear tipo de mision con subtipos', async ({ page }) => {});
-test.skip('checkbox subtipos muestra y oculta campo de subtipos', async ({ page }) => {});
+test('crear tipo de mision con subtipos', async ({ page }) => {
+  await page.getByRole('button', { name: '+ Nuevo tipo' }).click();
+
+  await page.getByRole('textbox', { name: 'Ej: AME, VMIL, FAP' }).fill('YYY');
+  await page.getByRole('textbox', { name: 'Ej: Aeromédico' }).fill('Tipo con subtipos');
+  await page.getByRole('combobox').nth(1).selectOption('TIPO_VUELO');
+
+  await page.getByRole('checkbox', { name: '¿Este tipo de vuelo tiene sub' }).check();
+  await page.getByRole('textbox', { name: 'Ej: Traslado de paciente,' }).fill('Sub1, Sub2, Sub3');
+
+  await page.getByRole('button', { name: 'Guardar' }).click();
+
+  await expect(page.getByText('YYY').first()).toBeVisible({ timeout: 10000 });
+});
+
+test('checkbox subtipos muestra y oculta campo de subtipos', async ({ page }) => {
+  await page.getByRole('button', { name: '+ Nuevo tipo' }).click();
+
+  await page.getByRole('combobox').nth(1).selectOption('TIPO_VUELO');
+
+  const checkbox = page.getByRole('checkbox', { name: '¿Este tipo de vuelo tiene sub' });
+  const campoSubtipos = page.getByRole('textbox', { name: 'Ej: Traslado de paciente,' });
+
+  await expect(campoSubtipos).not.toBeVisible();
+
+  await checkbox.check();
+  await expect(campoSubtipos).toBeVisible();
+
+  await checkbox.uncheck();
+  await expect(campoSubtipos).not.toBeVisible();
+});
 
 test('buscar tipo de mision filtra resultados', async ({ page }) => {
   const buscador = page.getByRole('textbox', { name: 'Buscar por código o nombre...' });
