@@ -43,6 +43,8 @@ test('editar aeronave y guardar cambios', async ({ page }) => {
 });
 
 test('editar aeronave NO DISPONIBLE sin motivo muestra error', async ({ page }) => {
+  // Buscar una aeronave DISPONIBLE para editar
+  await page.getByRole('textbox', { name: 'Buscar por matrícula o tipo...' }).fill('FAP0250');
   await page.getByRole('button', { name: 'Editar' }).first().click();
 
   // Aceptar el diálogo de confirmación
@@ -50,8 +52,8 @@ test('editar aeronave NO DISPONIBLE sin motivo muestra error', async ({ page }) 
     await dialog.accept();
   });
 
+  // Cambiar a NO DISPONIBLE pero NO seleccionar motivo
   await page.getByRole('combobox').nth(5).selectOption('NO_DISPONIBLE');
-  // No seleccionar motivo
 
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
 
