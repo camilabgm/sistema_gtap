@@ -1,10 +1,8 @@
-// src/app/api/personas/[id]/route.js
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 
-// PUT — actualiza datos personales e institucionales completos
 export async function PUT(request, { params }) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,14 +13,47 @@ export async function PUT(request, { params }) {
     const { id } = await params
     const body   = await request.json()
 
+    // Validaciones — mismas que en POST
+    if (!body.nombre || body.nombre.trim() === "") {
+      return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 })
+    }
+
+    if (!body.apellido || body.apellido.trim() === "") {
+      return NextResponse.json({ error: "El apellido es obligatorio" }, { status: 400 })
+    }
+
+    if (!body.nro_documento || body.nro_documento.trim() === "") {
+      return NextResponse.json({ error: "El número de documento es obligatorio" }, { status: 400 })
+    }
+
+    if (!/^\d+$/.test(body.nro_documento)) {
+      return NextResponse.json({ error: "El número de documento debe contener solo números, sin puntos ni guiones" }, { status: 400 })
+    }
+
+    if (!body.grado || body.grado.trim() === "") {
+      return NextResponse.json({ error: "El grado es obligatorio" }, { status: 400 })
+    }
+
+    // Verificar duplicado excluyendo el registro actual
+    const duplicado = await prisma.persona.findFirst({
+      where: {
+        nro_documento: body.nro_documento.trim(),
+        id: { not: Number(id) },
+      },
+    })
+
+    if (duplicado) {
+      return NextResponse.json({ error: "Ya existe otra persona con ese número de documento" }, { status: 400 })
+    }
+
     const persona = await prisma.persona.update({
       where: { id: Number(id) },
       data: {
-        nombre:              body.nombre,
-        apellido:            body.apellido,
-        grado:               body.grado,
-        nro_documento:       body.nro_documento,
-        fecha_nacimiento:    body.fecha_nacimiento    ? new Date(body.fecha_nacimiento) : null,
+        nombre:              body.nombre.trim(),
+        apellido:            body.apellido.trim(),
+        grado:               body.grado.trim(),
+        nro_documento:       body.nro_documento.trim(),
+        fecha_nacimiento:    body.fecha_nacimiento ? new Date(body.fecha_nacimiento) : null,
         escuadron:           body.escuadron,
         unidad:              body.unidad,
         especialidad:        body.especialidad        || null,
@@ -41,7 +72,6 @@ export async function PUT(request, { params }) {
   }
 }
 
-// PATCH — actualiza solo los campos enviados (usado por el modal de habilitaciones)
 export async function PATCH(request, { params }) {
   try {
     const session = await getServerSession(authOptions)
@@ -52,7 +82,6 @@ export async function PATCH(request, { params }) {
     const { id } = await params
     const body   = await request.json()
 
-    // Solo campos permitidos por PATCH para evitar updates masivos accidentales
     const camposPermitidos = ["hab_anual_habilitada", "nivel_operacional_habilitado"]
     const data = {}
 
@@ -60,7 +89,6 @@ export async function PATCH(request, { params }) {
       if (campo in body) {
         data[campo] = body[campo]
 
-        // Registrar quién y cuándo habilitó operacionalmente
         if (campo === "nivel_operacional_habilitado" && body[campo] === true) {
           data.nivel_operacional_aprobado_por = session.user.personaId || null
           data.nivel_operacional_fecha        = new Date()
@@ -86,7 +114,6 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE — soft delete
 export async function DELETE(request, { params }) {
   try {
     const session = await getServerSession(authOptions)

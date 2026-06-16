@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import bcrypt from "bcryptjs"
-
-const prisma = new PrismaClient()
 
 export async function PUT(request, { params }) {
   try {
@@ -25,7 +23,6 @@ export async function PUT(request, { params }) {
       data.password = await bcrypt.hash(body.password, 10)
     }
 
-    // Si el nuevo rol es Comandante, verificar que no haya otro activo
     if (Number(body.rol_id) === await obtenerIdRolComandante()) {
       const otroComandante = await prisma.usuario.findFirst({
         where: {
@@ -44,7 +41,6 @@ export async function PUT(request, { params }) {
       }
     }
 
-    // Si cambia el rol, invalidamos la sesión del usuario afectado
     const usuarioActual = await prisma.usuario.findUnique({
       where:  { id: Number(id) },
       select: { rol_id: true },
@@ -57,6 +53,14 @@ export async function PUT(request, { params }) {
     const usuario = await prisma.usuario.update({
       where: { id: Number(id) },
       data,
+      select: {
+        id:         true,
+        username:   true,
+        persona_id: true,
+        rol_id:     true,
+        activo:     true,
+        updated_at: true,
+      },
     })
 
     return NextResponse.json(usuario)
@@ -83,7 +87,7 @@ export async function DELETE(request, { params }) {
 
     const { id } = await params
 
-    const usuario = await prisma.usuario.update({
+    await prisma.usuario.update({
       where: { id: Number(id) },
       data: {
         activo:        false,
@@ -92,7 +96,7 @@ export async function DELETE(request, { params }) {
       },
     })
 
-    return NextResponse.json(usuario)
+    return NextResponse.json({ ok: true })
   } catch (error) {
     console.error("Error DELETE usuarios:", error)
     return NextResponse.json({ error: "Error al desactivar usuario" }, { status: 500 })
