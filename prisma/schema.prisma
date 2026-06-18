@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─────────────────────────────  ENUMS M0-M3  ──────────────────────────────
 enum Escuadron {
   ESCUADRON_OPERACIONES_AEREAS
   ESCUADRON_MANTENIMIENTO
@@ -65,6 +66,66 @@ enum ResultadoLogin {
   CUENTA_BLOQUEADA
 }
 
+// ─────────────────────────────  ENUMS  M4 ──────────────────────────────
+
+enum EstadoEscala {
+  PROGRAMADA
+  EN_DESARROLLO
+  CUMPLIDA
+  ABORTADA
+}
+
+enum MotivoAbortada {
+  ADOS // Orden Superior
+  ADFM // Falta de Material
+  ADCA // Condición de la Aeronave
+  ADCM // Condiciones Meteorológicas
+  ADTI // Técnica de Instrucción
+  ADCP // Condiciones del Piloto
+}
+
+enum CanalSolicitud {
+  WHATSAPP
+  PDF
+  IMAGEN // foto JPG / PNG
+  WORD
+  VERBAL // ej. orden presidencial; el archivo se adjunta después
+}
+
+enum RolEnVuelo {
+  PILOTO
+  COPILOTO
+  TECNICO_DE_VUELO
+}
+
+enum RolAutorizador {
+  COMANDANTE
+  JEFE_OPERACIONES
+  CMDTE_ESC_AEREO
+  CMDTE_ESC_MANTENIMIENTO
+  JEFE_PERSONAL
+}
+
+enum EstadoAutorizacion {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+enum RolAcuse {
+  PILOTO
+  COPILOTO
+  TECNICO_DE_VUELO
+  SUPERVISOR_SEMANA // línea de vuelo, los que preparan la aeronave
+}
+
+enum Novedad {
+  SIN_NOVEDAD
+  INCIDENTE
+  ACCIDENTE
+}
+
+// ─────────────────────────────  MODELOS M0–M3 ────────────────────────────
 model Persona {
   id                  Int                  @id @default(autoincrement())
   nombre              String
@@ -81,16 +142,16 @@ model Persona {
   nro_pasaporte       String?
 
   // Habilitación médica anual — check manual de Operaciones
-  hab_anual_habilitada            Boolean   @default(false)
+  hab_anual_habilitada Boolean @default(false)
 
   // Habilitación operacional — check manual de Operaciones
-  nivel_operacional_habilitado    Boolean   @default(false)
-  nivel_operacional_aprobado_por  Int?
-  nivel_operacional_fecha         DateTime?
+  nivel_operacional_habilitado   Boolean   @default(false)
+  nivel_operacional_aprobado_por Int?
+  nivel_operacional_fecha        DateTime?
 
   // Campos legacy — se mantienen para no perder datos históricos
-  nivel_operacional               String?
-  nivel_operacional_vence         DateTime?
+  nivel_operacional       String?
+  nivel_operacional_vence DateTime?
 
   activo        Boolean   @default(true)
   created_at    DateTime  @default(now())
@@ -105,6 +166,9 @@ model Persona {
   partes_diarios         ParteDiario[]
   habilitaciones_medicas HabilitacionMedica[]
 
+  tripulaciones EscalaTripulacion[]
+  acuses        AcuseRecibo[]
+
   @@map("personas")
 }
 
@@ -114,8 +178,8 @@ model HabilitacionMedica {
   id           Int      @id @default(autoincrement())
   persona_id   Int
   fecha_examen DateTime @db.Date
-  periodo      String   // "1P" | "2P"
-  anio         Int      // año de inicio del período
+  periodo      String // "1P" | "2P"
+  anio         Int // año de inicio del período
   vence        DateTime @db.Date
 
   created_at    DateTime  @default(now())
@@ -258,26 +322,28 @@ model TipoMision {
   editado_por   Int?
   eliminado_por Int?
 
+  escalas Escala[]
+
   @@map("tipos_misiones")
 }
 
 model Aeronave {
-  id                  Int               @id @default(autoincrement())
-  matricula           String            @unique
-  tipo                String
-  fabricante          String
-  anio_fabricacion    Int
-  anio_incorporacion  Int
-  capacidad_pasajeros Int
-  tipo_combustible    String
-  velocidad_crucero   Int?
-  estela_turbulencia  String?
-  color               String?
-  categoria           CategoriaAeronave
-  estado              EstadoAeronave    @default(DISPONIBLE)
-  motivo_no_disponible  MotivoNoDisponible?
-  motivo_otro           String?
-  activo              Boolean           @default(true)
+  id                   Int                 @id @default(autoincrement())
+  matricula            String              @unique
+  tipo                 String
+  fabricante           String
+  anio_fabricacion     Int
+  anio_incorporacion   Int
+  capacidad_pasajeros  Int
+  tipo_combustible     String
+  velocidad_crucero    Int?
+  estela_turbulencia   String?
+  color                String?
+  categoria            CategoriaAeronave
+  estado               EstadoAeronave      @default(DISPONIBLE)
+  motivo_no_disponible MotivoNoDisponible?
+  motivo_otro          String?
+  activo               Boolean             @default(true)
 
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
@@ -285,6 +351,8 @@ model Aeronave {
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
+
+  escalas Escala[]
 
   @@map("aeronaves")
 }
@@ -315,4 +383,196 @@ model LogIntentoLogin {
   created_at DateTime       @default(now())
 
   @@map("log_intentos_login")
+}
+
+// ─────────────────────────────  MODELO M4  ────────────────────────────
+
+//  NOTA 1: la disponibilidad administrativa del personal NO se modela
+//  acá. Se reutiliza el modelo ParteDiario que ya existe en M3.
+//  NOTA 2: cada escala guarda un inicio y un fin estimado (DateTime)
+//  para detectar choques de horario. Una aeronave o un tripulante
+//  PUEDEN tener varios vuelos el mismo día si NO se solapan en horario.
+//  NOTA 3: la VENTANA DE OCUPACIÓN (despegue → arribo final, incluye
+//  tiempo en tierra) es lo que usa el bloqueo de choques. Las HORAS
+//  VOLADAS (para SICEM/Informes) son la suma del tiempo de cada tramo
+//  del itinerario y NO incluyen el tiempo en tierra. Son números
+//  distintos.
+// ════════════════════════════════════════════════════════════════════
+
+model Escala {
+  id                     Int             @id @default(autoincrement())
+  nro_orden              String          @unique
+  fecha                  DateTime        @db.Date
+  hora_despegue_estimada DateTime?
+  hora_arribo_estimada   DateTime?
+  hora_real_salida       DateTime?
+  hora_real_arribo       DateTime?
+  solicitante            String // ej. FFMM, Presidencia, ANDE, CODI
+  observaciones          String?
+  estado                 EstadoEscala    @default(PROGRAMADA)
+  motivo_abortada        MotivoAbortada? // solo si estado = ABORTADA
+  observacion_aborto     String?
+  es_borrador            Boolean         @default(true)
+
+  // Relaciones con módulos existentes (M1 y M2) — opcionales en borrador
+  aeronave_id    Int?
+  aeronave       Aeronave?   @relation(fields: [aeronave_id], references: [id])
+  tipo_mision_id Int?
+  tipo_mision    TipoMision? @relation(fields: [tipo_mision_id], references: [id])
+
+  // Relaciones hijas (este módulo)
+  itinerarios    EscalaItinerario[]
+  tripulacion    EscalaTripulacion[]
+  solicitudes    Solicitud[]
+  autorizaciones EscalaAutorizacion[]
+  acuses         AcuseRecibo[]
+  post_vuelo     PostVuelo?
+
+  // Auditoría
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("escalas")
+}
+
+model EscalaItinerario {
+  id        Int    @id @default(autoincrement())
+  escala_id Int
+  escala    Escala @relation(fields: [escala_id], references: [id])
+
+  orden   Int // 1, 2, 3… el tramo dentro del vuelo
+  origen  String // OACI de partida del tramo, ej. SGAS
+  destino String // OACI de llegada del tramo, ej. SGFI
+
+  // Tiempos por tramo. Horas del tramo = llegada - salida.
+  // El total de la escala = suma de las horas de todos los tramos.
+  hora_estimada_salida  DateTime?
+  hora_estimada_llegada DateTime?
+  hora_real_salida      DateTime?
+  hora_real_llegada     DateTime?
+
+  // Auditoría
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("escala_itinerarios")
+}
+
+model EscalaTripulacion {
+  id        Int    @id @default(autoincrement())
+  escala_id Int
+  escala    Escala @relation(fields: [escala_id], references: [id])
+
+  persona_id   Int
+  persona      Persona    @relation(fields: [persona_id], references: [id])
+  rol_en_vuelo RolEnVuelo
+
+  // Auditoría
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@unique([escala_id, persona_id])
+  @@map("escala_tripulacion")
+}
+
+model Solicitud {
+  id        Int    @id @default(autoincrement())
+  escala_id Int
+  escala    Escala @relation(fields: [escala_id], references: [id])
+
+  canal                   CanalSolicitud
+  archivo                 String? // ruta del archivo guardado; null si VERBAL
+  nombre_archivo_original String?
+  recibido_por            Int? // id del usuario que cargó el pedido
+  fecha_recepcion         DateTime       @default(now())
+
+  // Auditoría
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("solicitudes")
+}
+
+model EscalaAutorizacion {
+  id        Int    @id @default(autoincrement())
+  escala_id Int
+  escala    Escala @relation(fields: [escala_id], references: [id])
+
+  orden_cascada    Int // posición en la cascada: 1, 2, 3…
+  rol_autorizador  RolAutorizador
+  autorizador_id   Int? // usuario que resolvió este paso
+  estado           EstadoAutorizacion @default(PENDIENTE)
+  comentario       String?
+  fecha_resolucion DateTime?
+
+  // Auditoría
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("escala_autorizaciones")
+}
+
+model AcuseRecibo {
+  id        Int    @id @default(autoincrement())
+  escala_id Int
+  escala    Escala @relation(fields: [escala_id], references: [id])
+
+  persona_id  Int
+  persona     Persona   @relation(fields: [persona_id], references: [id])
+  rol         RolAcuse
+  fecha_acuse DateTime? // null = todavía no acusó recibo
+
+  // Auditoría
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@unique([escala_id, persona_id, rol])
+  @@map("acuses_recibo")
+}
+
+model PostVuelo {
+  id        Int    @id @default(autoincrement())
+  escala_id Int    @unique // un post-vuelo por escala
+  escala    Escala @relation(fields: [escala_id], references: [id])
+
+  minutos_volados       Int // suma del tiempo de cada tramo, en minutos exactos (se muestra como HH:MM). Es la entrada del SICEM.
+  combustible_consumido Decimal? @db.Decimal(8, 2)
+  novedad               Novedad  @default(SIN_NOVEDAD)
+  detalle_novedad       String?
+  cargado_por           Int? // id del usuario; puede ser cualquiera
+  fecha_registro        DateTime @default(now())
+
+  // Auditoría
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("post_vuelos")
 }
