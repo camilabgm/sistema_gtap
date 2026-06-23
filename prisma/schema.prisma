@@ -401,7 +401,7 @@ model LogIntentoLogin {
 
 model Escala {
   id                     Int             @id @default(autoincrement())
-  nro_orden              String          @unique
+  nro_orden              String?         @unique
   fecha                  DateTime        @db.Date
   hora_despegue_estimada DateTime?
   hora_arribo_estimada   DateTime?
