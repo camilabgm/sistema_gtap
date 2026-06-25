@@ -1,3 +1,4 @@
+// src/lib/disponibilidad.js
 // Lógica de disponibilidad de aeronaves y tripulantes.
 // Se usa al completar una escala y se reutilizará al publicar y en el dashboard.
 
@@ -81,21 +82,32 @@ export async function verificarTripulante(personaId, fecha, ventana, escalaIdAct
       apellido: true,
       hab_anual_habilitada: true,
       nivel_operacional_habilitado: true,
+      // ¿Tiene alguna habilitación médica semestral (1P/2P) todavía vigente
+      // para la fecha del vuelo? Traemos solo una para saber si existe.
+      habilitaciones_medicas: {
+        where: { deleted_at: null, vence: { gte: fecha } },
+        select: { id: true },
+        take: 1,
+      },
     },
   })
   if (!persona) return { ok: false, motivo: "Una de las personas no existe o está inactiva" }
 
   const quien = `${persona.grado} ${persona.apellido}`
 
-  // 1. Habilitaciones — se bloquea por seguridad
-  if (!persona.hab_anual_habilitada) {
-    return { ok: false, motivo: `${quien}: habilitación médica no vigente` }
+  // 1. Habilitación médica — alcanza con que esté vigente la ANUAL o la SEMESTRAL
+  const anualVigente     = persona.hab_anual_habilitada === true
+  const semestralVigente = persona.habilitaciones_medicas.length > 0
+  if (!anualVigente && !semestralVigente) {
+    return { ok: false, motivo: `${quien}: sin habilitación médica vigente (ni anual ni semestral)` }
   }
+
+  // 2. Nivel operacional — debe estar habilitado para volar
   if (!persona.nivel_operacional_habilitado) {
     return { ok: false, motivo: `${quien}: nivel operacional no habilitado` }
   }
 
-  // 2. Novedad en el parte diario de esa fecha (permiso, vacaciones, reposo…)
+  // 3. Novedad en el parte diario de esa fecha (permiso, vacaciones, reposo…)
   const novedad = await prisma.parteDiario.findFirst({
     where: { persona_id: personaId, fecha, deleted_at: null },
     select: { observacion: true },
@@ -105,7 +117,7 @@ export async function verificarTripulante(personaId, fecha, ventana, escalaIdAct
     return { ok: false, motivo: `${quien}: con novedad en el parte del día${detalle}` }
   }
 
-  // 3. Ya vuela en otra escala confirmada que se solapa
+  // 4. Ya vuela en otra escala confirmada que se solapa
   if (ventana) {
     const choque = await prisma.escala.findFirst({
       where: {
