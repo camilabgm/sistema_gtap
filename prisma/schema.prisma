@@ -106,10 +106,17 @@ enum RolAutorizador {
   JEFE_PERSONAL
 }
 
-enum EstadoAutorizacion {
-  PENDIENTE
-  APROBADO
-  RECHAZADO
+enum MotivoEscalamiento {
+  INICIAL // primer responsable por defecto (Jefe de Operaciones)
+  EN_VUELO // el anterior estaba volando → saltó automático
+  PARTE_DIARIO // el anterior figura no disponible en el Parte Diario
+  DERIVACION_MANUAL // el anterior apretó el botón "derivar"
+}
+
+enum MotivoNoDisponibleAutorizador {
+  TAREA_ADMINISTRATIVA
+  FUERA_DE_LA_UNIDAD
+  OTRO // usar el campo motivo_detalle
 }
 
 enum RolAcuse {
@@ -168,6 +175,7 @@ model Persona {
 
   tripulaciones EscalaTripulacion[]
   acuses        AcuseRecibo[]
+  derivaciones  AutorizadorNoDisponible[]
 
   @@map("personas")
 }
@@ -414,6 +422,12 @@ model Escala {
   observacion_aborto     String?
   es_borrador            Boolean         @default(true)
 
+  // Resultado de la autorización (uno a uno con la escala)
+  autorizada         Boolean         @default(false)
+  autorizada_por     Int?
+  rol_autoriza       RolAutorizador?
+  fecha_autorizacion DateTime?
+
   // Relaciones con módulos existentes (M1 y M2) — opcionales en borrador
   aeronave_id    Int?
   aeronave       Aeronave?   @relation(fields: [aeronave_id], references: [id])
@@ -514,12 +528,19 @@ model EscalaAutorizacion {
   escala_id Int
   escala    Escala @relation(fields: [escala_id], references: [id])
 
-  orden_cascada    Int // posición en la cascada: 1, 2, 3…
-  rol_autorizador  RolAutorizador
-  autorizador_id   Int? // usuario que resolvió este paso
-  estado           EstadoAutorizacion @default(PENDIENTE)
-  comentario       String?
-  fecha_resolucion DateTime?
+  // A quién le tocó la responsabilidad en este paso, y por qué le tocó
+  rol_autorizador     RolAutorizador
+  persona_id          Int? // la persona concreta que tenía ese rol ese día
+  motivo_escalamiento MotivoEscalamiento
+
+  // Qué pasó en este paso: ¿autorizó acá, o se le pasó al siguiente?
+  // true  = esta persona AUTORIZÓ la escala (cierra el recorrido)
+  // false = quedó registrada como paso, pero la responsabilidad siguió
+  autorizo   Boolean @default(false)
+  comentario String?
+
+  // Cuándo ocurrió este paso (para mostrarlo en la interfaz)
+  fecha_paso DateTime @default(now())
 
   // Auditoría
   creado_por    Int?
@@ -552,6 +573,28 @@ model AcuseRecibo {
 
   @@unique([escala_id, persona_id, rol])
   @@map("acuses_recibo")
+}
+
+model AutorizadorNoDisponible {
+  id         Int     @id @default(autoincrement())
+  persona_id Int
+  persona    Persona @relation(fields: [persona_id], references: [id])
+
+  desde DateTime  @default(now()) // cuándo empezó a derivar
+  hasta DateTime? // cuándo volvió; null = sigue derivado
+
+  motivo         MotivoNoDisponibleAutorizador @default(TAREA_ADMINISTRATIVA)
+  motivo_detalle String? // texto libre si motivo = OTRO
+
+  // Auditoría
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("autorizador_no_disponible")
 }
 
 model PostVuelo {
