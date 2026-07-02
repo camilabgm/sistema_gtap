@@ -258,11 +258,12 @@ model Usuario {
   editado_por   Int?
   eliminado_por Int?
 
-  persona          Persona          @relation(fields: [persona_id], references: [id])
-  persona_id       Int              @unique
-  rol              Rol              @relation(fields: [rol_id], references: [id])
-  rol_id           Int
-  permisos_usuario PermisoUsuario[]
+  persona             Persona             @relation(fields: [persona_id], references: [id])
+  persona_id          Int                 @unique
+  rol                 Rol                 @relation(fields: [rol_id], references: [id])
+  rol_id              Int
+  permisos_usuario    PermisoUsuario[]
+  cargos_autorizacion CargoAutorizacion[]
 
   @@map("usuarios")
 }
@@ -595,6 +596,35 @@ model AutorizadorNoDisponible {
   deleted_at    DateTime?
 
   @@map("autorizador_no_disponible")
+}
+
+model CargoAutorizacion {
+  id Int @id @default(autoincrement())
+
+  // Qué cargo de autorización es (lista cerrada de 5, ya existe el enum)
+  rol_autorizador RolAutorizador
+
+  // Quién lo ocupa. Se conecta con Usuario, no con Persona.
+  usuario_id Int
+  usuario    Usuario @relation(fields: [usuario_id], references: [id])
+
+  // Orden dentro del cargo: 1 = titular, 2 = adjunto, 3… (Forma B)
+  orden Int
+
+  // Nombramiento vigente. Al rotar cargos: viejo activo=false, nuevo activo=true.
+  // La regla "no dos con el mismo (cargo, orden) activos" se valida en el
+  // código del apartado de usuarios (crear y editar), NO acá en la base.
+  activo Boolean @default(true)
+
+  // Auditoría (igual que el resto del sistema)
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("cargos_autorizacion")
 }
 
 model PostVuelo {
