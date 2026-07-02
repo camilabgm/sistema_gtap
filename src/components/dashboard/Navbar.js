@@ -3,6 +3,7 @@
 import { signOut } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { ROLES_ADMIN } from "@/lib/autorizacion"
 
 const modulos = [
   { nombre: "Inicio",            ruta: "/dashboard" },
@@ -14,8 +15,6 @@ const modulos = [
   { nombre: "Informes",          ruta: "/dashboard/informes" },
   { nombre: "SICEM",             ruta: "/dashboard/sicem" },
 ]
-
-const ROLES_ADMIN = ["Comandante", "Jefe de Operaciones"]
 
 export default function Navbar({ nombre, apellido, rol }) {
   const pathname = usePathname()

@@ -2,13 +2,17 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
+import { esAdministrador } from "@/lib/autorizacion"
 import bcrypt from "bcryptjs"
 
 export async function PUT(request, { params }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+
+    // Solo un administrador (Comandante o Jefe de Operaciones) puede
+    // editar el rol de un usuario. Esto cubre también "no logueado".
+    if (!esAdministrador(session)) {
+      return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
     }
 
     const { id } = await params
@@ -81,8 +85,10 @@ async function obtenerIdRolComandante() {
 export async function DELETE(request, { params }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+
+    // Solo un administrador puede desactivar un usuario.
+    if (!esAdministrador(session)) {
+      return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
     }
 
     const { id } = await params

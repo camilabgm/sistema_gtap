@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
-import { PrismaClient } from "@prisma/client"
-
-const prisma = new PrismaClient()
+import { esAdministrador } from "@/lib/autorizacion"
 
 // GET — trae permisos del rol + overrides individuales del usuario
 export async function GET(request, { params }) {
   const sesion = await getServerSession(authOptions)
 
-  if (!sesion || sesion.user.rol !== "Comandante") {
+  // Solo un administrador (Comandante o Jefe de Operaciones)
+  if (!esAdministrador(sesion)) {
     return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
   }
 
@@ -39,7 +39,8 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   const sesion = await getServerSession(authOptions)
 
-  if (!sesion || sesion.user.rol !== "Comandante") {
+  // Solo un administrador (Comandante o Jefe de Operaciones)
+  if (!esAdministrador(sesion)) {
     return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
   }
 

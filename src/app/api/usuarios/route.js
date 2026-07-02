@@ -2,13 +2,17 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
+import { esAdministrador } from "@/lib/autorizacion"
 import bcrypt from "bcryptjs"
 
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+
+    // Solo un administrador (Comandante o Jefe de Operaciones) puede
+    // crear un usuario nuevo. Esto cubre también "no logueado".
+    if (!esAdministrador(session)) {
+      return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
     }
 
     const body = await request.json()
