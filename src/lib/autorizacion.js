@@ -11,6 +11,10 @@
 // Roles que pueden administrar el sistema (permisos, usuarios, roles).
 export const ROLES_ADMIN = ["Comandante", "Jefe de Operaciones"]
 
+// Función principal del módulo: chequea si el usuario logueado en la
+// sesión tiene un rol administrativo (según ROLES_ADMIN). Se usa como
+// guardia de permisos al inicio de los endpoints que solo puede tocar
+// un administrador (gestión de usuarios, roles, permisos).
 // Devuelve true si la sesión corresponde a un usuario administrador.
 // Uso en un endpoint:
 //   if (!esAdministrador(sesion)) {
