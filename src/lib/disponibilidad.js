@@ -1,6 +1,8 @@
-// src/lib/disponibilidad.js
+// Destino: src/lib/disponibilidad.js
+// (reemplaza tu archivo actual completo — es tu mismo contenido + los 2 agregados)
+//
 // Lógica de disponibilidad de aeronaves y tripulantes.
-// Se usa al completar una escala y se reutilizará al publicar y en el dashboard.
+// Se usa al completar una escala, al publicarla, y se reutilizará en el dashboard.
 
 import prisma from "@/lib/prisma"
 
@@ -28,7 +30,10 @@ export function calcularVentana(itinerarios) {
 // no abortados, ni esta misma escala) y que se solapan con la ventana.
 // La condición de solape es la clásica: empieza antes de que termine la
 // nuestra Y termina después de que empieza la nuestra.
-function condicionSolape(ventana, escalaIdActual) {
+//
+// AHORA EXPORTADA: la reutiliza estaDisponibleAhora() más abajo, para no
+// duplicar la lógica de solape en el chequeo de autorización.
+export function condicionSolape(ventana, escalaIdActual) {
   return {
     es_borrador: false,
     estado: { not: "ABORTADA" },
@@ -133,4 +138,48 @@ export async function verificarTripulante(personaId, fecha, ventana, escalaIdAct
   }
 
   return { ok: true }
+}
+
+// ── NUEVA: disponibilidad para AUTORIZAR (no para volar) ──────────────
+// Revisa las tres fuentes de no-disponibilidad, en este orden de prioridad:
+// derivación manual > en vuelo > novedad en el parte diario de hoy.
+// Se usa al publicar una escala, y se reutilizará al aprobar.
+// Devuelve { disponible: true } o
+// { disponible: false, motivo: "EN_VUELO" | "PARTE_DIARIO" | "DERIVACION_MANUAL" }.
+export async function estaDisponibleAhora(personaId) {
+  const ahora = new Date()
+
+  const derivacion = await prisma.autorizadorNoDisponible.findFirst({
+    where: {
+      persona_id: personaId,
+      deleted_at: null,
+      desde: { lte: ahora },
+      OR: [{ hasta: null }, { hasta: { gte: ahora } }],
+    },
+    select: { id: true },
+  })
+  if (derivacion) return { disponible: false, motivo: "DERIVACION_MANUAL" }
+
+  // "En vuelo ahora" es el mismo chequeo de solape de siempre, pero con
+  // una ventana de un solo instante en vez de un rango. El -1 en vez de
+  // undefined es a propósito: nunca existe una escala con ese id, así
+  // que la exclusión de condicionSolape queda inofensiva sin ambigüedad.
+  const enVuelo = await prisma.escala.findFirst({
+    where: {
+      ...condicionSolape({ inicio: ahora, fin: ahora }, -1),
+      tripulacion: { some: { persona_id: personaId, deleted_at: null } },
+    },
+    select: { id: true },
+  })
+  if (enVuelo) return { disponible: false, motivo: "EN_VUELO" }
+
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const novedadHoy = await prisma.parteDiario.findFirst({
+    where: { persona_id: personaId, fecha: hoy, deleted_at: null },
+    select: { id: true },
+  })
+  if (novedadHoy) return { disponible: false, motivo: "PARTE_DIARIO" }
+
+  return { disponible: true }
 }
