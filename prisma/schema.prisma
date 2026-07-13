@@ -111,6 +111,8 @@ enum MotivoEscalamiento {
   EN_VUELO // el anterior estaba volando → saltó automático
   PARTE_DIARIO // el anterior figura no disponible en el Parte Diario
   DERIVACION_MANUAL // el anterior apretó el botón "derivar"
+  ROL_DESACTUALIZADO // el anterior sigue cargado en CargoAutorizacion, pero su Rol ya cambió
+  SIN_ASIGNAR // este cargo no tiene a nadie cargado (ni titular ni adjunto)
 }
 
 enum MotivoNoDisponibleAutorizador {

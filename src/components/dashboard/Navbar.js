@@ -84,6 +84,18 @@ export default function Navbar({ nombre, apellido, rol }) {
             >
               Registro de Accesos
             </Link>
+            <Link
+              href="/dashboard/escalas/cargos-autorizacion"
+              className={`
+                block px-4 py-2 rounded-md text-sm transition-colors
+                ${pathname === "/dashboard/escalas/cargos-autorizacion"
+                  ? "bg-blue-600 text-white font-medium"
+                  : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                }
+              `}
+            >
+              Cargos de Autorización
+            </Link>
           </div>
         )}
       </nav>

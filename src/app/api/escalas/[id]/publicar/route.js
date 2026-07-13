@@ -1,5 +1,4 @@
 // Destino: src/app/api/escalas/[id]/publicar/route.js
-// (carpeta NUEVA "publicar" adentro de la carpeta [id] que ya existe)
 //
 // PUT /api/escalas/<id>/publicar
 //
@@ -22,59 +21,8 @@ import {
   calcularVentana,
   verificarAeronave,
   verificarTripulante,
-  estaDisponibleAhora,
 } from "@/lib/disponibilidad"
-
-// Orden de la cascada de autorización. Es un fallback: si el titular de
-// un cargo no está disponible, se pasa al siguiente. No es aprobación
-// multinivel — un solo autorizante está "activo" por vez.
-const CASCADA_AUTORIZACION = [
-  "JEFE_OPERACIONES",
-  "COMANDANTE",
-  "CMDTE_ESC_AEREO",
-  "CMDTE_ESC_MANTENIMIENTO",
-  "JEFE_PERSONAL",
-]
-
-// Recorre la cascada y arma el historial de pasos para EscalaAutorizacion.
-// Cada fila explica, con su propio motivo_escalamiento, por qué la
-// responsabilidad LLEGÓ a ese cargo: la primera fila siempre es "INICIAL"
-// (punto de partida por defecto); si esa persona no está disponible, la
-// razón de ese salto queda anotada en la fila SIGUIENTE (Opción X). Así,
-// leer solo la última fila alcanza para saber quién autoriza ahora y por qué.
-//
-// Devuelve { autorizanteRol, autorizantePersonaId, pasos }.
-// Si nadie en la cascada está disponible, autorizantePersonaId es null.
-async function calcularAutorizanteActivo() {
-  const pasos = []
-  let motivoDeEsteRol = "INICIAL"
-
-  for (const rol of CASCADA_AUTORIZACION) {
-    const titular = await prisma.cargoAutorizacion.findFirst({
-      where: { rol_autorizador: rol, orden: 1, activo: true, deleted_at: null },
-      select: { usuario: { select: { persona_id: true } } },
-    })
-
-    // Sin titular cargado para este cargo: se salta, sin motivo nuevo que registrar.
-    if (!titular) {
-      pasos.push({ rol_autorizador: rol, persona_id: null, motivo_escalamiento: motivoDeEsteRol })
-      continue
-    }
-
-    const personaId = titular.usuario.persona_id
-    const disponibilidad = await estaDisponibleAhora(personaId)
-
-    pasos.push({ rol_autorizador: rol, persona_id: personaId, motivo_escalamiento: motivoDeEsteRol })
-
-    if (disponibilidad.disponible) {
-      return { autorizanteRol: rol, autorizantePersonaId: personaId, pasos }
-    }
-
-    motivoDeEsteRol = disponibilidad.motivo
-  }
-
-  return { autorizanteRol: null, autorizantePersonaId: null, pasos }
-}
+import { calcularAutorizanteActivo } from "@/lib/cascadaAutorizacion"
 
 export async function PUT(request, { params }) {
   try {
@@ -157,7 +105,7 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // 8. Calcular el autorizante activo (cascada como fallback)
+    // 8. Calcular el autorizante activo (cascada como fallback, titular → adjunto → siguiente cargo)
     const { autorizantePersonaId, pasos } = await calcularAutorizanteActivo()
     if (!autorizantePersonaId) {
       return NextResponse.json(
