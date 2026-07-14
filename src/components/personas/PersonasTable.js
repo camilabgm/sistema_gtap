@@ -1,5 +1,4 @@
 "use client"
-// src/components/personas/PersonasTable.js
 
 import { useState } from "react"
 import PersonasForm from "./PersonasForm"
@@ -44,7 +43,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
       p.apellido.toLowerCase().includes(texto)      ||
       p.nro_documento.toLowerCase().includes(texto)
     const pasaEspecialidad =
-      filtroEspecialidad === "TODAS" || p.especialidad === filtroEspecialidad
+      filtroEspecialidad === "TODAS" || (p.especialidades || []).includes(filtroEspecialidad)
     const pasaEscuadron =
       filtroEscuadron === "TODOS" || p.escuadron === filtroEscuadron
     return pasaBusqueda && pasaEspecialidad && pasaEscuadron
@@ -69,7 +68,6 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
   async function handleGuardadoUsuario()  { handleCerrarUsuario();         await recargarDatos() }
   async function handleGuardadoPermisos() { handleCerrarPermisos();        await recargarDatos() }
 
-  // Al cerrar el modal de habilitaciones recargamos para actualizar los badges
   async function handleCerradoHabilitaciones() {
     handleCerrarHabilitaciones()
     await recargarDatos()
@@ -83,12 +81,10 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
     setEliminando(null)
   }
 
-  // Badge para la habilitación médica (usa el historial semestral)
   function badgeMedica(persona) {
     const habs = persona.habilitaciones_medicas || []
     const hoy  = new Date()
 
-    // Buscar la habilitación semestral vigente más reciente
     const vigente = habs
       .filter((h) => !h.deleted_at && new Date(h.vence) >= hoy)
       .sort((a, b) => new Date(b.vence) - new Date(a.vence))[0]
@@ -101,7 +97,6 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
       )
     }
 
-    // Buscar la más reciente aunque esté vencida
     const masReciente = habs
       .filter((h) => !h.deleted_at)
       .sort((a, b) => new Date(b.vence) - new Date(a.vence))[0]
@@ -116,7 +111,6 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
       )
     }
 
-    // También puede tener habilitación anual
     if (persona.hab_anual_habilitada) {
       return (
         <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
@@ -132,6 +126,14 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
     return habilitado
       ? <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">✓ Habilitado</span>
       : <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">✗ No habilitado</span>
+  }
+
+  // Varias especialidades por persona: se listan como texto separado por
+  // coma. Si es solo una, se ve igual que antes.
+  function textoEspecialidades(persona) {
+    const lista = persona.especialidades || []
+    if (lista.length === 0) return "—"
+    return lista.map((e) => ETIQUETAS_ESPECIALIDAD[e] || e).join(", ")
   }
 
   return (
@@ -183,8 +185,9 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grado</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Especialidad</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Especialidades</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Escuadrón</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol en el sistema</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hab. médica</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hab. operacional</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceso</th>
@@ -194,7 +197,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
           <tbody className="bg-white divide-y divide-gray-200">
             {personasFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-8 text-gray-400">No se encontraron personas</td>
+                <td colSpan={9} className="text-center py-8 text-gray-400">No se encontraron personas</td>
               </tr>
             ) : (
               personasFiltradas.map((persona) => (
@@ -204,11 +207,12 @@ export default function PersonasTable({ personas: datosIniciales, permisos, rolU
                     <p className="text-xs text-gray-400">{persona.nro_documento}</p>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">{persona.grado}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">
-                    {ETIQUETAS_ESPECIALIDAD[persona.especialidad] || "—"}
-                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-700">{textoEspecialidades(persona)}</td>
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {ETIQUETAS_ESCUADRON[persona.escuadron] || persona.escuadron}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-700">
+                    {persona.usuario?.rol?.nombre || "—"}
                   </td>
                   <td className="px-6 py-4 text-sm">{badgeMedica(persona)}</td>
                   <td className="px-6 py-4 text-sm">{badgeOperacional(persona.nivel_operacional_habilitado)}</td>

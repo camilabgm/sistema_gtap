@@ -1,12 +1,21 @@
+// Destino: src/app/api/escalas/[id]/route.js
+//
+// PUT /api/escalas/<id>
+//
+// Completa el borrador: asigna aeronave, tipo de misión (+ subtipo si
+// corresponde), itinerario, tripulación y observaciones. NO publica la
+// escala. Permite guardado parcial: lo que no venga en el body se deja
+// como está.
+
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { calcularVentana, verificarAeronave, verificarTripulante } from "@/lib/disponibilidad"
+import { parsearSubtipos } from "@/lib/tiposMision"
 
 const ROLES_EN_VUELO = ["PILOTO", "COPILOTO", "TECNICO_DE_VUELO"]
 
-// ── Validaciones de forma ─────────────────────────────────────────────
 function validarItinerarios(itinerarios) {
   if (!Array.isArray(itinerarios)) return "El itinerario debe ser una lista"
   for (const t of itinerarios) {
@@ -39,8 +48,30 @@ function validarTripulacion(tripulacion) {
   return null
 }
 
-// Normaliza un id que puede venir, venir null (para limpiar) o no venir.
-// Devuelve { tocado, valor } y un posible error.
+// Segunda pasada, ya contra la base: cada persona tiene que tener, entre
+// sus especialidades (ahora una lista — puede tener más de una), la que
+// corresponde al rol_en_vuelo que le están asignando en esta escala.
+async function validarEspecialidadTripulacion(tripulacion) {
+  const ids = tripulacion.map((t) => parseInt(t.persona_id, 10))
+  const personas = await prisma.persona.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, especialidades: true, grado: true, apellido: true },
+  })
+  const porId = new Map(personas.map((p) => [p.id, p]))
+
+  for (const t of tripulacion) {
+    const pid = parseInt(t.persona_id, 10)
+    const persona = porId.get(pid)
+    if (!persona) return "Una de las personas de la tripulación no existe"
+    if (!(persona.especialidades || []).includes(t.rol_en_vuelo)) {
+      const quien = `${persona.grado} ${persona.apellido}`
+      const rolTexto = t.rol_en_vuelo.replace(/_/g, " ").toLowerCase()
+      return `${quien} no tiene la especialidad "${rolTexto}"`
+    }
+  }
+  return null
+}
+
 function normalizarId(valor) {
   if (valor === undefined) return { tocado: false, valor: undefined, error: null }
   if (valor === null)      return { tocado: true,  valor: null,      error: null }
@@ -49,13 +80,21 @@ function normalizarId(valor) {
   return { tocado: true, valor: n, error: null }
 }
 
-// ── PUT /api/escalas/<id> ─────────────────────────────────────────────
-// Completa el borrador: asigna aeronave, tipo de misión, itinerario y
-// tripulación. NO publica la escala (sigue siendo borrador). Permite
-// guardado parcial: lo que no venga en el body se deja como está.
+function normalizarObservaciones(valor) {
+  if (typeof valor !== "string") return undefined
+  const recortado = valor.trim()
+  return recortado === "" ? null : recortado
+}
+
+function normalizarSubtipoElegido(valor) {
+  if (valor === undefined) return { tocado: false, valor: undefined }
+  if (valor === null) return { tocado: true, valor: null }
+  const recortado = `${valor}`.trim()
+  return { tocado: true, valor: recortado === "" ? null : recortado }
+}
+
 export async function PUT(request, { params }) {
   try {
-    // 1. Sesión + permiso de editar
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
@@ -64,20 +103,19 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "No tenés permiso para editar escalas" }, { status: 403 })
     }
 
-    // 2. Id de la escala
     const { id } = await params
     const escalaId = parseInt(id, 10)
     if (!Number.isInteger(escalaId) || escalaId <= 0) {
       return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
     }
 
-    // 3. La escala debe existir y todavía ser borrador
     const escala = await prisma.escala.findFirst({
       where: { id: escalaId, deleted_at: null },
       select: {
         es_borrador: true,
         fecha: true,
         aeronave_id: true,
+        tipo_mision_id: true,
         tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
       },
     })
@@ -91,9 +129,8 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // 4. Leer el body y validar lo que venga
     const body = await request.json()
-    const { aeronave_id, tipo_mision_id, itinerarios, tripulacion } = body
+    const { aeronave_id, tipo_mision_id, itinerarios, tripulacion, observaciones, subtipo_elegido } = body
 
     const aeronave = normalizarId(aeronave_id)
     if (aeronave.error) return NextResponse.json({ error: "Aeronave inválida" }, { status: 400 })
@@ -108,17 +145,55 @@ export async function PUT(request, { params }) {
     if (tripulacion !== undefined) {
       const err = validarTripulacion(tripulacion)
       if (err) return NextResponse.json({ error: err }, { status: 400 })
-    }
-    if (tipoMision.tocado && tipoMision.valor !== null) {
-      const tm = await prisma.tipoMision.findFirst({
-        where: { id: tipoMision.valor, deleted_at: null },
-        select: { id: true },
-      })
-      if (!tm) return NextResponse.json({ error: "El tipo de misión no existe" }, { status: 400 })
+
+      const errEspecialidad = await validarEspecialidadTripulacion(tripulacion)
+      if (errEspecialidad) return NextResponse.json({ error: errEspecialidad }, { status: 400 })
     }
 
-    // 5. Calcular la ventana con el itinerario efectivo (el nuevo si vino;
-    //    si no, el que la escala ya tiene guardado)
+    let tipoMisionNuevoInfo = null
+    if (tipoMision.tocado && tipoMision.valor !== null) {
+      tipoMisionNuevoInfo = await prisma.tipoMision.findFirst({
+        where: { id: tipoMision.valor, deleted_at: null },
+        select: { id: true, tiene_subtipo: true, subtipo: true },
+      })
+      if (!tipoMisionNuevoInfo) {
+        return NextResponse.json({ error: "El tipo de misión no existe" }, { status: 400 })
+      }
+    }
+
+    const observacionesNueva = normalizarObservaciones(observaciones)
+    const subtipoElegido = normalizarSubtipoElegido(subtipo_elegido)
+
+    let tipoMisionEfectivo = tipoMisionNuevoInfo
+    if (!tipoMision.tocado && escala.tipo_mision_id) {
+      tipoMisionEfectivo = await prisma.tipoMision.findFirst({
+        where: { id: escala.tipo_mision_id, deleted_at: null },
+        select: { id: true, tiene_subtipo: true, subtipo: true },
+      })
+    }
+
+    if (subtipoElegido.tocado && subtipoElegido.valor !== null) {
+      if (!tipoMisionEfectivo) {
+        return NextResponse.json(
+          { error: "No se puede elegir un subtipo sin un tipo de misión asignado" },
+          { status: 400 }
+        )
+      }
+      if (!tipoMisionEfectivo.tiene_subtipo) {
+        return NextResponse.json({ error: "Este tipo de misión no tiene subtipos" }, { status: 400 })
+      }
+      const opcionesValidas = parsearSubtipos(tipoMisionEfectivo.subtipo)
+      if (!opcionesValidas.includes(subtipoElegido.valor)) {
+        return NextResponse.json(
+          { error: "El subtipo elegido no es una opción válida para este tipo de misión" },
+          { status: 400 }
+        )
+      }
+    }
+
+    const limpiarSubtipoPorCambioDeTipo =
+      tipoMision.tocado && tipoMisionNuevoInfo && !tipoMisionNuevoInfo.tiene_subtipo && !subtipoElegido.tocado
+
     let itinerarioEfectivo = itinerarios
     if (itinerarioEfectivo === undefined) {
       itinerarioEfectivo = await prisma.escalaItinerario.findMany({
@@ -128,7 +203,6 @@ export async function PUT(request, { params }) {
     }
     const ventana = calcularVentana(itinerarioEfectivo)
 
-    // 6. Chequeos de disponibilidad — si algo falla, se bloquea con el motivo
     const errores = []
 
     const aeronaveAChequear = aeronave.tocado ? aeronave.valor : escala.aeronave_id
@@ -152,15 +226,18 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // 7. Guardar todo de forma atómica
     const actualizada = await prisma.$transaction(async (tx) => {
       const dataEscala = { editado_por: session.user.id }
       if (aeronave.tocado)   dataEscala.aeronave_id    = aeronave.valor
       if (tipoMision.tocado) dataEscala.tipo_mision_id = tipoMision.valor
+      if (observacionesNueva !== undefined) dataEscala.observaciones = observacionesNueva
 
-      // Reemplazar el itinerario completo si vino uno nuevo. En un borrador
-      // los tramos son andamiaje: se reemplazan enteros (borrado físico) en
-      // vez de soft-delete, para evitar choques de unicidad al recargar.
+      if (subtipoElegido.tocado) {
+        dataEscala.subtipo_elegido = subtipoElegido.valor
+      } else if (limpiarSubtipoPorCambioDeTipo) {
+        dataEscala.subtipo_elegido = null
+      }
+
       if (itinerarios !== undefined) {
         await tx.escalaItinerario.deleteMany({ where: { escala_id: escalaId } })
         for (const t of itinerarios) {
@@ -176,12 +253,10 @@ export async function PUT(request, { params }) {
             },
           })
         }
-        // La ventana se mantiene en sincronía con los tramos
         dataEscala.hora_despegue_estimada = ventana ? ventana.inicio : null
         dataEscala.hora_arribo_estimada   = ventana ? ventana.fin    : null
       }
 
-      // Reemplazar la tripulación completa si vino una nueva
       if (tripulacion !== undefined) {
         await tx.escalaTripulacion.deleteMany({ where: { escala_id: escalaId } })
         for (const t of tripulacion) {

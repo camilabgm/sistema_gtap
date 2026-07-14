@@ -1,0 +1,15 @@
+﻿feat: formulario de creacion de escalas + especialidades multiples en personas
+
+Escalas:
+- Formulario visual de 3 secciones (Solicitud, Detalles, Publicacion) que encadena POST -> PUT -> publicar en un solo flujo para quien carga la escala
+- Campo subtipo_elegido en Escala + parsearSubtipos() en lib/tiposMision.js, validado contra el catalogo real de TipoMision (no solo texto libre)
+- Endpoint candidatos-disponibles: filtra aeronaves y personas reutilizando verificarAeronave/verificarTripulante de disponibilidad.js, sin duplicar reglas de negocio
+- validarEspecialidadTripulacion(): doble validacion (filtro en el frontend + rechazo en el backend) de que cada persona tenga la especialidad que corresponde al rol_en_vuelo asignado
+- Boton manual "Actualizar disponibilidad" para refrescar candidatos sin depender de que cambie fecha/itinerario
+
+Personas:
+- especialidad paso de valor unico a lista (especialidades EspecialidadPersona[]) via migracion
+- PersonasForm: selector multiple para especialidades (Ctrl/Cmd + clic)
+- PersonasTable: columna Especialidades muestra varias, + columna nueva Rol en el sistema
+- GET/POST/PUT de personas actualizados con normalizarEspecialidades() compartida en lib/personas.js
+- Fix: PATCH y DELETE de personas/[id]/route.js restaurados (se habian perdido en un reemplazo de archivo de una sesion anterior)

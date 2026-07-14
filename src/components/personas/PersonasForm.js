@@ -1,7 +1,14 @@
 "use client"
-// src/components/personas/PersonasForm.js
-
 import { useState, useEffect } from "react"
+
+const OPCIONES_ESPECIALIDAD = [
+  { valor: "PILOTO",           etiqueta: "Piloto" },
+  { valor: "COPILOTO",         etiqueta: "Copiloto" },
+  { valor: "TECNICO_DE_VUELO", etiqueta: "Técnico de vuelo" },
+  { valor: "MECANICO",         etiqueta: "Mecánico" },
+  { valor: "ADMINISTRATIVO",   etiqueta: "Administrativo" },
+  { valor: "OTRO",             etiqueta: "Otro" },
+]
 
 export default function PersonasForm({ persona, onGuardado, onCerrar }) {
 
@@ -16,7 +23,7 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
       ? new Date(persona.fecha_nacimiento).toISOString().slice(0, 10) : "",
     escuadron:           persona?.escuadron           || "PLANA_MAYOR",
     unidad:              persona?.unidad              || "",
-    especialidad:        persona?.especialidad        || "",
+    especialidades:      persona?.especialidades      || [],
     residencia:          persona?.residencia          || "",
     telefono:            persona?.telefono            || "",
     contacto_emergencia: persona?.contacto_emergencia || "",
@@ -32,13 +39,23 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
     return () => document.removeEventListener("keydown", manejarTecla)
   }, [])
 
+  function toggleEspecialidad(valor) {
+    setForm((prev) => {
+      const yaEsta = prev.especialidades.includes(valor)
+      return {
+        ...prev,
+        especialidades: yaEsta
+          ? prev.especialidades.filter((e) => e !== valor)
+          : [...prev.especialidades, valor],
+      }
+    })
+  }
+
   async function handleGuardar() {
     if (cargando) return
     setCargando(true)
     setError("")
 
-      // Validación del nro_documento
-     // Validación del nro_documento
     if (!form.nro_documento || !/^\d+$/.test(form.nro_documento)) {
       setError("El número de documento debe contener solo números")
       setCargando(false)
@@ -89,7 +106,6 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
 
         <div className="px-6 py-4 space-y-6">
 
-          {/* ── Datos personales ─────────────────────────────── */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Datos personales
@@ -113,25 +129,24 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
                   placeholder="López Cattebeke"
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-         <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Nro. de documento <span className="text-red-500">*</span>
-  </label>
-  <input 
-    type="text"
-    inputMode="numeric"
-    pattern="[0-9]*"
-    value={form.nro_documento}
-    onChange={(e) => {
-      // Solo permite ingresar números
-      const soloNumeros = e.target.value.replace(/\D/g, "")
-      setForm({ ...form, nro_documento: soloNumeros })
-    }}
-    placeholder="1234567"
-    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-  />
-  <p className="text-xs text-gray-400 mt-1">Solo números, sin puntos ni guiones</p>
-</div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nro. de documento <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={form.nro_documento}
+                  onChange={(e) => {
+                    const soloNumeros = e.target.value.replace(/\D/g, "")
+                    setForm({ ...form, nro_documento: soloNumeros })
+                  }}
+                  placeholder="1234567"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">Solo números, sin puntos ni guiones</p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Fecha de nacimiento
@@ -166,7 +181,6 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
             </div>
           </div>
 
-          {/* ── Datos institucionales ─────────────────────────── */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Datos institucionales
@@ -204,20 +218,6 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Especialidad</label>
-                <select value={form.especialidad}
-                  onChange={(e) => setForm({ ...form, especialidad: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Sin especialidad</option>
-                  <option value="PILOTO">Piloto</option>
-                  <option value="COPILOTO">Copiloto</option>
-                  <option value="TECNICO_DE_VUELO">Técnico de vuelo</option>
-                  <option value="MECANICO">Mecánico</option>
-                  <option value="ADMINISTRATIVO">Administrativo</option>
-                  <option value="OTRO">Otro</option>
-                </select>
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nro. de pasaporte
                 </label>
@@ -225,6 +225,24 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
                   onChange={(e) => setForm({ ...form, nro_pasaporte: e.target.value })}
                   placeholder="AA123456"
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Especialidades <span className="text-gray-400 font-normal">(puede tener más de una)</span>
+                </label>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {OPCIONES_ESPECIALIDAD.map((op) => (
+                    <label key={op.valor} className="flex items-center gap-1.5 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={form.especialidades.includes(op.valor)}
+                        onChange={() => toggleEspecialidad(op.valor)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      {op.etiqueta}
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

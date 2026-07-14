@@ -1,7 +1,9 @@
+
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
+import { normalizarEspecialidades } from "@/lib/personas"
 
 export async function GET() {
   try {
@@ -20,6 +22,9 @@ export async function GET() {
             username: true,
             rol_id:   true,
             activo:   true,
+            rol: {
+              select: { nombre: true },
+            },
           },
         },
         habilitaciones_medicas: {
@@ -65,6 +70,11 @@ export async function POST(request) {
       return NextResponse.json({ error: "El grado es obligatorio" }, { status: 400 })
     }
 
+    const especialidades = normalizarEspecialidades(body.especialidades)
+    if (especialidades.error) {
+      return NextResponse.json({ error: especialidades.error }, { status: 400 })
+    }
+
     const existe = await prisma.persona.findUnique({
       where: { nro_documento: body.nro_documento.trim() },
     })
@@ -82,7 +92,7 @@ export async function POST(request) {
         fecha_nacimiento:    body.fecha_nacimiento ? new Date(body.fecha_nacimiento) : null,
         escuadron:           body.escuadron,
         unidad:              body.unidad,
-        especialidad:        body.especialidad        || null,
+        especialidades:      especialidades.valor,
         residencia:          body.residencia          || null,
         telefono:            body.telefono            || null,
         contacto_emergencia: body.contacto_emergencia || null,

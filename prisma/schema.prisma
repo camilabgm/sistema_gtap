@@ -136,15 +136,15 @@ enum Novedad {
 
 // ─────────────────────────────  MODELOS M0–M3 ────────────────────────────
 model Persona {
-  id                  Int                  @id @default(autoincrement())
+  id                  Int                   @id @default(autoincrement())
   nombre              String
   apellido            String
   grado               String
-  nro_documento       String               @unique
+  nro_documento       String                @unique
   fecha_nacimiento    DateTime?
   escuadron           Escuadron
   unidad              String
-  especialidad        EspecialidadPersona?
+  especialidades      EspecialidadPersona[] @default([])
   residencia          String?
   telefono            String?
   contacto_emergencia String?
@@ -432,10 +432,11 @@ model Escala {
   fecha_autorizacion DateTime?
 
   // Relaciones con módulos existentes (M1 y M2) — opcionales en borrador
-  aeronave_id    Int?
-  aeronave       Aeronave?   @relation(fields: [aeronave_id], references: [id])
-  tipo_mision_id Int?
-  tipo_mision    TipoMision? @relation(fields: [tipo_mision_id], references: [id])
+  aeronave_id     Int?
+  aeronave        Aeronave?   @relation(fields: [aeronave_id], references: [id])
+  tipo_mision_id  Int?
+  tipo_mision     TipoMision? @relation(fields: [tipo_mision_id], references: [id])
+  subtipo_elegido String? // el subtipo puntual elegido, si tipo_mision.tiene_subtipo
 
   // Relaciones hijas (este módulo)
   itinerarios    EscalaItinerario[]

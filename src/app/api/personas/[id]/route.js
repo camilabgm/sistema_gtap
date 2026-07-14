@@ -1,7 +1,10 @@
+// Destino: src/app/api/personas/[id]/route.js
+
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
+import { normalizarEspecialidades } from "@/lib/personas"
 
 export async function PUT(request, { params }) {
   try {
@@ -13,35 +16,33 @@ export async function PUT(request, { params }) {
     const { id } = await params
     const body   = await request.json()
 
-    // Validaciones — mismas que en POST
     if (!body.nombre || body.nombre.trim() === "") {
       return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 })
     }
-
     if (!body.apellido || body.apellido.trim() === "") {
       return NextResponse.json({ error: "El apellido es obligatorio" }, { status: 400 })
     }
-
     if (!body.nro_documento || body.nro_documento.trim() === "") {
       return NextResponse.json({ error: "El número de documento es obligatorio" }, { status: 400 })
     }
-
     if (!/^\d+$/.test(body.nro_documento)) {
       return NextResponse.json({ error: "El número de documento debe contener solo números, sin puntos ni guiones" }, { status: 400 })
     }
-
     if (!body.grado || body.grado.trim() === "") {
       return NextResponse.json({ error: "El grado es obligatorio" }, { status: 400 })
     }
 
-    // Verificar duplicado excluyendo el registro actual
+    const especialidades = normalizarEspecialidades(body.especialidades)
+    if (especialidades.error) {
+      return NextResponse.json({ error: especialidades.error }, { status: 400 })
+    }
+
     const duplicado = await prisma.persona.findFirst({
       where: {
         nro_documento: body.nro_documento.trim(),
         id: { not: Number(id) },
       },
     })
-
     if (duplicado) {
       return NextResponse.json({ error: "Ya existe otra persona con ese número de documento" }, { status: 400 })
     }
@@ -56,7 +57,7 @@ export async function PUT(request, { params }) {
         fecha_nacimiento:    body.fecha_nacimiento ? new Date(body.fecha_nacimiento) : null,
         escuadron:           body.escuadron,
         unidad:              body.unidad,
-        especialidad:        body.especialidad        || null,
+        especialidades:      especialidades.valor,
         residencia:          body.residencia          || null,
         telefono:            body.telefono            || null,
         contacto_emergencia: body.contacto_emergencia || null,
