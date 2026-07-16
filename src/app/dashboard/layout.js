@@ -1,14 +1,13 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
-import { PrismaClient } from "@prisma/client"
+import prisma from "@/lib/prisma"
 import Navbar from "@/components/dashboard/Navbar"
 import CerrarSesionAutomatico from "@/components/shared/CerrarSesionAutomatico"
 import VerificadorSesion from "@/components/shared/VerificadorSesion"
 import DetectorInactividad from "@/components/shared/DetectorInactividad"
 import CambioContrasenaObligatorio from "@/components/shared/CambioContrasenaObligatorio"
 
-const prisma = new PrismaClient()
 
 export default async function DashboardLayout({ children }) {
   const sesion = await getServerSession(authOptions)

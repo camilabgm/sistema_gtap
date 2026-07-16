@@ -1,10 +1,9 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
-import { PrismaClient } from "@prisma/client"
+import prisma from "@/lib/prisma"
 import PermisosRolTable from "@/components/administracion/PermisosRolTable"
 
-const prisma = new PrismaClient()
 
 export default async function PermisosPage() {
   const sesion = await getServerSession(authOptions)

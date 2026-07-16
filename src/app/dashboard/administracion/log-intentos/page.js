@@ -1,10 +1,9 @@
-import { PrismaClient } from "@prisma/client"
+import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
 import TablaLogIntentos from  "@/components/administracion/TablaLogIntentos"
 
-const prisma = new PrismaClient()
 
 export default async function LogIntentosPage() {
   // Verificar que el usuario esté logueado

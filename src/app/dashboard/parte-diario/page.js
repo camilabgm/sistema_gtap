@@ -1,9 +1,8 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
-import { PrismaClient } from "@prisma/client"
+import prisma from "@/lib/prisma"
 import ParteDiarioPage from "@/components/parte-diario/ParteDiarioPage"
 
-const prisma = new PrismaClient()
 
 function hoyComoFecha() {
   const hoy = new Date()

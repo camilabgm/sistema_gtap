@@ -73,6 +73,7 @@ enum EstadoEscala {
   EN_DESARROLLO
   CUMPLIDA
   ABORTADA
+  RECHAZADA
 }
 
 enum MotivoAbortada {
@@ -430,6 +431,14 @@ model Escala {
   autorizada_por     Int?
   rol_autoriza       RolAutorizador?
   fecha_autorizacion DateTime?
+
+  // Resultado si el autorizante decide RECHAZAR en vez de autorizar —
+  // distinto de "abortada" (eso es sobre la aeronave/tripulación en el
+  // momento operativo). Rechazada es una decisión humana del autorizante,
+  // antes de que la escala llegue a volar.
+  rechazada_por  Int?
+  motivo_rechazo String?
+  fecha_rechazo  DateTime?
 
   // Relaciones con módulos existentes (M1 y M2) — opcionales en borrador
   aeronave_id     Int?

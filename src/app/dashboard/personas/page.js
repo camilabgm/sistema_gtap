@@ -1,10 +1,9 @@
 // src/app/dashboard/personas/page.js
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
-import { PrismaClient } from "@prisma/client"
+import prisma from "@/lib/prisma"
 import PersonasTable from "@/components/personas/PersonasTable"
 
-const prisma = new PrismaClient()
 
 export default async function PersonasPage() {
 

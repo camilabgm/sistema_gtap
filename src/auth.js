@@ -1,10 +1,9 @@
 // src/auth.js
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaClient } from "@prisma/client"
+import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
-const prisma = new PrismaClient()
 
 const MAX_INTENTOS_FALLIDOS = 3
 const MINUTOS_BLOQUEO = 15

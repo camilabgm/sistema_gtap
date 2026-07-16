@@ -1,10 +1,4 @@
 // Destino: src/app/api/escalas/route.js
-//
-// GET  /api/escalas  → lista de escalas para la tabla del panel
-// POST /api/escalas  → crea la escala en BORRADOR a partir de la solicitud
-//                      (solicitante, fecha, canal, archivo). Todavía sin
-//                      aeronave/tipo de misión/itinerario/tripulación —
-//                      eso lo completa el PUT de [id].
 
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
@@ -14,48 +8,71 @@ import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenam
 
 const CANALES_VALIDOS = ["WHATSAPP", "PDF", "IMAGEN", "WORD", "VERBAL"]
 
-// Valida los datos de la solicitud (no el archivo en sí — eso lo valida
-// guardarArchivoSolicitud, no hace falta duplicarlo acá).
 function validarDatosSolicitud({ solicitante, fecha, canal, hayArchivo }) {
   if (!solicitante || !`${solicitante}`.trim()) return "El solicitante es obligatorio"
   if (!fecha) return "La fecha es obligatoria"
   if (isNaN(new Date(fecha).getTime())) return "La fecha no es válida"
   if (!canal) return "El canal es obligatorio"
   if (!CANALES_VALIDOS.includes(canal)) return "El canal no es válido"
-
-  // El archivo es obligatorio salvo cuando el pedido llegó de forma verbal
   if (canal !== "VERBAL" && !hayArchivo) {
     return "Debe adjuntar el archivo de la solicitud (salvo que el canal sea VERBAL)"
   }
   return null
 }
 
-// ── GET /api/escalas ───────────────────────────────────────────────────
-export async function GET() {
+export async function GET(request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
-    // OJO: asumí "puede_ver" para listar. Si tu permiso de lectura se
-    // llama distinto en PermisoRol/PermisoUsuario, avisame y cambio esta
-    // línea nomás.
     if (!session.user.permisos?.ESCALAS?.puede_ver) {
       return NextResponse.json({ error: "No tenés permiso para ver escalas" }, { status: 403 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const desde = searchParams.get("desde")
+    const hasta = searchParams.get("hasta")
+
+    const where = { deleted_at: null }
+    if (desde && hasta) {
+      const fechaDesde = new Date(desde)
+      const fechaHasta = new Date(hasta)
+      if (isNaN(fechaDesde.getTime()) || isNaN(fechaHasta.getTime())) {
+        return NextResponse.json({ error: "Fechas de filtro inválidas" }, { status: 400 })
+      }
+      where.fecha = { gte: fechaDesde, lte: fechaHasta }
+      where.es_borrador = false
+    }
+
     const escalas = await prisma.escala.findMany({
-      where: { deleted_at: null },
-      orderBy: { fecha: "desc" },
+      where,
+      orderBy: [{ fecha: "asc" }, { hora_despegue_estimada: "asc" }],
       select: {
         id: true,
         nro_orden: true,
         fecha: true,
+        hora_despegue_estimada: true,
+        hora_arribo_estimada: true,
         solicitante: true,
         estado: true,
         es_borrador: true,
+        motivo_abortada: true,
+        observacion_aborto: true,
         aeronave: { select: { matricula: true } },
-        tipo_mision: { select: { nombre: true } },
+        tipo_mision: { select: { codigo: true, nombre: true } },
+        itinerarios: {
+          where: { deleted_at: null },
+          orderBy: { orden: "asc" },
+          select: { orden: true, origen: true, destino: true },
+        },
+        tripulacion: {
+          where: { deleted_at: null },
+          select: {
+            rol_en_vuelo: true,
+            persona: { select: { grado: true, apellido: true } },
+          },
+        },
       },
     })
 
@@ -66,13 +83,6 @@ export async function GET() {
   }
 }
 
-// ── POST /api/escalas ──────────────────────────────────────────────────
-// Multipart/form-data (por el archivo). Crea la escala + su fila en
-// solicitudes. Si el guardado del archivo falla, se deshace la escala
-// recién creada (no puede quedar huérfana sin su solicitud) — es un
-// borrado físico a propósito, porque en ese punto la escala nunca llegó
-// a existir de verdad para nadie; no es lo mismo que borrar una escala
-// real ya en uso, ahí sí corresponde el soft-delete de siempre.
 export async function POST(request) {
   let escalaCreada = null
   let rutaGuardada = null
@@ -93,8 +103,6 @@ export async function POST(request) {
     const observaciones = formData.get("observaciones")
     const archivo       = formData.get("archivo")
 
-    // ¿Vino un archivo de verdad? Un campo vacío puede llegar como "" o
-    // como un File de 0 bytes; en ambos casos se trata como "sin archivo".
     const hayArchivo =
       archivo && typeof archivo.arrayBuffer === "function" && archivo.size > 0
 
@@ -103,7 +111,6 @@ export async function POST(request) {
       return NextResponse.json({ error: errorValidacion }, { status: 400 })
     }
 
-    // 1. Crear la escala en borrador
     escalaCreada = await prisma.escala.create({
       data: {
         fecha: new Date(fecha),
@@ -114,7 +121,6 @@ export async function POST(request) {
       },
     })
 
-    // 2. Si vino archivo, guardarlo en disco
     let nombreOriginal = null
     if (hayArchivo) {
       try {
@@ -127,7 +133,6 @@ export async function POST(request) {
       }
     }
 
-    // 3. Crear la fila de la solicitud, ligada a la escala
     await prisma.solicitud.create({
       data: {
         escala_id: escalaCreada.id,
@@ -143,7 +148,6 @@ export async function POST(request) {
   } catch (error) {
     console.error("Error POST escalas:", error)
 
-    // Deshacer lo que se haya alcanzado a crear, para no dejar basura
     if (rutaGuardada) {
       await borrarArchivoSolicitud(rutaGuardada).catch(() => {})
     }

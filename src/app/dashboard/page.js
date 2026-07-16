@@ -1,13 +1,13 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
+import { necesitaAlertaHabilitacion } from "@/lib/personas"
 
 async function obtenerEstadisticas() {
   const totalPersonas = await prisma.persona.count({
     where: { activo: true, deleted_at: null },
   })
 
-  // Aeronaves — tabla ya existe
   const aeronavesDisponibles = await prisma.aeronave.count({
     where: { estado: "DISPONIBLE", activo: true, deleted_at: null },
   })
@@ -15,8 +15,31 @@ async function obtenerEstadisticas() {
     where: { activo: true, deleted_at: null },
   })
 
-  const escalasHoy = 0
-  const alertas    = 0
+  // Escalas hoy: publicadas, con fecha de hoy
+  const hoyISO = new Date().toISOString().slice(0, 10)
+  const inicioHoy = new Date(hoyISO)
+  const escalasHoy = await prisma.escala.count({
+    where: {
+      fecha: { gte: inicioHoy, lte: inicioHoy },
+      es_borrador: false,
+      deleted_at: null,
+    },
+  })
+
+  // Alertas: personas activas con habilitación médica u operacional
+  // vencida, incompleta, o por vencer dentro de 30 días.
+  const personasParaAlertas = await prisma.persona.findMany({
+    where: { activo: true, deleted_at: null },
+    select: {
+      nivel_operacional_habilitado: true,
+      hab_anual_habilitada: true,
+      habilitaciones_medicas: {
+        where: { deleted_at: null },
+        select: { vence: true, deleted_at: true },
+      },
+    },
+  })
+  const alertas = personasParaAlertas.filter((p) => necesitaAlertaHabilitacion(p)).length
 
   return {
     totalPersonas,
@@ -47,8 +70,8 @@ function obtenerFechaYSaludo() {
 }
 
 export default async function DashboardPage() {
-  const sesion          = await getServerSession(authOptions)
-  const stats           = await obtenerEstadisticas()
+  const sesion            = await getServerSession(authOptions)
+  const stats              = await obtenerEstadisticas()
   const { saludo, fecha } = obtenerFechaYSaludo()
 
   const tarjetas = [
@@ -106,7 +129,7 @@ export default async function DashboardPage() {
             { nombre: "Tipos de Misiones", activo: true  },
             { nombre: "Aeronaves",         activo: true  },
             { nombre: "Personas",          activo: true  },
-            { nombre: "Escalas",           activo: false },
+            { nombre: "Escalas",           activo: true  },
             { nombre: "Manifiesto",        activo: false },
             { nombre: "Informes",          activo: false },
             { nombre: "SICEM",             activo: false },
