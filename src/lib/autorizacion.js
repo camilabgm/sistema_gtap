@@ -67,3 +67,11 @@ export function rolCoincideConCargo(nombreRolUsuario, cargoAutorizador) {
   if (!nombreEsperado) return false
   return nombreRolUsuario === nombreEsperado
 }
+
+// Devuelve true si el Rol de sistema de la persona corresponde a
+// CUALQUIERA de los 5 cargos de la cascada — se usa para decidir quién
+// puede ver la pantalla de "Pendientes de autorizar" (todos los 5, no
+// solo ROLES_ADMIN) y quién puede usar el botón general de "Derivar".
+export function esCargoDeCascada(nombreRolUsuario) {
+  return Object.values(ROL_NOMBRE_POR_CARGO_AUTORIZACION).includes(nombreRolUsuario)
+}

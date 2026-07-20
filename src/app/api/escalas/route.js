@@ -57,8 +57,10 @@ export async function GET(request) {
         solicitante: true,
         estado: true,
         es_borrador: true,
+        autorizada: true,
         motivo_abortada: true,
         observacion_aborto: true,
+        motivo_rechazo: true,
         aeronave: { select: { matricula: true } },
         tipo_mision: { select: { codigo: true, nombre: true } },
         itinerarios: {

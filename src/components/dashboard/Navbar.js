@@ -3,123 +3,253 @@
 import { signOut } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ROLES_ADMIN } from "@/lib/autorizacion"
+import { useState, useEffect } from "react"
+import {
+  Home, Tag, Plane, Users, CalendarCheck, CalendarDays, PlusCircle,
+  ShieldCheck, UserCog, History, FileText, BarChart3, Wrench, Lock,
+  ScrollText, Menu, LogOut, KeyRound,
+} from "lucide-react"
+import { ROLES_ADMIN, esCargoDeCascada } from "@/lib/autorizacion"
 
-const modulos = [
-  { nombre: "Inicio",            ruta: "/dashboard" },
-  { nombre: "Tipos de Misiones", ruta: "/dashboard/tipos-misiones" },
-  { nombre: "Aeronaves",         ruta: "/dashboard/aeronaves" },
-  { nombre: "Personas",          ruta: "/dashboard/personas" },
-  { nombre: "Escalas",           ruta: "/dashboard/escalas" },
-  { nombre: "Manifiesto",        ruta: "/dashboard/manifiesto" },
-  { nombre: "Informes",          ruta: "/dashboard/informes" },
-  { nombre: "SICEM",             ruta: "/dashboard/sicem" },
+const modulosAntes = [
+  { nombre: "Inicio",            ruta: "/dashboard",              Icono: Home },
+  { nombre: "Tipos de Misiones", ruta: "/dashboard/tipos-misiones", Icono: Tag },
+  { nombre: "Aeronaves",         ruta: "/dashboard/aeronaves",     Icono: Plane },
+  { nombre: "Personas",          ruta: "/dashboard/personas",      Icono: Users },
 ]
 
-export default function Navbar({ nombre, apellido, rol }) {
+const modulosDespues = [
+  { nombre: "Manifiesto", ruta: "/dashboard/manifiesto", Icono: FileText },
+  { nombre: "Informes",   ruta: "/dashboard/informes",   Icono: BarChart3 },
+  { nombre: "SICEM",      ruta: "/dashboard/sicem",      Icono: Wrench },
+]
+
+function ItemModulo({ nombre, ruta, Icono, activo, colapsado }) {
+  if (colapsado) {
+    return (
+      <Link
+        href={ruta}
+        title={nombre}
+        className={`flex items-center justify-center py-2.5 rounded-md transition-colors ${
+          activo ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+        }`}
+      >
+        <Icono size={18} />
+      </Link>
+    )
+  }
+  return (
+    <Link
+      href={ruta}
+      className={`flex items-center gap-3 px-4 py-2 rounded-md text-sm transition-colors ${
+        activo ? "bg-blue-600 text-white font-medium" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+      }`}
+    >
+      <Icono size={18} className="shrink-0" />
+      <span>{nombre}</span>
+    </Link>
+  )
+}
+
+function SubItemEscalas({ nombre, ruta, Icono, activo, badge, colapsado }) {
+  if (colapsado) {
+    return (
+      <Link
+        href={ruta}
+        title={badge > 0 ? `${nombre} (${badge})` : nombre}
+        className={`relative flex items-center justify-center py-2 rounded-md transition-colors ${
+          activo ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-700 hover:text-white"
+        }`}
+      >
+        <Icono size={16} />
+        {badge > 0 && <span className="absolute top-1 right-3.5 w-2 h-2 bg-red-500 rounded-full" />}
+      </Link>
+    )
+  }
+  return (
+    <Link
+      href={ruta}
+      className={`flex items-center justify-between pl-8 pr-4 py-1.5 rounded-md text-sm transition-colors ${
+        activo ? "bg-blue-600 text-white font-medium" : "text-gray-400 hover:bg-gray-700 hover:text-white"
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        <Icono size={14} className="shrink-0" />
+        {nombre}
+      </span>
+      {badge > 0 && (
+        <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+          {badge}
+        </span>
+      )}
+    </Link>
+  )
+}
+
+export default function Navbar({ nombre, apellido, rol, permisos, colapsado, onToggleColapsado }) {
   const pathname = usePathname()
+  const [pendientesParaMi, setPendientesParaMi] = useState(0)
+
+  const dentroDeEscalas = pathname.startsWith("/dashboard/escalas")
+  const vePersonas = permisos?.PERSONAS?.puede_ver
+
+  useEffect(() => {
+    if (!esCargoDeCascada(rol)) return
+    fetch("/api/escalas/pendientes-autorizar", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setPendientesParaMi(data?.podesActuar ? data.escalas.length : 0))
+      .catch(() => {})
+  }, [pathname, rol])
 
   return (
-    <div className="flex h-screen flex-col bg-gray-900 text-white w-64 fixed left-0 top-0">
+    <div
+      className={`flex h-screen flex-col bg-gray-900 text-white fixed left-0 top-0 transition-all duration-200 ${
+        colapsado ? "w-16" : "w-64"
+      }`}
+    >
 
-      {/* Logo y título */}
-      <div className="px-6 py-5 border-b border-gray-700">
-        <h1 className="text-lg font-bold text-white">Sistema GTAP</h1>
-        <p className="text-xs text-gray-400 mt-1">
-          Grupo de Transporte Aéreo Presidencial
-        </p>
+      {/* Encabezado: logo + título a la izquierda (solo si está expandido), ☰ siempre visible a la derecha */}
+      <div className={`border-b border-gray-700 flex items-center ${colapsado ? "justify-center py-4" : "justify-between px-4 py-4"}`}>
+        {!colapsado && (
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="bg-blue-600 rounded-md p-1.5 shrink-0">
+              <Plane size={18} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold text-white truncate">Sistema GTAP</h1>
+              <p className="text-[11px] text-gray-400 truncate">Grupo de Transporte Aéreo Presidencial</p>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={onToggleColapsado}
+          title={colapsado ? "Expandir menú" : "Colapsar menú"}
+          className="text-gray-300 hover:text-white hover:bg-gray-800 rounded-md p-1.5 transition-colors shrink-0"
+        >
+          <Menu size={20} />
+        </button>
       </div>
 
-      {/* Menú de módulos */}
-      <nav className="flex-1 px-4 py-4 overflow-y-auto">
+      <nav className="flex-1 px-2 py-4 overflow-y-auto">
         <ul className="space-y-1">
-          {modulos.map((modulo) => {
-            const estaActivo = pathname === modulo.ruta
-            return (
-              <li key={modulo.ruta}>
-                <Link
-                  href={modulo.ruta}
-                  className={`
-                    block px-4 py-2 rounded-md text-sm transition-colors
-                    ${estaActivo
-                      ? "bg-blue-600 text-white font-medium"
-                      : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                    }
-                  `}
-                >
-                  {modulo.nombre}
-                </Link>
-              </li>
-            )
-          })}
+          {modulosAntes.map((modulo) => (
+            <li key={modulo.ruta}>
+              <ItemModulo {...modulo} activo={pathname === modulo.ruta} colapsado={colapsado} />
+            </li>
+          ))}
+
+          {vePersonas && (
+            <li>
+              <ItemModulo
+                nombre="Parte Diario"
+                ruta="/dashboard/parte-diario"
+                Icono={CalendarCheck}
+                activo={pathname === "/dashboard/parte-diario"}
+                colapsado={colapsado}
+              />
+            </li>
+          )}
+
+          <li>
+            {colapsado ? (
+              <Link
+                href="/dashboard/escalas"
+                title="Escalas"
+                className={`flex items-center justify-center py-2.5 rounded-md transition-colors ${
+                  dentroDeEscalas ? "text-white bg-gray-800" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                }`}
+              >
+                <CalendarDays size={18} />
+              </Link>
+            ) : (
+              <Link
+                href="/dashboard/escalas"
+                className={`flex items-center gap-3 px-4 py-2 rounded-md text-sm transition-colors ${
+                  dentroDeEscalas ? "text-white font-medium" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                }`}
+              >
+                <CalendarDays size={18} className="shrink-0" />
+                <span>Escalas</span>
+              </Link>
+            )}
+
+            {dentroDeEscalas && (
+              <ul className="mt-1 space-y-0.5">
+                <li>
+                  <SubItemEscalas nombre="Agenda" ruta="/dashboard/escalas" Icono={CalendarDays}
+                    activo={pathname === "/dashboard/escalas"} colapsado={colapsado} />
+                </li>
+                <li>
+                  <SubItemEscalas nombre="Nueva escala" ruta="/dashboard/escalas/nueva" Icono={PlusCircle}
+                    activo={pathname === "/dashboard/escalas/nueva"} colapsado={colapsado} />
+                </li>
+                <li>
+                  <SubItemEscalas nombre="Historial" ruta="/dashboard/escalas/historial" Icono={History}
+                    activo={pathname === "/dashboard/escalas/historial"} colapsado={colapsado} />
+                </li>
+                {esCargoDeCascada(rol) && (
+                  <li>
+                    <SubItemEscalas nombre="Pendientes de autorizar" ruta="/dashboard/escalas/pendientes-autorizar" Icono={ShieldCheck}
+                      activo={pathname === "/dashboard/escalas/pendientes-autorizar"} badge={pendientesParaMi} colapsado={colapsado} />
+                  </li>
+                )}
+                {ROLES_ADMIN.includes(rol) && (
+                  <li>
+                    <SubItemEscalas nombre="Cargos de Autorización" ruta="/dashboard/escalas/cargos-autorizacion" Icono={UserCog}
+                      activo={pathname === "/dashboard/escalas/cargos-autorizacion"} colapsado={colapsado} />
+                  </li>
+                )}
+              </ul>
+            )}
+          </li>
+
+          {modulosDespues.map((modulo) => (
+            <li key={modulo.ruta}>
+              <ItemModulo {...modulo} activo={pathname === modulo.ruta} colapsado={colapsado} />
+            </li>
+          ))}
         </ul>
 
-        {/* Sección administrativa — Comandante y Jefe de Operaciones */}
         {ROLES_ADMIN.includes(rol) && (
           <div className="mt-4 pt-4 border-t border-gray-700">
-            <p className="text-xs font-semibold uppercase text-gray-500 px-4 mb-2">
-              Administración
-            </p>
-            <Link
-              href="/dashboard/administracion/permisos"
-              className={`
-                block px-4 py-2 rounded-md text-sm transition-colors
-                ${pathname === "/dashboard/administracion/permisos"
-                  ? "bg-blue-600 text-white font-medium"
-                  : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                }
-              `}
-            >
-              Gestión de Permisos
-            </Link>
-            <Link
-              href="/dashboard/administracion/log-intentos"
-              className={`
-                block px-4 py-2 rounded-md text-sm transition-colors
-                ${pathname === "/dashboard/administracion/log-intentos"
-                  ? "bg-blue-600 text-white font-medium"
-                  : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                }
-              `}
-            >
-              Registro de Accesos
-            </Link>
-            <Link
-              href="/dashboard/escalas/cargos-autorizacion"
-              className={`
-                block px-4 py-2 rounded-md text-sm transition-colors
-                ${pathname === "/dashboard/escalas/cargos-autorizacion"
-                  ? "bg-blue-600 text-white font-medium"
-                  : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                }
-              `}
-            >
-              Cargos de Autorización
-            </Link>
+            {!colapsado && (
+              <p className="text-xs font-semibold uppercase text-gray-500 px-4 mb-2">Administración</p>
+            )}
+            <ul className="space-y-1">
+              <li>
+                <ItemModulo nombre="Gestión de Permisos" ruta="/dashboard/administracion/permisos" Icono={Lock}
+                  activo={pathname === "/dashboard/administracion/permisos"} colapsado={colapsado} />
+              </li>
+              <li>
+                <ItemModulo nombre="Registro de Accesos" ruta="/dashboard/administracion/log-intentos" Icono={ScrollText}
+                  activo={pathname === "/dashboard/administracion/log-intentos"} colapsado={colapsado} />
+              </li>
+            </ul>
           </div>
         )}
       </nav>
 
-      {/* Datos del usuario */}
-      <div className="px-6 py-4 border-t border-gray-700 space-y-1">
-        <p className="text-sm font-semibold text-white">
-          {nombre} {apellido}
-        </p>
-        <p className="text-sm font-medium text-blue-400">
-          {rol}
-        </p>
-        <div className="pt-1 space-y-1">
+      <div className={`border-t border-gray-700 ${colapsado ? "py-3 flex flex-col items-center gap-3" : "px-6 py-4 space-y-1"}`}>
+        {!colapsado && (
+          <>
+            <p className="text-sm font-semibold text-white">{nombre} {apellido}</p>
+            <p className="text-sm font-medium text-blue-400">{rol}</p>
+          </>
+        )}
+        <div className={colapsado ? "flex flex-col gap-3" : "pt-1 space-y-1"}>
           <Link
             href="/dashboard/perfil"
-            className="block text-xs text-gray-400 hover:text-white transition-colors"
+            title={colapsado ? "Cambiar contraseña" : undefined}
+            className={`text-gray-400 hover:text-white transition-colors ${colapsado ? "flex justify-center" : "block text-xs"}`}
           >
-            Cambiar contraseña
+            {colapsado ? <KeyRound size={16} /> : "Cambiar contraseña"}
           </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full text-xs text-red-400 hover:text-red-300 text-left transition-colors"
+            title={colapsado ? "Cerrar sesión" : undefined}
+            className={`text-red-400 hover:text-red-300 transition-colors ${colapsado ? "flex justify-center" : "w-full text-xs text-left"}`}
           >
-            Cerrar sesión
+            {colapsado ? <LogOut size={16} /> : "Cerrar sesión"}
           </button>
         </div>
       </div>

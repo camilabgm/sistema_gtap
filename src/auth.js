@@ -4,7 +4,6 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
-
 const MAX_INTENTOS_FALLIDOS = 3
 const MINUTOS_BLOQUEO = 15
 
@@ -167,6 +166,7 @@ export const authOptions = {
           nombre:               usuario.persona.nombre,
           apellido:             usuario.persona.apellido,
           rol:                  usuario.rol.nombre,
+          personaId:            usuario.persona.id,
           sesion_invalidada_en: null,
           permisos,
         }
@@ -181,6 +181,7 @@ export const authOptions = {
         token.nombre               = user.nombre
         token.apellido             = user.apellido
         token.rol                  = user.rol
+        token.personaId            = user.personaId
         token.permisos             = user.permisos
         token.sesion_invalidada_en = user.sesion_invalidada_en
         token.iat                  = Math.floor(Date.now() / 1000)
@@ -193,6 +194,7 @@ export const authOptions = {
       session.user.nombre               = token.nombre
       session.user.apellido             = token.apellido
       session.user.rol                  = token.rol
+      session.user.personaId            = token.personaId
       session.user.permisos             = token.permisos
       session.user.sesion_invalidada_en = token.sesion_invalidada_en
       session.user.token_emitido_en     = token.iat

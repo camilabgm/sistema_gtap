@@ -2,12 +2,11 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
-import Navbar from "@/components/dashboard/Navbar"
+import DashboardShell from "@/components/dashboard/DashboardShell"
 import CerrarSesionAutomatico from "@/components/shared/CerrarSesionAutomatico"
 import VerificadorSesion from "@/components/shared/VerificadorSesion"
 import DetectorInactividad from "@/components/shared/DetectorInactividad"
 import CambioContrasenaObligatorio from "@/components/shared/CambioContrasenaObligatorio"
-
 
 export default async function DashboardLayout({ children }) {
   const sesion = await getServerSession(authOptions)
@@ -31,16 +30,15 @@ export default async function DashboardLayout({ children }) {
   return (
     <div className="flex min-h-screen bg-gray-100">
 
-      <Navbar
+      <DashboardShell
         nombre={sesion.user.nombre}
         apellido={sesion.user.apellido}
         rol={sesion.user.rol}
-      />
-
-      <main className="ml-64 flex-1 p-6">
+        permisos={sesion.user.permisos}
+      >
         {sesionDesactualizada && <CerrarSesionAutomatico />}
         {children}
-      </main>
+      </DashboardShell>
 
       <VerificadorSesion />
       <DetectorInactividad />

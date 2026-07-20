@@ -3,26 +3,32 @@ import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import ParteDiarioPage from "@/components/parte-diario/ParteDiarioPage"
 
-
 function hoyComoFecha() {
   const hoy = new Date()
   return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
 }
 
 export default async function ParteDiarioDashboardPage() {
-
   const session = await getServerSession(authOptions)
+
+  if (!session?.user?.permisos?.PERSONAS?.puede_ver) {
+    return (
+      <div className="p-8">
+        <h1 className="text-xl font-semibold text-gray-900">Sin permisos</h1>
+        <p className="mt-2 text-gray-600">No tenés permiso para ver el parte diario.</p>
+      </div>
+    )
+  }
 
   const personas = await prisma.persona.findMany({
     where:   { activo: true },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
     select: {
-      id:          true,
-      nombre:      true,
-      apellido:    true,
-      grado:       true,
-      escuadron:   true,
-      especialidad: true,
+      id:        true,
+      nombre:    true,
+      apellido:  true,
+      grado:     true,
+      escuadron: true,
     },
   })
 
@@ -36,7 +42,7 @@ export default async function ParteDiarioDashboardPage() {
     orderBy: { created_at: "asc" },
   })
 
-  const permisos = session?.user?.permisos?.PERSONAS
+  const permisos = session.user.permisos.PERSONAS
 
   return (
     <ParteDiarioPage

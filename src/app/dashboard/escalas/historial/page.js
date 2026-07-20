@@ -1,8 +1,8 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
-import AgendaEscalas from "@/components/escalas/AgendaEscalas"
+import HistorialEscalas from "@/components/escalas/HistorialEscalas"
 
-export default async function EscalasPage() {
+export default async function HistorialEscalasPage() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.permisos?.ESCALAS?.puede_ver) {
@@ -14,10 +14,5 @@ export default async function EscalasPage() {
     )
   }
 
-  return (
-    <AgendaEscalas
-      puedeCrear={!!session.user.permisos?.ESCALAS?.puede_crear}
-      puedeEditar={!!session.user.permisos?.ESCALAS?.puede_editar}
-    />
-  )
+  return <HistorialEscalas />
 }
