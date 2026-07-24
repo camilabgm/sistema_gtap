@@ -87,3 +87,30 @@ export function useTick(intervaloMs = 30000) {
     return () => clearInterval(id)
   }, [intervaloMs])
 }
+
+// Sumar esto al archivo, sin tocar lo que ya existía
+
+export function formatearFechaHoraCompacta(iso) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleString("es-PY", {
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  })
+}
+
+// Si salida y llegada caen el mismo día, muestra solo horas ("15:30 – 16:45").
+// Si caen en días distintos, muestra fecha + hora en los dos extremos, para
+// que un vuelo "sale el 22 y llega el 23" nunca se vea como que dura cero
+// minutos solo porque comparten la misma hora del reloj.
+export function formatearRangoVuelo(horaDespegueIso, horaArriboIso) {
+  if (!horaDespegueIso) return "—"
+  if (!horaArriboIso) return `${formatearHora(horaDespegueIso)} – —`
+
+  const despegue = new Date(horaDespegueIso)
+  const llegada  = new Date(horaArriboIso)
+  const mismoDia = despegue.toDateString() === llegada.toDateString()
+
+  if (mismoDia) {
+    return `${formatearHora(horaDespegueIso)} – ${formatearHora(horaArriboIso)}`
+  }
+  return `${formatearFechaHoraCompacta(horaDespegueIso)} – ${formatearFechaHoraCompacta(horaArriboIso)}`
+}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO_ABORTO, calcularEstadoVisual, puedeAbortarAhora, estaPendienteDeAutorizacion, formatearHora, useTick } from "@/lib/escalas"
+import { ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO_ABORTO, calcularEstadoVisual, puedeAbortarAhora, estaPendienteDeAutorizacion, formatearHora, formatearRangoVuelo, useTick } from "@/lib/escalas"
 
 const MOTIVOS_ABORTO = Object.keys(ETIQUETAS_MOTIVO_ABORTO)
 
@@ -60,9 +60,9 @@ export default function PanelDetalleEscala({ escala, puedeEditar, onCerrar, onAc
           <p className="text-sm font-semibold text-gray-900">
             {e.aeronave?.matricula || "Sin aeronave"} · {ruta} · {ETIQUETAS_ESTADO[estadoVisual] || estadoVisual}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {formatearHora(e.hora_despegue_estimada)} – {formatearHora(e.hora_arribo_estimada)}
-          </p>
+         <p className="text-xs text-gray-500 mt-1">
+          {formatearRangoVuelo(e.hora_despegue_estimada, e.hora_arribo_estimada)}
+        </p>
           <p className="text-xs text-gray-500 mt-1">
             Tripulación:{" "}
             {(e.tripulacion || []).length > 0
