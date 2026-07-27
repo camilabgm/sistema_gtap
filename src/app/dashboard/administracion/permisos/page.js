@@ -2,13 +2,14 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
+import { esAdministrador } from "@/lib/autorizacion"
 import PermisosRolTable from "@/components/administracion/PermisosRolTable"
 
 
 export default async function PermisosPage() {
   const sesion = await getServerSession(authOptions)
 
-  if (sesion.user.rol !== "Comandante") {
+  if (!esAdministrador(sesion)) {
     redirect("/dashboard")
   }
 

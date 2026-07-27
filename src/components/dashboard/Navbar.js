@@ -11,17 +11,19 @@ import {
 } from "lucide-react"
 import { ROLES_ADMIN, esCargoDeCascada } from "@/lib/autorizacion"
 
+// Cada módulo con "modulo" definido se filtra según permisos?.[modulo]?.puede_ver.
+// Los que no tienen "modulo" (como Inicio) siempre quedan visibles.
 const modulosAntes = [
-  { nombre: "Inicio",            ruta: "/dashboard",              Icono: Home },
-  { nombre: "Tipos de Misiones", ruta: "/dashboard/tipos-misiones", Icono: Tag },
-  { nombre: "Aeronaves",         ruta: "/dashboard/aeronaves",     Icono: Plane },
-  { nombre: "Personas",          ruta: "/dashboard/personas",      Icono: Users },
+  { nombre: "Inicio",            ruta: "/dashboard",                Icono: Home  },
+  { nombre: "Tipos de Misiones", ruta: "/dashboard/tipos-misiones", Icono: Tag,   modulo: "TIPOS_MISIONES" },
+  { nombre: "Aeronaves",         ruta: "/dashboard/aeronaves",      Icono: Plane, modulo: "AERONAVES" },
+  { nombre: "Personas",          ruta: "/dashboard/personas",       Icono: Users, modulo: "PERSONAS" },
 ]
 
 const modulosDespues = [
-  { nombre: "Manifiesto", ruta: "/dashboard/manifiesto", Icono: FileText },
-  { nombre: "Informes",   ruta: "/dashboard/informes",   Icono: BarChart3 },
-  { nombre: "SICEM",      ruta: "/dashboard/sicem",      Icono: Wrench },
+  { nombre: "Manifiesto", ruta: "/dashboard/manifiesto", Icono: FileText,  modulo: "MANIFIESTO" },
+  { nombre: "Informes",   ruta: "/dashboard/informes",   Icono: BarChart3, modulo: "INFORMES" },
+  { nombre: "SICEM",      ruta: "/dashboard/sicem",      Icono: Wrench,    modulo: "SICEM" },
 ]
 
 function ItemModulo({ nombre, ruta, Icono, activo, colapsado }) {
@@ -92,6 +94,16 @@ export default function Navbar({ nombre, apellido, rol, permisos, colapsado, onT
 
   const dentroDeEscalas = pathname.startsWith("/dashboard/escalas")
   const vePersonas = permisos?.PERSONAS?.puede_ver
+  const veEscalas  = permisos?.ESCALAS?.puede_ver
+
+  // Filtramos cada lista según el permiso puede_ver del módulo correspondiente.
+  // Un módulo sin "modulo" definido (como Inicio) siempre queda visible.
+  const modulosAntesVisibles = modulosAntes.filter(
+    (m) => !m.modulo || permisos?.[m.modulo]?.puede_ver
+  )
+  const modulosDespuesVisibles = modulosDespues.filter(
+    (m) => !m.modulo || permisos?.[m.modulo]?.puede_ver
+  )
 
   useEffect(() => {
     if (!esCargoDeCascada(rol)) return
@@ -132,7 +144,7 @@ export default function Navbar({ nombre, apellido, rol, permisos, colapsado, onT
 
       <nav className="flex-1 px-2 py-4 overflow-y-auto">
         <ul className="space-y-1">
-          {modulosAntes.map((modulo) => (
+          {modulosAntesVisibles.map((modulo) => (
             <li key={modulo.ruta}>
               <ItemModulo {...modulo} activo={pathname === modulo.ruta} colapsado={colapsado} />
             </li>
@@ -150,60 +162,62 @@ export default function Navbar({ nombre, apellido, rol, permisos, colapsado, onT
             </li>
           )}
 
-          <li>
-            {colapsado ? (
-              <Link
-                href="/dashboard/escalas"
-                title="Escalas"
-                className={`flex items-center justify-center py-2.5 rounded-md transition-colors ${
-                  dentroDeEscalas ? "text-white bg-gray-800" : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                }`}
-              >
-                <CalendarDays size={18} />
-              </Link>
-            ) : (
-              <Link
-                href="/dashboard/escalas"
-                className={`flex items-center gap-3 px-4 py-2 rounded-md text-sm transition-colors ${
-                  dentroDeEscalas ? "text-white font-medium" : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                }`}
-              >
-                <CalendarDays size={18} className="shrink-0" />
-                <span>Escalas</span>
-              </Link>
-            )}
+          {veEscalas && (
+            <li>
+              {colapsado ? (
+                <Link
+                  href="/dashboard/escalas"
+                  title="Escalas"
+                  className={`flex items-center justify-center py-2.5 rounded-md transition-colors ${
+                    dentroDeEscalas ? "text-white bg-gray-800" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                  }`}
+                >
+                  <CalendarDays size={18} />
+                </Link>
+              ) : (
+                <Link
+                  href="/dashboard/escalas"
+                  className={`flex items-center gap-3 px-4 py-2 rounded-md text-sm transition-colors ${
+                    dentroDeEscalas ? "text-white font-medium" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                  }`}
+                >
+                  <CalendarDays size={18} className="shrink-0" />
+                  <span>Escalas</span>
+                </Link>
+              )}
 
-            {dentroDeEscalas && (
-              <ul className="mt-1 space-y-0.5">
-                <li>
-                  <SubItemEscalas nombre="Agenda" ruta="/dashboard/escalas" Icono={CalendarDays}
-                    activo={pathname === "/dashboard/escalas"} colapsado={colapsado} />
-                </li>
-                <li>
-                  <SubItemEscalas nombre="Nueva escala" ruta="/dashboard/escalas/nueva" Icono={PlusCircle}
-                    activo={pathname === "/dashboard/escalas/nueva"} colapsado={colapsado} />
-                </li>
-                <li>
-                  <SubItemEscalas nombre="Historial" ruta="/dashboard/escalas/historial" Icono={History}
-                    activo={pathname === "/dashboard/escalas/historial"} colapsado={colapsado} />
-                </li>
-                {esCargoDeCascada(rol) && (
+              {dentroDeEscalas && (
+                <ul className="mt-1 space-y-0.5">
                   <li>
-                    <SubItemEscalas nombre="Pendientes de autorizar" ruta="/dashboard/escalas/pendientes-autorizar" Icono={ShieldCheck}
-                      activo={pathname === "/dashboard/escalas/pendientes-autorizar"} badge={pendientesParaMi} colapsado={colapsado} />
+                    <SubItemEscalas nombre="Agenda" ruta="/dashboard/escalas" Icono={CalendarDays}
+                      activo={pathname === "/dashboard/escalas"} colapsado={colapsado} />
                   </li>
-                )}
-                {ROLES_ADMIN.includes(rol) && (
                   <li>
-                    <SubItemEscalas nombre="Cargos de Autorización" ruta="/dashboard/escalas/cargos-autorizacion" Icono={UserCog}
-                      activo={pathname === "/dashboard/escalas/cargos-autorizacion"} colapsado={colapsado} />
+                    <SubItemEscalas nombre="Nueva escala" ruta="/dashboard/escalas/nueva" Icono={PlusCircle}
+                      activo={pathname === "/dashboard/escalas/nueva"} colapsado={colapsado} />
                   </li>
-                )}
-              </ul>
-            )}
-          </li>
+                  <li>
+                    <SubItemEscalas nombre="Historial" ruta="/dashboard/escalas/historial" Icono={History}
+                      activo={pathname === "/dashboard/escalas/historial"} colapsado={colapsado} />
+                  </li>
+                  {esCargoDeCascada(rol) && (
+                    <li>
+                      <SubItemEscalas nombre="Pendientes de autorizar" ruta="/dashboard/escalas/pendientes-autorizar" Icono={ShieldCheck}
+                        activo={pathname === "/dashboard/escalas/pendientes-autorizar"} badge={pendientesParaMi} colapsado={colapsado} />
+                    </li>
+                  )}
+                  {ROLES_ADMIN.includes(rol) && (
+                    <li>
+                      <SubItemEscalas nombre="Cargos de Autorización" ruta="/dashboard/escalas/cargos-autorizacion" Icono={UserCog}
+                        activo={pathname === "/dashboard/escalas/cargos-autorizacion"} colapsado={colapsado} />
+                    </li>
+                  )}
+                </ul>
+              )}
+            </li>
+          )}
 
-          {modulosDespues.map((modulo) => (
+          {modulosDespuesVisibles.map((modulo) => (
             <li key={modulo.ruta}>
               <ItemModulo {...modulo} activo={pathname === modulo.ruta} colapsado={colapsado} />
             </li>

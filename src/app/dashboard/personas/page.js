@@ -3,11 +3,18 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import PersonasTable from "@/components/personas/PersonasTable"
+import { tienePermiso } from "@/lib/permisos"
+import { esAdministrador } from "@/lib/autorizacion"
+import SinPermisos from "@/components/shared/SinPermisos"
 
 
 export default async function PersonasPage() {
 
   const session = await getServerSession(authOptions)
+
+  if (!tienePermiso(session, "PERSONAS")) {
+    return <SinPermisos mensaje="No tenés permiso para ver personas." />
+  }
 
   const personas = await prisma.persona.findMany({
     where:   { activo: true },
@@ -22,14 +29,14 @@ export default async function PersonasPage() {
     },
   })
 
-  const permisos   = session?.user?.permisos?.PERSONAS
-  const rolUsuario = session?.user?.rol
+  const permisos = session?.user?.permisos?.PERSONAS
+  const puedeGestionarPermisos = esAdministrador(session)
 
   return (
     <PersonasTable
       personas={personas}
       permisos={permisos}
-      rolUsuario={rolUsuario}
+      puedeGestionarPermisos={puedeGestionarPermisos}
     />
   )
 }

@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
+import { esAdministrador } from "@/lib/autorizacion"
+import SinPermisos from "@/components/shared/SinPermisos"
 import TablaLogIntentos from  "@/components/administracion/TablaLogIntentos"
 
 
@@ -9,6 +11,11 @@ export default async function LogIntentosPage() {
   // Verificar que el usuario esté logueado
   const session = await getServerSession(authOptions)
   if (!session) redirect("/login")
+
+  // Solo Comandante y Jefe de Operaciones pueden ver el registro de intentos de login
+  if (!esAdministrador(session)) {
+    return <SinPermisos mensaje="No tenés acceso al registro de intentos de login." />
+  }
 
   // Traer los últimos 200 intentos de login, del más reciente al más viejo
   const intentos = await prisma.logIntentoLogin.findMany({
