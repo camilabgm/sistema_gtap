@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/auth"
-import { esAdministrador } from "@/lib/autorizacion"
+import { conAdmin } from "@/lib/api-helpers"
 
 // GET — trae permisos del rol + overrides individuales del usuario
-export async function GET(request, { params }) {
-  const sesion = await getServerSession(authOptions)
-
-  // Solo un administrador (Comandante o Jefe de Operaciones)
-  if (!esAdministrador(sesion)) {
-    return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
-  }
-
+export const GET = conAdmin("PERMISOS_USUARIO", async (request, { params }, session) => {
   const { id } = await params
 
   const usuario = await prisma.usuario.findUnique({
@@ -33,17 +24,10 @@ export async function GET(request, { params }) {
     permisos_rol:     usuario.rol.permisos_rol,
     permisos_usuario: usuario.permisos_usuario,
   })
-}
+})
 
 // PUT — guarda overrides individuales e invalida sesión del usuario
-export async function PUT(request, { params }) {
-  const sesion = await getServerSession(authOptions)
-
-  // Solo un administrador (Comandante o Jefe de Operaciones)
-  if (!esAdministrador(sesion)) {
-    return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
-  }
-
+export const PUT = conAdmin("PERMISOS_USUARIO", async (request, { params }, session) => {
   const { id } = await params
   const usuarioId = parseInt(id)
   const { permisos } = await request.json()
@@ -71,7 +55,7 @@ export async function PUT(request, { params }) {
           puede_editar:   permiso.puede_editar,
           puede_eliminar: permiso.puede_eliminar,
           puede_reportes: permiso.puede_reportes,
-          editado_por:    sesion.user.id,
+          editado_por:    session.user.id,
         },
         create: {
           usuario_id:     usuarioId,
@@ -81,7 +65,7 @@ export async function PUT(request, { params }) {
           puede_editar:   permiso.puede_editar,
           puede_eliminar: permiso.puede_eliminar,
           puede_reportes: permiso.puede_reportes,
-          creado_por:     sesion.user.id,
+          creado_por:     session.user.id,
         },
       })
     }
@@ -94,4 +78,4 @@ export async function PUT(request, { params }) {
   })
 
   return NextResponse.json({ ok: true })
-}
+})

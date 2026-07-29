@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { validarContrasena } from "@/lib/validarContrasena"
+import { conSesion } from "@/lib/api-helpers"
 
-
-export async function PUT(request) {
-  const sesion = await getServerSession(authOptions)
-
-  if (!sesion) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-  }
-
+export const PUT = conSesion("CAMBIAR_PASSWORD", async (request, context, session) => {
   const { password_actual, password_nuevo } = await request.json()
 
   if (!password_actual || !password_nuevo) {
@@ -29,7 +21,7 @@ export async function PUT(request) {
   }
 
   const usuario = await prisma.usuario.findUnique({
-    where: { id: sesion.user.id },
+    where: { id: session.user.id },
   })
 
   const passwordValida = await bcrypt.compare(password_actual, usuario.password)
@@ -44,13 +36,13 @@ export async function PUT(request) {
   const passwordHash = await bcrypt.hash(password_nuevo, 10)
 
   await prisma.usuario.update({
-    where: { id: sesion.user.id },
+    where: { id: session.user.id },
     data:  {
       password:          passwordHash,
       password_temporal: false,
-      editado_por:       sesion.user.id,
+      editado_por:       session.user.id,
     },
   })
 
   return NextResponse.json({ ok: true })
-}
+})

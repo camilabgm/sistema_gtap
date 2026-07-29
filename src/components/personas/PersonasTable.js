@@ -22,7 +22,7 @@ const ETIQUETAS_ESPECIALIDAD = {
   OTRO:             "Otro",
 }
 
-export default function PersonasTable({ personas: datosIniciales, permisos, puedeGestionarPermisos }) {
+export default function PersonasTable({ personas: datosIniciales, permisos, esAdministrador }) {
 
   const [personas,              setPersonas]              = useState(datosIniciales)
   const [busqueda,              setBusqueda]              = useState("")
@@ -242,7 +242,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos, pued
                           {persona.usuario ? "Acceso" : "Dar acceso"}
                         </button>
                       )}
-                      {puedeGestionarPermisos && persona.usuario && (
+                      {esAdministrador && persona.usuario && (
                         <button onClick={() => handleAbrirPermisos(persona)}
                           className="px-3 py-1 text-xs text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-50 transition-colors">
                           Permisos
@@ -276,7 +276,11 @@ export default function PersonasTable({ personas: datosIniciales, permisos, pued
         <PersonasForm persona={personaSeleccionada} onGuardado={handleGuardado} onCerrar={handleCerrar} />
       )}
       {modalHabilitaciones && personaSeleccionada && (
-        <HabilitacionesModal persona={personaSeleccionada} onCerrar={handleCerradoHabilitaciones} />
+        <HabilitacionesModal
+          persona={personaSeleccionada}
+          onCerrar={handleCerradoHabilitaciones}
+          esAdministrador={esAdministrador}
+        />
       )}
       {modalUsuario && personaSeleccionada && (
         <UsuarioModal persona={personaSeleccionada} onGuardado={handleGuardadoUsuario} onCerrar={handleCerrarUsuario} />

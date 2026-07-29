@@ -28,7 +28,7 @@ function badgeVencimiento(vence) {
   return               { label: "Vigente",  color: "bg-green-100 text-green-700" }
 }
 
-export default function HabilitacionesModal({ persona, onCerrar }) {
+export default function HabilitacionesModal({ persona, onCerrar, esAdministrador }) {
 
   const [habilitaciones,     setHabilitaciones]     = useState([])
   const [cargandoDatos,      setCargandoDatos]       = useState(true)
@@ -139,6 +139,15 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
 
         <div className="px-6 py-5 space-y-6">
 
+          {/* Aviso de solo lectura para quien no es administrador */}
+          {!esAdministrador && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+              <p className="text-xs text-gray-500">
+                Solo el Jefe de Operaciones y el Comandante pueden cargar períodos o modificar habilitaciones. Podés ver el historial, pero no editarlo.
+              </p>
+            </div>
+          )}
+
           {/* ── HABILITACIÓN MÉDICA ─────────────────────────── */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
@@ -149,7 +158,7 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
             <div className="border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-medium text-gray-700">Semestral</p>
-                {!mostrarFormSemestral && (
+                {esAdministrador && !mostrarFormSemestral && (
                   <button
                     onClick={() => setMostrarFormSemestral(true)}
                     className="text-xs text-blue-600 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50 transition-colors"
@@ -160,7 +169,7 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
               </div>
 
               {/* Form para agregar período */}
-              {mostrarFormSemestral && (
+              {esAdministrador && mostrarFormSemestral && (
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                   {errorSemestral && (
                     <p className="text-xs text-red-600 mb-3">{errorSemestral}</p>
@@ -242,12 +251,14 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
                               {badge.label}
                             </span>
                           )}
-                          <button
-                            onClick={() => handleEliminarSemestral(h.id)}
-                            className="text-xs text-gray-300 hover:text-red-500 transition-colors"
-                          >
-                            ✕
-                          </button>
+                          {esAdministrador && (
+                            <button
+                              onClick={() => handleEliminarSemestral(h.id)}
+                              className="text-xs text-gray-300 hover:text-red-500 transition-colors"
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
                       </div>
                     )
@@ -258,10 +269,10 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
 
             {/* Anual */}
             <div className="border border-gray-200 rounded-lg p-4">
-              <label className="flex items-center gap-3 cursor-pointer">
+              <label className={`flex items-center gap-3 ${esAdministrador ? "cursor-pointer" : "cursor-not-allowed"}`}>
                 <input type="checkbox"
                   checked={anualHabilitada}
-                  disabled={guardandoCheck}
+                  disabled={guardandoCheck || !esAdministrador}
                   onChange={(e) => {
                   const nuevoValor = e.target.checked
                   const accion = nuevoValor ? "habilitar" : "quitar la habilitación de"
@@ -272,7 +283,7 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
                   setAnualHabilitada(nuevoValor)
                   handleToggleCheck("hab_anual_habilitada", nuevoValor)
                 }}
-                  className="w-4 h-4 text-blue-600 rounded" />
+                  className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
                 <div>
                   <span className="text-sm font-medium text-gray-700">Anual — habilitado por Operaciones</span>
                   <p className="text-xs text-gray-400 mt-0.5">
@@ -289,10 +300,10 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
               Habilitación operacional
             </h3>
             <div className="border border-gray-200 rounded-lg p-4">
-              <label className="flex items-center gap-3 cursor-pointer">
+              <label className={`flex items-center gap-3 ${esAdministrador ? "cursor-pointer" : "cursor-not-allowed"}`}>
                 <input type="checkbox"
                   checked={operacionalHabilitada}
-                  disabled={guardandoCheck}
+                  disabled={guardandoCheck || !esAdministrador}
                   onChange={(e) => {
                   const nuevoValor = e.target.checked
                   const accion = nuevoValor ? "habilitar operacionalmente" : "quitar la habilitación operacional de"
@@ -303,7 +314,7 @@ export default function HabilitacionesModal({ persona, onCerrar }) {
                   setOperacionalHabilitada(nuevoValor)
                   handleToggleCheck("nivel_operacional_habilitado", nuevoValor)
                 }}
-                  className="w-4 h-4 text-blue-600 rounded" />
+                  className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
                 <div>
                   <span className="text-sm font-medium text-gray-700">Habilitado por Operaciones</span>
                   <p className="text-xs text-gray-400 mt-0.5">

@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/auth"
-import { esAdministrador } from "@/lib/autorizacion"
+import { conAdmin } from "@/lib/api-helpers"
 
 // GET — trae todos los roles con sus permisos actuales
-export async function GET() {
-  const sesion = await getServerSession(authOptions)
-
-  // Solo un administrador (Comandante o Jefe de Operaciones)
-  if (!esAdministrador(sesion)) {
-    return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
-  }
-
+export const GET = conAdmin("PERMISOS_ROL", async (request, context, session) => {
   const roles = await prisma.rol.findMany({
     where:   { deleted_at: null },
     include: { permisos_rol: true },
@@ -20,17 +11,10 @@ export async function GET() {
   })
 
   return NextResponse.json(roles)
-}
+})
 
 // PUT — actualiza permisos de un rol e invalida sesiones afectadas
-export async function PUT(request) {
-  const sesion = await getServerSession(authOptions)
-
-  // Solo un administrador (Comandante o Jefe de Operaciones)
-  if (!esAdministrador(sesion)) {
-    return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
-  }
-
+export const PUT = conAdmin("PERMISOS_ROL", async (request, context, session) => {
   const { rol_id, permisos } = await request.json()
   // permisos = [{ modulo, puede_ver, puede_crear, puede_editar, puede_eliminar, puede_reportes }]
 
@@ -53,7 +37,7 @@ export async function PUT(request) {
         puede_editar:   permiso.puede_editar,
         puede_eliminar: permiso.puede_eliminar,
         puede_reportes: permiso.puede_reportes,
-        editado_por:    sesion.user.id,
+        editado_por:    session.user.id,
       },
       create: {
         rol_id:         rol_id,
@@ -63,7 +47,7 @@ export async function PUT(request) {
         puede_editar:   permiso.puede_editar,
         puede_eliminar: permiso.puede_eliminar,
         puede_reportes: permiso.puede_reportes,
-        creado_por:     sesion.user.id,
+        creado_por:     session.user.id,
       },
     })
   }
@@ -75,4 +59,4 @@ export async function PUT(request) {
   })
 
   return NextResponse.json({ ok: true })
-}
+})

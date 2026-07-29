@@ -1,23 +1,12 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/auth"
+import { conPermiso } from "@/lib/api-helpers"
 
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
+export const GET = conPermiso("PERSONAS", "puede_editar", async (request, context, session) => {
+  const roles = await prisma.rol.findMany({
+    where:   { deleted_at: null },
+    orderBy: { nombre: "asc" },
+  })
 
-    const roles = await prisma.rol.findMany({
-      where:   { deleted_at: null },
-      orderBy: { nombre: "asc" },
-    })
-
-    return NextResponse.json(roles)
-  } catch (error) {
-    console.error("Error GET roles:", error)
-    return NextResponse.json({ error: "Error al obtener roles" }, { status: 500 })
-  }
-}
+  return NextResponse.json(roles)
+})
