@@ -1,12 +1,21 @@
 // Destino: src/app/api/escalas/cargos-autorizacion/candidatos/route.js
 //
-// GET /api/escalas/cargos-autorizacion/candidatos?rol_autorizador=JEFE_OPERACIONES
+// GET /api/escalas/cargos-autorizacion/candidatos?rol_autorizador=JEFE_OPERACIONES&orden=1
 //
-// Devuelve la lista de usuarios activos cuyo Rol actual corresponde al
-// cargo de autorización pedido. Es el endpoint que alimenta el buscador
-// de la pantalla de administración de Cargos de Autorización — filtrado
-// en el origen para que sea imposible asignar como titular/adjunto a
-// alguien cuyo Rol no corresponde.
+// Devuelve la lista de usuarios candidatos a ocupar una posición (titular
+// o adjunto) de un cargo de autorización. El filtro depende de `orden`:
+//
+//   orden=1 (titular) → solo usuarios activos cuyo Rol actual corresponde
+//     exactamente al cargo pedido (ej. Rol="Jefe de Operaciones" para el
+//     cargo JEFE_OPERACIONES). El titular ES ese puesto, así que su Rol
+//     tiene que coincidir.
+//
+//   orden=2 (adjunto) → todos los usuarios activos, SIN filtrar por Rol.
+//     El adjunto no tiene un Rol equivalente en el sistema — su Rol
+//     refleja su función real (Piloto, Copiloto, etc.), no el cargo
+//     administrativo que ocupa como respaldo de autorización. Filtrar acá
+//     por Rol excluiría al candidato real (caso: Sebastián Morales,
+//     adjunto de Jefe de Operaciones, con Rol="Copiloto").
 //
 // Reusa el mapeo ROL_NOMBRE_POR_CARGO_AUTORIZACION de lib/autorizacion.js
 // en vez de tener su propia copia — es el mismo mapeo que usa la cascada.
@@ -26,6 +35,7 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url)
     const rolAutorizador = searchParams.get("rol_autorizador")
+    const orden = Number(searchParams.get("orden"))
 
     const nombreRolEsperado = ROL_NOMBRE_POR_CARGO_AUTORIZACION[rolAutorizador]
     if (!nombreRolEsperado) {
@@ -34,12 +44,21 @@ export async function GET(request) {
         { status: 400 }
       )
     }
+    if (orden !== 1 && orden !== 2) {
+      return NextResponse.json(
+        { error: "orden debe ser 1 (titular) o 2 (adjunto)" },
+        { status: 400 }
+      )
+    }
+
+    // Titular: filtrado estricto por Rol. Adjunto: cualquier usuario activo.
+    const where =
+      orden === 1
+        ? { activo: true, rol: { nombre: nombreRolEsperado } }
+        : { activo: true }
 
     const candidatos = await prisma.usuario.findMany({
-      where: {
-        activo: true,
-        rol: { nombre: nombreRolEsperado },
-      },
+      where,
       select: {
         id: true,
         persona: { select: { nombre: true, apellido: true, grado: true } },

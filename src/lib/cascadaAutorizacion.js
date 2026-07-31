@@ -8,11 +8,15 @@
 // primero el TITULAR (orden 1), después el ADJUNTO (orden 2). Recién si
 // ninguno de los dos sirve, se pasa al siguiente cargo.
 //
-// Para cada posición (titular o adjunto) se hacen dos chequeos, en este
-// orden:
-//   1) ¿Su Rol actual todavía corresponde a este cargo? (más barato,
-//      no toca la lógica de disponibilidad — se revisa primero)
-//   2) ¿Está disponible ahora mismo? (en vuelo / parte diario / derivación)
+// Para cada posición se hacen hasta dos chequeos, en este orden:
+//   1) SOLO para el TITULAR (orden 1): ¿su Rol actual todavía
+//      corresponde a este cargo? El ADJUNTO no tiene este chequeo — su
+//      Rol nunca tiene por qué coincidir con el nombre del cargo (su
+//      Rol refleja su función real: Piloto, Copiloto, General, etc.),
+//      así que evaluarlo por Rol lo descartaría siempre, sin importar
+//      si está disponible o no.
+//   2) Para titular Y adjunto: ¿está disponible ahora mismo? (en vuelo
+//      / parte diario / derivación)
 //
 // Se usa al publicar una escala.
 
@@ -39,7 +43,8 @@ export const CASCADA_AUTORIZACION = [
 //     → esta persona sirve, es el autorizante.
 //   { resultado: "SALTAR", motivo, personaId }
 //     → hay alguien cargado, pero no sirve ahora mismo (motivo:
-//       ROL_DESACTUALIZADO, EN_VUELO, PARTE_DIARIO o DERIVACION_MANUAL).
+//       ROL_DESACTUALIZADO — solo titular —, EN_VUELO, PARTE_DIARIO o
+//       DERIVACION_MANUAL).
 //   { resultado: "SIN_ASIGNAR", personaId: null }
 //     → no hay nadie cargado en esta posición para este cargo.
 async function evaluarPosicion(rol, orden) {
@@ -64,9 +69,10 @@ async function evaluarPosicion(rol, orden) {
   const nombreRolActual = cargo.usuario.rol?.nombre ?? null
 
   // Chequeo 1 (barato): ¿su Rol actual todavía corresponde a este cargo?
-  // Si cambió de puesto y nadie actualizó CargoAutorizacion, no sirve
-  // aunque esté "disponible" en el sentido de horarios.
-  if (!rolCoincideConCargo(nombreRolActual, rol)) {
+  // SOLO aplica al titular (orden 1) — el adjunto nunca tiene un Rol que
+  // deba coincidir con el nombre del cargo, así que este chequeo no le
+  // corresponde y se salta directo al Chequeo 2.
+  if (orden === 1 && !rolCoincideConCargo(nombreRolActual, rol)) {
     return { resultado: "SALTAR", motivo: "ROL_DESACTUALIZADO", personaId }
   }
 

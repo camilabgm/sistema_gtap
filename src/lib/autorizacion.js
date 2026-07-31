@@ -1,5 +1,4 @@
-// src/lib/autorizacion.js
-//
+
 //  Funciones centrales de AUTORIZACIÓN (¿quién puede hacer qué?).
 //
 //  La idea: en vez de repetir la regla "quién es administrador" en cada
@@ -9,6 +8,8 @@
 //  Esta lista debe coincidir con el ROLES_ADMIN del Navbar, para que la
 //  interfaz y los endpoints usen la misma regla.
 // ─────────────────────────────────────────────────────────────────────
+
+import prisma from "@/lib/prisma"
 
 // Roles que pueden administrar el sistema (permisos, usuarios, roles).
 export const ROLES_ADMIN = ["Comandante", "Jefe de Operaciones"]
@@ -37,13 +38,17 @@ export function esAdministrador(sesion) {
 //  sistema. Se usa para dos cosas:
 //
 //   1) Filtrar el buscador de usuarios en la pantalla de administración
-//      de Cargos de Autorización (solo mostrar personas cuyo Rol actual
-//      corresponda al cargo que se está asignando).
+//      de Cargos de Autorización, SOLO para la posición de TITULAR (el
+//      ADJUNTO no se filtra por Rol — ver candidatos/route.js).
 //   2) La verificación en tiempo real dentro de la cascada de
 //      autorización: antes de dejar que alguien autorice una escala
-//      como titular o adjunto de un cargo, confirmar que su Rol actual
-//      todavía es el que corresponde — por si cambió de puesto después
-//      de haber sido asignado en CargoAutorizacion.
+//      como TITULAR de un cargo, confirmar que su Rol actual todavía es
+//      el que corresponde (ver ROL_DESACTUALIZADO en
+//      cascadaAutorizacion.js). El ADJUNTO no tiene este chequeo,
+//      porque su Rol nunca tiene por qué coincidir con el cargo — su
+//      Rol refleja su función real (Piloto, Copiloto, General, etc.),
+//      no el cargo administrativo que ocupa como respaldo de
+//      autorización.
 // ─────────────────────────────────────────────────────────────────────
 
 export const ROL_NOMBRE_POR_CARGO_AUTORIZACION = {
@@ -55,7 +60,8 @@ export const ROL_NOMBRE_POR_CARGO_AUTORIZACION = {
 }
 
 // Verifica si el Rol actual de un usuario todavía corresponde al cargo
-// de autorización que se le quiere validar.
+// de autorización que se le quiere validar. Se usa solo para el TITULAR
+// (orden=1) — ver el punto 4 del PUT en cargos-autorizacion/route.js.
 //
 // nombreRolUsuario  → el Rol.nombre actual del usuario (ej. "Jefe de Operaciones")
 // cargoAutorizador  → un valor del enum RolAutorizador (ej. "JEFE_OPERACIONES")
@@ -68,10 +74,29 @@ export function rolCoincideConCargo(nombreRolUsuario, cargoAutorizador) {
   return nombreRolUsuario === nombreEsperado
 }
 
-// Devuelve true si el Rol de sistema de la persona corresponde a
-// CUALQUIERA de los 5 cargos de la cascada — se usa para decidir quién
-// puede ver la pantalla de "Pendientes de autorizar" (todos los 5, no
-// solo ROLES_ADMIN) y quién puede usar el botón general de "Derivar".
-export function esCargoDeCascada(nombreRolUsuario) {
-  return Object.values(ROL_NOMBRE_POR_CARGO_AUTORIZACION).includes(nombreRolUsuario)
+// Devuelve true si este usuario está efectivamente cargado en
+// CargoAutorizacion (como titular O adjunto, en cualquiera de los 5
+// cargos, activo) — es decir, si tiene la potestad real de autorizar
+// escalas en algún momento de la cascada.
+//
+// IMPORTANTE: esto NO mira el Rol del usuario. Rol y CargoAutorizacion
+// son independientes — un adjunto puede tener cualquier Rol (Copiloto,
+// General, etc.) y de todas formas tener la potestad de autorizar
+// cuando le toque en la cascada.
+//
+// Se usa UNA SOLA VEZ en todo el sistema: desde auth.js, en el momento
+// del login. El resultado queda guardado en session.user.esCargoDeCascada
+// y NO se vuelve a consultar durante la sesión — mismo patrón que ya
+// usan permisos y rol (regla 5 de la metodología del proyecto). Ningún
+// otro archivo debería llamar a esta función directamente — deberían
+// leer session.user.esCargoDeCascada.
+export async function usuarioTieneCargoDeCascada(usuarioId) {
+  if (!usuarioId) return false
+
+  const asignacion = await prisma.cargoAutorizacion.findFirst({
+    where: { usuario_id: usuarioId, activo: true, deleted_at: null },
+    select: { id: true },
+  })
+
+  return !!asignacion
 }

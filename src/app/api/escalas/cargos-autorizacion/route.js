@@ -99,10 +99,14 @@ export async function PUT(request) {
       return NextResponse.json({ error: "El usuario no existe o está inactivo" }, { status: 400 })
     }
 
-    // 4. Prevención en el origen: su Rol actual tiene que corresponder al cargo pedido
-    if (!rolCoincideConCargo(usuario.rol?.nombre ?? null, rolAutorizador)) {
+    // 4. Prevención en el origen — SOLO para el TITULAR (orden 1): su Rol
+    // actual tiene que corresponder al cargo pedido. El ADJUNTO (orden 2)
+    // no tiene un Rol equivalente en el sistema — su Rol refleja su
+    // función real (Piloto, Copiloto, etc.), no el cargo administrativo
+    // que ocupa como respaldo de autorización, así que acá no se valida.
+    if (orden === 1 && !rolCoincideConCargo(usuario.rol?.nombre ?? null, rolAutorizador)) {
       return NextResponse.json(
-        { error: `Este usuario no tiene el Rol "${nombreRolEsperado}" — no puede ser asignado a este cargo` },
+        { error: `Este usuario no tiene el Rol "${nombreRolEsperado}" — no puede ser asignado como titular de este cargo` },
         { status: 400 }
       )
     }

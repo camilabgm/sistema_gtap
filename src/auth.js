@@ -3,6 +3,7 @@ import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { usuarioTieneCargoDeCascada } from "@/lib/autorizacion"
 
 const MAX_INTENTOS_FALLIDOS = 3
 const MINUTOS_BLOQUEO = 15
@@ -159,7 +160,12 @@ export const authOptions = {
           }
         }
 
-        // 11. Retornar datos del usuario para la sesión
+        // 11. ¿Tiene potestad de autorizar en la cascada? Se calcula acá,
+        // una sola vez, para no volver a consultar CargoAutorizacion en
+        // cada request — mismo patrón que los permisos de arriba.
+        const esCargoDeCascada = await usuarioTieneCargoDeCascada(usuario.id)
+
+        // 12. Retornar datos del usuario para la sesión
         return {
           id:                   usuario.id,
           username:             usuario.username,
@@ -169,6 +175,7 @@ export const authOptions = {
           personaId:            usuario.persona.id,
           sesion_invalidada_en: null,
           permisos,
+          esCargoDeCascada,
         }
       },
     }),
@@ -183,6 +190,7 @@ export const authOptions = {
         token.rol                  = user.rol
         token.personaId            = user.personaId
         token.permisos             = user.permisos
+        token.esCargoDeCascada     = user.esCargoDeCascada
         token.sesion_invalidada_en = user.sesion_invalidada_en
         token.iat                  = Math.floor(Date.now() / 1000)
       }
@@ -196,6 +204,7 @@ export const authOptions = {
       session.user.rol                  = token.rol
       session.user.personaId            = token.personaId
       session.user.permisos             = token.permisos
+      session.user.esCargoDeCascada     = token.esCargoDeCascada
       session.user.sesion_invalidada_en = token.sesion_invalidada_en
       session.user.token_emitido_en     = token.iat
       return session

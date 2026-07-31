@@ -9,7 +9,7 @@ import {
   ShieldCheck, UserCog, History, FileText, BarChart3, Wrench, Lock,
   ScrollText, Menu, LogOut, KeyRound,
 } from "lucide-react"
-import { ROLES_ADMIN, esCargoDeCascada } from "@/lib/autorizacion"
+import { ROLES_ADMIN } from "@/lib/autorizacion"
 
 // Cada módulo con "modulo" definido se filtra según permisos?.[modulo]?.puede_ver.
 // Los que no tienen "modulo" (como Inicio) siempre quedan visibles.
@@ -88,7 +88,7 @@ function SubItemEscalas({ nombre, ruta, Icono, activo, badge, colapsado }) {
   )
 }
 
-export default function Navbar({ nombre, apellido, rol, permisos, colapsado, onToggleColapsado }) {
+export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCascada, colapsado, onToggleColapsado }) {
   const pathname = usePathname()
   const [pendientesParaMi, setPendientesParaMi] = useState(0)
 
@@ -106,12 +106,12 @@ export default function Navbar({ nombre, apellido, rol, permisos, colapsado, onT
   )
 
   useEffect(() => {
-    if (!esCargoDeCascada(rol)) return
+    if (!esCargoDeCascada) return
     fetch("/api/escalas/pendientes-autorizar", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => setPendientesParaMi(data?.podesActuar ? data.escalas.length : 0))
       .catch(() => {})
-  }, [pathname, rol])
+  }, [pathname, esCargoDeCascada])
 
   return (
     <div
@@ -200,7 +200,7 @@ export default function Navbar({ nombre, apellido, rol, permisos, colapsado, onT
                     <SubItemEscalas nombre="Historial" ruta="/dashboard/escalas/historial" Icono={History}
                       activo={pathname === "/dashboard/escalas/historial"} colapsado={colapsado} />
                   </li>
-                  {esCargoDeCascada(rol) && (
+                  {esCargoDeCascada && (
                     <li>
                       <SubItemEscalas nombre="Pendientes de autorizar" ruta="/dashboard/escalas/pendientes-autorizar" Icono={ShieldCheck}
                         activo={pathname === "/dashboard/escalas/pendientes-autorizar"} badge={pendientesParaMi} colapsado={colapsado} />

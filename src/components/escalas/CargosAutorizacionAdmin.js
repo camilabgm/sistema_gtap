@@ -2,8 +2,13 @@
 
 // Pantalla de administración de los 5 cargos de la cascada de
 // autorización de Escalas. Cada cargo muestra su titular y adjunto
-// actuales, con un desplegable inline (no modal) para reasignar,
-// filtrado por Rol correspondiente desde el backend.
+// actuales, con un desplegable inline (no modal) para reasignar.
+//
+// El filtro de candidatos depende de la posición: el TITULAR se filtra
+// por Rol (backend), el ADJUNTO muestra todos los usuarios activos —
+// porque el adjunto no tiene un Rol equivalente en el sistema. Cuando
+// hay más de un candidato, aparece un buscador que filtra en el cliente
+// (los candidatos ya están cargados en memoria, no hace falta otro fetch).
 
 import { useState, useEffect } from "react"
 
@@ -63,7 +68,7 @@ export default function CargosAutorizacionAdmin() {
     setCargandoCandidatos(true)
     try {
       const res = await fetch(
-        `/api/escalas/cargos-autorizacion/candidatos?rol_autorizador=${rolAutorizador}`,
+        `/api/escalas/cargos-autorizacion/candidatos?rol_autorizador=${rolAutorizador}&orden=${orden}`,
         { credentials: "include" }
       )
       const data = await res.json()
@@ -157,6 +162,7 @@ export default function CargosAutorizacionAdmin() {
             <div className="divide-y divide-gray-100">
               <FilaPosicion
                 etiqueta="Titular"
+                orden={1}
                 persona={cargo.titular}
                 estaAbierto={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 1}
                 estaGuardando={slotGuardando?.rol_autorizador === cargo.rol_autorizador && slotGuardando?.orden === 1}
@@ -169,6 +175,7 @@ export default function CargosAutorizacionAdmin() {
               />
               <FilaPosicion
                 etiqueta="Adjunto"
+                orden={2}
                 persona={cargo.adjunto}
                 estaAbierto={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 2}
                 estaGuardando={slotGuardando?.rol_autorizador === cargo.rol_autorizador && slotGuardando?.orden === 2}
@@ -188,9 +195,23 @@ export default function CargosAutorizacionAdmin() {
 }
 
 function FilaPosicion({
-  etiqueta, persona, estaAbierto, estaGuardando, estaGuardado,
+  etiqueta, orden, persona, estaAbierto, estaGuardando, estaGuardado,
   error, candidatos, cargandoCandidatos, onAbrir, onElegir,
 }) {
+  const [busqueda, setBusqueda] = useState("")
+
+  // Al cerrar el slot, limpiar el texto buscado — para que la próxima
+  // vez que se abra (este mismo cargo u otro) no arrastre el filtro
+  // anterior sin que se note por qué la lista aparece vacía.
+  useEffect(() => {
+    if (!estaAbierto) setBusqueda("")
+  }, [estaAbierto])
+
+  const candidatosFiltrados = candidatos.filter((c) => {
+    const texto = `${c.persona.grado} ${c.persona.nombre} ${c.persona.apellido}`.toLowerCase()
+    return texto.includes(busqueda.toLowerCase())
+  })
+
   return (
     <div className="px-5 py-3">
       <div className="flex items-center justify-between">
@@ -229,20 +250,43 @@ function FilaPosicion({
           {cargandoCandidatos ? (
             <p className="text-sm text-gray-400">Buscando candidatos...</p>
           ) : candidatos.length === 0 ? (
-            <p className="text-sm text-gray-400">No hay ningún usuario con este Rol asignado todavía.</p>
+            <p className="text-sm text-gray-400">
+              {orden === 1
+                ? "No hay ningún usuario con este Rol asignado todavía."
+                : "No hay usuarios activos disponibles."}
+            </p>
           ) : (
-            <ul className="space-y-1">
-              {candidatos.map((c) => (
-                <li key={c.id}>
-                  <button
-                    onClick={() => onElegir(c.id)}
-                    className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-900 bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-colors"
-                  >
-                    {c.persona.grado} {c.persona.nombre} {c.persona.apellido}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              {candidatos.length > 1 && (
+                <input
+                  type="text"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar por nombre, apellido o grado..."
+                  autoFocus
+                  className="w-full mb-2 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+
+              {candidatosFiltrados.length === 0 ? (
+                <p className="text-sm text-gray-400 px-1">
+                  Ningún usuario coincide con &quot;{busqueda}&quot;.
+                </p>
+              ) : (
+                <ul className="space-y-1 max-h-64 overflow-y-auto">
+                  {candidatosFiltrados.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        onClick={() => onElegir(c.id)}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-900 bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                      >
+                        {c.persona.grado} {c.persona.nombre} {c.persona.apellido}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
           {error && (
             <div className="mt-2 p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-xs">
