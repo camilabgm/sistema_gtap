@@ -14,5 +14,10 @@ export default async function HistorialEscalasPage() {
     )
   }
 
-  return <HistorialEscalas />
+  return (
+    <HistorialEscalas
+      puedeEditar={!!session.user.permisos?.ESCALAS?.puede_editar}
+      puedeEliminar={!!session.user.permisos?.ESCALAS?.puede_eliminar}
+    />
+  )
 }

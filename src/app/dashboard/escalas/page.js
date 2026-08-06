@@ -17,7 +17,6 @@ export default async function EscalasPage() {
   return (
     <AgendaEscalas
       puedeCrear={!!session.user.permisos?.ESCALAS?.puede_crear}
-      puedeEditar={!!session.user.permisos?.ESCALAS?.puede_editar}
     />
   )
 }

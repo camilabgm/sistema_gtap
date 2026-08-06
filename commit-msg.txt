@@ -1,0 +1,43 @@
+﻿feat: flujo de re-autorizacion de escalas y reorganizacion de pantallas
+
+Edicion de escalas publicadas:
+- Nuevo endpoint PUT /api/escalas/[id]/editar: resetea autorizacion,
+  revierte RECHAZADA a PROGRAMADA, borra acuses de recibo
+- Nuevo GET /api/escalas/[id] para precargar la pantalla de edicion
+- Nuevo DELETE /api/escalas/[id] con borrado logico
+- Nuevo componente EditarEscala.js: pantalla unica para completar
+  borrador o editar publicada, con Guardar y publicar en un solo paso
+
+Estados mas precisos:
+- estadoDetallado() distingue Programada-Pendiente, Programada-Autorizada,
+  Vencida-Sin-autorizar, y el resto de los estados existentes
+- puedeEditarAhora, puedeEliminarse, puedeAbortarAhora ajustados a la
+  regla real: solo importa el tiempo si la escala llego a autorizarse
+- PUT /autorizar rechaza si ya paso la hora sin autorizar
+
+Canal, archivo y numero de orden:
+- Validacion real de formato de archivo contra el canal elegido
+- Numero de orden editable en cualquier momento, no solo al publicar
+- Se saco WHATSAPP de los canales (redundante con los demas)
+
+Disponibilidad:
+- condicionSolape() ya no bloquea con escalas rechazadas o vencidas
+  sin autorizar; una pendiente con hora vigente sigue bloqueando
+
+Reorganizacion Agenda / Gestion de Escalas:
+- Agenda pasa a ser de solo consulta, reanclada al dia REAL de vuelo
+  (antes usaba la fecha de Solicitud, causaba inconsistencias)
+- Historial renombrado a "Gestion de Escalas": unico lugar con
+  acciones (Ver, Editar, Eliminar, Abortar)
+- Filtros por Estado (multi), Aeronave y rango de fechas
+
+Cargos de Autorizacion:
+- Comandante ya no muestra fila de Adjunto (nunca existe ese puesto)
+
+Fixes de bugs encontrados en el camino:
+- useTick separado de lib/escalas.js (rompia el build del servidor)
+- fechaSoloDia.js: corrige desfasaje de un dia por huso horario UTC
+- nro_orden no se guardaba por mal uso de normalizarNroOrden
+- validacion de canal se disparaba aunque no se tocara el campo
+- Abortar aparecia en un borrador sin publicar
+- limpieza de roles huerfanos en la tabla roles

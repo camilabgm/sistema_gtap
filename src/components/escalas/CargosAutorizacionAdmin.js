@@ -1,19 +1,12 @@
 "use client"
 
 // Pantalla de administración de los 5 cargos de la cascada de
-// autorización de Escalas. Cada cargo muestra su titular y adjunto
-// actuales, con un desplegable inline (no modal) para reasignar.
-//
-// El filtro de candidatos depende de la posición: el TITULAR se filtra
-// por Rol (backend), el ADJUNTO muestra todos los usuarios activos —
-// porque el adjunto no tiene un Rol equivalente en el sistema. Cuando
-// hay más de un candidato, aparece un buscador que filtra en el cliente
-// (los candidatos ya están cargados en memoria, no hace falta otro fetch).
+// autorización de Escalas. El Comandante NUNCA tiene adjunto en la vida
+// real — no existe ese puesto en la cadena de mando — así que esa fila
+// se oculta directamente para ese cargo en particular.
 
 import { useState, useEffect } from "react"
 
-// Orden de la cascada, para mostrar las filas en el orden en que el
-// sistema realmente las recorre al autorizar.
 const CASCADA_ORDEN = [
   "JEFE_OPERACIONES",
   "COMANDANTE",
@@ -124,7 +117,11 @@ export default function CargosAutorizacionAdmin() {
     return <div className="p-8 max-w-4xl mx-auto text-sm text-red-600">{errorGeneral}</div>
   }
 
-  const completos = cargos.filter((c) => c.titular && c.adjunto).length
+  // El Comandante solo necesita titular para considerarse "completo" —
+  // nunca va a tener adjunto, así que no se lo exige como al resto.
+  const completos = cargos.filter((c) =>
+    c.rol_autorizador === "COMANDANTE" ? !!c.titular : (c.titular && c.adjunto)
+  ).length
   const conVacantes = cargos.length - completos
 
   return (
@@ -140,7 +137,7 @@ export default function CargosAutorizacionAdmin() {
       <div className="grid grid-cols-2 gap-4 mb-8">
         <div className="bg-green-50 rounded-lg border border-green-200 p-4 text-center">
           <p className="text-2xl font-bold text-green-700">{completos}</p>
-          <p className="text-xs text-green-600 mt-1">Cargos completos (titular y adjunto)</p>
+          <p className="text-xs text-green-600 mt-1">Cargos completos</p>
         </div>
         <div className="bg-amber-50 rounded-lg border border-amber-200 p-4 text-center">
           <p className="text-2xl font-bold text-amber-700">{conVacantes}</p>
@@ -153,42 +150,47 @@ export default function CargosAutorizacionAdmin() {
       </h2>
 
       <div className="space-y-4">
-        {cargos.map((cargo) => (
-          <div key={cargo.rol_autorizador} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
-              <p className="text-sm font-semibold text-gray-900">{cargo.nombre_rol}</p>
-            </div>
+        {cargos.map((cargo) => {
+          const esComandante = cargo.rol_autorizador === "COMANDANTE"
+          return (
+            <div key={cargo.rol_autorizador} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
+                <p className="text-sm font-semibold text-gray-900">{cargo.nombre_rol}</p>
+              </div>
 
-            <div className="divide-y divide-gray-100">
-              <FilaPosicion
-                etiqueta="Titular"
-                orden={1}
-                persona={cargo.titular}
-                estaAbierto={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 1}
-                estaGuardando={slotGuardando?.rol_autorizador === cargo.rol_autorizador && slotGuardando?.orden === 1}
-                estaGuardado={slotGuardado?.rol_autorizador === cargo.rol_autorizador && slotGuardado?.orden === 1}
-                error={slotError?.rol_autorizador === cargo.rol_autorizador && slotError?.orden === 1 ? slotError.mensaje : null}
-                candidatos={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 1 ? candidatos : []}
-                cargandoCandidatos={cargandoCandidatos}
-                onAbrir={() => abrirSlot(cargo.rol_autorizador, 1)}
-                onElegir={(usuarioId) => elegirCandidato(cargo.rol_autorizador, 1, usuarioId)}
-              />
-              <FilaPosicion
-                etiqueta="Adjunto"
-                orden={2}
-                persona={cargo.adjunto}
-                estaAbierto={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 2}
-                estaGuardando={slotGuardando?.rol_autorizador === cargo.rol_autorizador && slotGuardando?.orden === 2}
-                estaGuardado={slotGuardado?.rol_autorizador === cargo.rol_autorizador && slotGuardado?.orden === 2}
-                error={slotError?.rol_autorizador === cargo.rol_autorizador && slotError?.orden === 2 ? slotError.mensaje : null}
-                candidatos={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 2 ? candidatos : []}
-                cargandoCandidatos={cargandoCandidatos}
-                onAbrir={() => abrirSlot(cargo.rol_autorizador, 2)}
-                onElegir={(usuarioId) => elegirCandidato(cargo.rol_autorizador, 2, usuarioId)}
-              />
+              <div className="divide-y divide-gray-100">
+                <FilaPosicion
+                  etiqueta="Titular"
+                  orden={1}
+                  persona={cargo.titular}
+                  estaAbierto={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 1}
+                  estaGuardando={slotGuardando?.rol_autorizador === cargo.rol_autorizador && slotGuardando?.orden === 1}
+                  estaGuardado={slotGuardado?.rol_autorizador === cargo.rol_autorizador && slotGuardado?.orden === 1}
+                  error={slotError?.rol_autorizador === cargo.rol_autorizador && slotError?.orden === 1 ? slotError.mensaje : null}
+                  candidatos={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 1 ? candidatos : []}
+                  cargandoCandidatos={cargandoCandidatos}
+                  onAbrir={() => abrirSlot(cargo.rol_autorizador, 1)}
+                  onElegir={(usuarioId) => elegirCandidato(cargo.rol_autorizador, 1, usuarioId)}
+                />
+                {!esComandante && (
+                  <FilaPosicion
+                    etiqueta="Adjunto"
+                    orden={2}
+                    persona={cargo.adjunto}
+                    estaAbierto={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 2}
+                    estaGuardando={slotGuardando?.rol_autorizador === cargo.rol_autorizador && slotGuardando?.orden === 2}
+                    estaGuardado={slotGuardado?.rol_autorizador === cargo.rol_autorizador && slotGuardado?.orden === 2}
+                    error={slotError?.rol_autorizador === cargo.rol_autorizador && slotError?.orden === 2 ? slotError.mensaje : null}
+                    candidatos={slotAbierto?.rol_autorizador === cargo.rol_autorizador && slotAbierto?.orden === 2 ? candidatos : []}
+                    cargandoCandidatos={cargandoCandidatos}
+                    onAbrir={() => abrirSlot(cargo.rol_autorizador, 2)}
+                    onElegir={(usuarioId) => elegirCandidato(cargo.rol_autorizador, 2, usuarioId)}
+                  />
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -200,9 +202,6 @@ function FilaPosicion({
 }) {
   const [busqueda, setBusqueda] = useState("")
 
-  // Al cerrar el slot, limpiar el texto buscado — para que la próxima
-  // vez que se abra (este mismo cargo u otro) no arrastre el filtro
-  // anterior sin que se note por qué la lista aparece vacía.
   useEffect(() => {
     if (!estaAbierto) setBusqueda("")
   }, [estaAbierto])

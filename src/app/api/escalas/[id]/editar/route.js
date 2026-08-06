@@ -1,9 +1,29 @@
-// Destino: src/app/api/escalas/[id]/route.js
+// Destino: src/app/api/escalas/[id]/editar/route.js
 //
-// GET    /api/escalas/<id>     → detalle completo, para precargar edición
-// PUT    /api/escalas/<id>     → completa el borrador
-// DELETE /api/escalas/<id>     → borrado lógico. Ver puedeEliminarse() en
-//                                 lib/escalas.js para la regla exacta.
+// PUT /api/escalas/<id>/editar
+//
+// Edita una escala YA PUBLICADA (es_borrador: false). Cualquier cambio
+// la manda de nuevo a autorización completa — no hay campos "livianos"
+// que se salteen la re-autorización.
+//
+// Qué hace, en orden:
+//   1. Verifica que la escala esté en un estado editable y que todavía
+//      no haya pasado la hora estimada de despegue.
+//   2. Valida y aplica los cambios (helpers compartidos con completar-borrador).
+//   3. Resetea la autorización: autorizada, autorizada_por, rol_autoriza
+//      y fecha_autorizacion vuelven a su estado inicial. Si estaba
+//      RECHAZADA, vuelve a PROGRAMADA y limpia rechazada_por/
+//      motivo_rechazo/fecha_rechazo.
+//   4. Borra los acuses de recibo existentes.
+//
+// Sobre canal/archivo: el frontend reenvía SIEMPRE el canal actual
+// (es un <select> controlado), aunque no lo estés tocando. Por eso la
+// validación de canal↔archivo solo se dispara si el canal REALMENTE
+// cambió respecto al que ya tenía la Solicitud, o si subiste un archivo
+// nuevo — nunca solo porque el campo vino en el body. Sin esto, una
+// escala con un desajuste viejo (de antes de la validación estricta)
+// queda imposible de editar para NADA, aunque solo quieras cambiar el
+// Nro. de orden.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -11,8 +31,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { calcularVentana, verificarAeronave, verificarTripulante } from "@/lib/disponibilidad"
 import { parsearSubtipos } from "@/lib/tiposMision"
+import { puedeEditarAhora, yaPasoLaHora, ESTADOS_EDITABLES_PUBLICADA } from "@/lib/escalas"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
-import { puedeEliminarse } from "@/lib/escalas"
 import {
   validarItinerarios,
   validarTripulacion,
@@ -25,85 +45,6 @@ import {
   normalizarNroOrden,
   validarCanalConArchivo,
 } from "@/lib/validacionEscala"
-
-export async function GET(request, { params }) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-    if (!session.user.permisos?.ESCALAS?.puede_ver) {
-      return NextResponse.json({ error: "No tenés permiso para ver escalas" }, { status: 403 })
-    }
-
-    const { id } = await params
-    const escalaId = parseInt(id, 10)
-    if (!Number.isInteger(escalaId) || escalaId <= 0) {
-      return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
-    }
-
-    const escala = await prisma.escala.findFirst({
-      where: { id: escalaId, deleted_at: null },
-      select: {
-        id: true,
-        nro_orden: true,
-        fecha: true,
-        es_borrador: true,
-        estado: true,
-        autorizada: true,
-        rol_autoriza: true,
-        fecha_autorizacion: true,
-        rechazada_por: true,
-        motivo_rechazo: true,
-        fecha_rechazo: true,
-        hora_despegue_estimada: true,
-        hora_arribo_estimada: true,
-        solicitante: true,
-        observaciones: true,
-        subtipo_elegido: true,
-        aeronave_id: true,
-        aeronave: { select: { id: true, matricula: true, tipo: true } },
-        tipo_mision_id: true,
-        tipo_mision: {
-          select: { id: true, codigo: true, nombre: true, tiene_subtipo: true, subtipo: true },
-        },
-        itinerarios: {
-          where: { deleted_at: null },
-          orderBy: { orden: "asc" },
-          select: {
-            id: true,
-            orden: true,
-            origen: true,
-            destino: true,
-            hora_estimada_salida: true,
-            hora_estimada_llegada: true,
-          },
-        },
-        tripulacion: {
-          where: { deleted_at: null },
-          select: {
-            persona_id: true,
-            rol_en_vuelo: true,
-            persona: { select: { id: true, nombre: true, apellido: true, grado: true } },
-          },
-        },
-        solicitudes: {
-          orderBy: { fecha_recepcion: "asc" },
-          take: 1,
-          select: { id: true, canal: true, archivo: true, nombre_archivo_original: true, fecha_recepcion: true },
-        },
-      },
-    })
-    if (!escala) {
-      return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
-    }
-
-    return NextResponse.json(escala)
-  } catch (error) {
-    console.error("Error GET escala:", error)
-    return NextResponse.json({ error: "Error interno al obtener la escala" }, { status: 500 })
-  }
-}
 
 export async function PUT(request, { params }) {
   let rutaGuardadaNueva = null
@@ -127,21 +68,41 @@ export async function PUT(request, { params }) {
       where: { id: escalaId, deleted_at: null },
       select: {
         es_borrador: true,
+        estado: true,
         fecha: true,
+        hora_despegue_estimada: true,
         aeronave_id: true,
         tipo_mision_id: true,
+        solicitante: true,
+        autorizada: true,
         tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
       },
     })
     if (!escala) {
       return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
     }
-    if (!escala.es_borrador) {
+    if (escala.es_borrador) {
       return NextResponse.json(
-        { error: "La escala ya está publicada. Para editarla, usá /api/escalas/[id]/editar." },
+        { error: "La escala todavía es un borrador. Para completarla, usá /api/escalas/[id]." },
         { status: 409 }
       )
     }
+    if (!ESTADOS_EDITABLES_PUBLICADA.includes(escala.estado)) {
+      return NextResponse.json(
+        { error: `No se puede editar una escala en estado ${escala.estado}` },
+        { status: 409 }
+      )
+    }
+    if (!puedeEditarAhora(escala)) {
+      return NextResponse.json(
+        { error: "Ya pasó la hora de despegue estimada, no se puede editar" },
+        { status: 409 }
+      )
+    }
+
+    // Capturado ANTES de la transacción, sobre el dato original — el
+    // reset de estado más abajo depende de saber si venía de RECHAZADA.
+    const veniaDeRechazada = escala.estado === "RECHAZADA"
 
     const solicitudActual = await prisma.solicitud.findFirst({
       where: { escala_id: escalaId, deleted_at: null },
@@ -201,7 +162,7 @@ export async function PUT(request, { params }) {
       archivoNuevo && typeof archivoNuevo.arrayBuffer === "function" && archivoNuevo.size > 0
 
     const canalEfectivo = canalTocado ? canalValor : (solicitudActual?.canal ?? null)
-    const nombreArchivoParaValidar = hayArchivoNuevo ? archivoNuevo.name : solicitudActual?.archivo
+    const nombreArchivoEfectivo = hayArchivoNuevo ? archivoNuevo.name : solicitudActual?.archivo
 
     // FIX: antes se revalidaba SIEMPRE que hubiera solicitudActual, sin
     // importar si el canal realmente cambió — como el frontend reenvía
@@ -211,7 +172,7 @@ export async function PUT(request, { params }) {
     // solo se revalida si el canal cambió de verdad o si hay archivo nuevo.
     const canalRealmenteCambio = canalTocado && canalValor !== solicitudActual?.canal
     if (solicitudActual && (canalRealmenteCambio || hayArchivoNuevo)) {
-      const errCanal = validarCanalConArchivo(canalEfectivo, nombreArchivoParaValidar)
+      const errCanal = validarCanalConArchivo(canalEfectivo, nombreArchivoEfectivo)
       if (errCanal) return NextResponse.json({ error: errCanal }, { status: 400 })
     }
 
@@ -267,6 +228,13 @@ export async function PUT(request, { params }) {
     }
     const ventana = calcularVentana(itinerarioEfectivo)
 
+    if (ventana && yaPasoLaHora(ventana.inicio)) {
+      return NextResponse.json(
+        { error: "No se puede guardar: el nuevo horario ya pasó la hora de despegue" },
+        { status: 400 }
+      )
+    }
+
     const errores = []
 
     const aeronaveAChequear = aeronave.tocado ? aeronave.valor : escala.aeronave_id
@@ -285,7 +253,7 @@ export async function PUT(request, { params }) {
 
     if (errores.length > 0) {
       return NextResponse.json(
-        { error: "No se pudo completar la asignación", detalles: errores },
+        { error: "No se pudo guardar la edición", detalles: errores },
         { status: 409 }
       )
     }
@@ -302,7 +270,22 @@ export async function PUT(request, { params }) {
     }
 
     const actualizada = await prisma.$transaction(async (tx) => {
-      const dataEscala = { editado_por: session.user.id }
+      const dataEscala = {
+        editado_por: session.user.id,
+        // Reset de autorización — el corazón de la re-autorización.
+        autorizada: false,
+        autorizada_por: null,
+        rol_autoriza: null,
+        fecha_autorizacion: null,
+      }
+
+      if (veniaDeRechazada) {
+        dataEscala.estado = "PROGRAMADA"
+        dataEscala.rechazada_por = null
+        dataEscala.motivo_rechazo = null
+        dataEscala.fecha_rechazo = null
+      }
+
       if (solicitanteRes.tocado) dataEscala.solicitante = solicitanteRes.valor
       if (fechaRes.tocado)       dataEscala.fecha        = fechaRes.valor
       if (nroOrdenNuevo !== undefined) dataEscala.nro_orden = nroOrdenNuevo
@@ -359,6 +342,10 @@ export async function PUT(request, { params }) {
         await tx.solicitud.update({ where: { id: solicitudActual.id }, data: dataSolicitud })
       }
 
+      // Reset de acuses de recibo — todos los involucrados vuelven a
+      // tener que confirmar que vieron la versión actualizada.
+      await tx.acuseRecibo.deleteMany({ where: { escala_id: escalaId } })
+
       return tx.escala.update({ where: { id: escalaId }, data: dataEscala })
     })
 
@@ -368,58 +355,13 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json(actualizada)
   } catch (error) {
-    console.error("Error PUT escalas:", error)
+    console.error("Error PUT editar escala:", error)
     if (rutaGuardadaNueva) {
       await borrarArchivoSolicitud(rutaGuardadaNueva).catch(() => {})
     }
     if (error.code === "P2002" && error.meta?.target?.includes("nro_orden")) {
       return NextResponse.json({ error: "Ese número de orden ya está en uso por otra escala" }, { status: 409 })
     }
-    return NextResponse.json({ error: "Error interno al completar la escala" }, { status: 500 })
-  }
-}
-
-// DELETE — borrado lógico. Regla en puedeEliminarse() de lib/escalas.js:
-// eliminable únicamente si nunca llegó a autorizarse.
-export async function DELETE(request, { params }) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-    if (!session.user.permisos?.ESCALAS?.puede_eliminar) {
-      return NextResponse.json({ error: "No tenés permiso para eliminar escalas" }, { status: 403 })
-    }
-
-    const { id } = await params
-    const escalaId = parseInt(id, 10)
-    if (!Number.isInteger(escalaId) || escalaId <= 0) {
-      return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
-    }
-
-    const escala = await prisma.escala.findFirst({
-      where: { id: escalaId, deleted_at: null },
-      select: { es_borrador: true, estado: true, autorizada: true },
-    })
-    if (!escala) {
-      return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
-    }
-
-    if (!puedeEliminarse(escala)) {
-      return NextResponse.json(
-        { error: "Esta escala ya fue autorizada en algún momento y no se puede eliminar" },
-        { status: 409 }
-      )
-    }
-
-    await prisma.escala.update({
-      where: { id: escalaId },
-      data: { deleted_at: new Date(), eliminado_por: session.user.id },
-    })
-
-    return NextResponse.json({ ok: true })
-  } catch (error) {
-    console.error("Error DELETE escala:", error)
-    return NextResponse.json({ error: "Error interno al eliminar la escala" }, { status: 500 })
+    return NextResponse.json({ error: "Error interno al editar la escala" }, { status: 500 })
   }
 }

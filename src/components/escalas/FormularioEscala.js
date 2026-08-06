@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from "react"
 import { parsearSubtipos } from "@/lib/tiposMision"
 
-const CANALES = ["WHATSAPP", "PDF", "IMAGEN", "WORD", "VERBAL"]
+const CANALES = ["PDF", "IMAGEN", "WORD", "VERBAL"]
 const ROLES_EN_VUELO = ["PILOTO", "COPILOTO", "TECNICO_DE_VUELO"]
 
 function crearTramoVacio(orden) {
@@ -25,7 +25,7 @@ export default function FormularioEscala() {
 
   const [solicitante, setSolicitante] = useState("")
   const [fecha, setFecha] = useState("")
-  const [canal, setCanal] = useState("WHATSAPP")
+  const [canal, setCanal] = useState("PDF")
   const archivoRef = useRef(null)
   const [observaciones, setObservaciones] = useState("")
 
@@ -68,15 +68,20 @@ export default function FormularioEscala() {
   const [tramos, setTramos] = useState([crearTramoVacio(1)])
   const [aeronaveId, setAeronaveId] = useState("")
   const [tripulacion, setTripulacion] = useState([{ persona_id: "", rol_en_vuelo: "PILOTO" }])
+  const [nroOrden, setNroOrden] = useState("")
 
   const [candidatosAeronaves, setCandidatosAeronaves] = useState([])
   const [candidatosPersonas, setCandidatosPersonas] = useState([])
   const [cargandoCandidatos, setCargandoCandidatos] = useState(false)
 
   const [guardandoDetalles, setGuardandoDetalles] = useState(false)
+  const [publicando, setPublicando] = useState(false)
   const [errorDetalles, setErrorDetalles] = useState(null)
   const [detallesConflicto, setDetallesConflicto] = useState([])
+  const [errorPublicar, setErrorPublicar] = useState(null)
+  const [conflictosPublicar, setConflictosPublicar] = useState([])
   const [guardadoDetalles, setGuardadoDetalles] = useState(false)
+  const [escalaPublicada, setEscalaPublicada] = useState(false)
 
   const tipoSeleccionado = tiposMision.find((t) => String(t.id) === String(tipoMisionId)) || null
   const opcionesSubtipo = tipoSeleccionado?.tiene_subtipo ? parsearSubtipos(tipoSeleccionado.subtipo) : []
@@ -85,9 +90,6 @@ export default function FormularioEscala() {
     if (!opcionesSubtipo.includes(subtipoElegido)) setSubtipoElegido("")
   }, [tipoMisionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pedido de disponibilidad — separado en su propia función para que lo
-  // pueda disparar tanto el debounce automático (al cambiar fecha/itinerario)
-  // como el botón manual "Actualizar disponibilidad", sin duplicar lógica.
   async function buscarCandidatos() {
     if (!fecha) return
     setCargandoCandidatos(true)
@@ -147,27 +149,48 @@ export default function FormularioEscala() {
     )
   }
 
-  async function guardarDetalles() {
+  const tripulacionCompletaLista = tripulacion.filter((t) => t.persona_id)
+
+  // Un tramo se considera "completo" solo si tiene los 4 datos. El
+  // itinerario en conjunto está completo solo si TODOS sus tramos lo están.
+  const itinerarioCompleto =
+    tramos.length > 0 && tramos.every((t) => t.origen && t.destino && t.hora_estimada_salida && t.hora_estimada_llegada)
+
+  const datosCompletos =
+    !!aeronaveId &&
+    !!tipoMisionId &&
+    itinerarioCompleto &&
+    tripulacionCompletaLista.length > 0
+
+  // Guarda los detalles y, si ya está todo completo, publica en el mismo
+  // paso. El itinerario SOLO se manda en el body si está completo — así,
+  // el tramo vacío por defecto (o uno a medio llenar) nunca tira abajo
+  // el resto del guardado (como el número de orden), que puede
+  // completarse en cualquier momento de forma independiente.
+  async function guardarYPublicar() {
     setErrorDetalles(null)
     setDetallesConflicto([])
+    setErrorPublicar(null)
+    setConflictosPublicar([])
     if (!escalaId) return setErrorDetalles("Guardá la solicitud primero (Sección 1)")
-
-    const tripulacionCompleta = tripulacion.filter((t) => t.persona_id)
 
     setGuardandoDetalles(true)
     try {
+      const formData = new FormData()
+      formData.append("aeronave_id", aeronaveId || "")
+      formData.append("tipo_mision_id", tipoMisionId || "")
+      formData.append("subtipo_elegido", subtipoElegido || "")
+      formData.append("nro_orden", nroOrden || "")
+      if (itinerarioCompleto) {
+        formData.append("itinerarios", JSON.stringify(tramos))
+      }
+      formData.append("tripulacion", JSON.stringify(tripulacionCompletaLista))
+      formData.append("observaciones", observaciones)
+
       const res = await fetch(`/api/escalas/${escalaId}`, {
         method: "PUT",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          aeronave_id: aeronaveId || null,
-          tipo_mision_id: tipoMisionId || null,
-          subtipo_elegido: subtipoElegido || null,
-          itinerarios: tramos,
-          tripulacion: tripulacionCompleta,
-          observaciones,
-        }),
+        body: formData,
       })
       const data = await res.json()
       if (!res.ok) {
@@ -175,47 +198,32 @@ export default function FormularioEscala() {
         setDetallesConflicto(data.detalles || [])
         return
       }
-      setGuardadoDetalles(true)
-      setTimeout(() => setGuardadoDetalles(false), 3000)
-    } catch (err) {
-      setErrorDetalles(err.message)
-    } finally {
-      setGuardandoDetalles(false)
-    }
-  }
 
-  const [nroOrden, setNroOrden] = useState("")
-  const [publicando, setPublicando] = useState(false)
-  const [errorPublicar, setErrorPublicar] = useState(null)
-  const [conflictosPublicar, setConflictosPublicar] = useState([])
-  const [escalaPublicada, setEscalaPublicada] = useState(false)
+      if (!datosCompletos) {
+        setGuardadoDetalles(true)
+        setTimeout(() => setGuardadoDetalles(false), 3000)
+        return
+      }
 
-  async function publicar() {
-    setErrorPublicar(null)
-    setConflictosPublicar([])
-    if (!escalaId) return setErrorPublicar("Guardá la solicitud primero")
-
-    setPublicando(true)
-    try {
-      const body = {}
-      if (nroOrden.trim()) body.nro_orden = nroOrden.trim()
-
-      const res = await fetch(`/api/escalas/${escalaId}/publicar`, {
+      // Todo completo: publicar enseguida, sin un paso aparte.
+      setPublicando(true)
+      const resPub = await fetch(`/api/escalas/${escalaId}/publicar`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({}),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setErrorPublicar(data.error || "Error al publicar")
-        setConflictosPublicar(data.detalles || [])
+      const dataPub = await resPub.json()
+      if (!resPub.ok) {
+        setErrorPublicar(dataPub.error || "Error al publicar")
+        setConflictosPublicar(dataPub.detalles || [])
         return
       }
       setEscalaPublicada(true)
     } catch (err) {
-      setErrorPublicar(err.message)
+      setErrorDetalles(err.message)
     } finally {
+      setGuardandoDetalles(false)
       setPublicando(false)
     }
   }
@@ -234,12 +242,20 @@ export default function FormularioEscala() {
     )
   }
 
+  const textoBoton = guardandoDetalles
+    ? "Guardando..."
+    : publicando
+    ? "Publicando..."
+    : datosCompletos
+    ? "Guardar y publicar"
+    : "Guardar detalles"
+
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Nueva Escala de Vuelo</h1>
 
       <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">1. Solicitud</h2>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Solicitud</h2>
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -323,10 +339,23 @@ export default function FormularioEscala() {
       </div>
 
       <div className={`bg-white rounded-lg border border-gray-200 p-5 ${!escalaId ? "opacity-50" : ""}`}>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">2. Detalles de la escala</h2>
-        {!escalaId && <p className="text-sm text-gray-400 mb-3">Guardá la solicitud (Sección 1) para habilitar esta parte.</p>}
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Detalles de la escala</h2>
+        {!escalaId && <p className="text-sm text-gray-400 mb-3">Guardá la solicitud para habilitar esta parte.</p>}
 
         <fieldset disabled={!escalaId} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nro. de orden <span className="text-gray-400 font-normal">(opcional — se puede completar en cualquier momento)</span>
+            </label>
+            <input
+              type="text"
+              value={nroOrden}
+              onChange={(e) => setNroOrden(e.target.value)}
+              placeholder="Se puede completar después si todavía no lo asignaron"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de misión</label>
             <select
@@ -381,8 +410,6 @@ export default function FormularioEscala() {
             <button type="button" onClick={agregarTramo} className="mt-2 text-xs text-blue-600 hover:underline font-medium">+ Agregar tramo</button>
           </div>
 
-          {/* Aviso + botón manual, compartido para Aeronave y Tripulación —
-              ambas listas salen del mismo pedido a candidatos-disponibles */}
           <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-md px-3 py-2">
             <p className="text-xs text-blue-700">
               {cargandoCandidatos
@@ -467,31 +494,6 @@ export default function FormularioEscala() {
             </div>
           )}
 
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={guardarDetalles} disabled={guardandoDetalles} className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
-              {guardandoDetalles ? "Guardando..." : "Guardar detalles"}
-            </button>
-            {guardadoDetalles && <span className="text-sm text-green-600">✓ Guardado</span>}
-          </div>
-        </fieldset>
-      </div>
-
-      <div className={`bg-white rounded-lg border border-gray-200 p-5 ${!escalaId ? "opacity-50" : ""}`}>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">3. Publicación</h2>
-        <fieldset disabled={!escalaId} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nro. de orden <span className="text-gray-400 font-normal">(opcional)</span>
-            </label>
-            <input
-              type="text"
-              value={nroOrden}
-              onChange={(e) => setNroOrden(e.target.value)}
-              placeholder="Se puede completar después si todavía no lo asignaron"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
           {errorPublicar && (
             <div className="p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
               <p>{errorPublicar}</p>
@@ -501,9 +503,17 @@ export default function FormularioEscala() {
             </div>
           )}
 
-          <button type="button" onClick={publicar} disabled={publicando} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50">
-            {publicando ? "Publicando..." : "Publicar escala"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={guardarYPublicar}
+              disabled={guardandoDetalles || publicando}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {textoBoton}
+            </button>
+            {guardadoDetalles && <span className="text-sm text-green-600">✓ Guardado</span>}
+          </div>
         </fieldset>
       </div>
     </div>

@@ -114,6 +114,7 @@ enum MotivoEscalamiento {
   DERIVACION_MANUAL // el anterior apretó el botón "derivar"
   ROL_DESACTUALIZADO // el anterior sigue cargado en CargoAutorizacion, pero su Rol ya cambió
   SIN_ASIGNAR // este cargo no tiene a nadie cargado (ni titular ni adjunto)
+  REAUTORIZACION // la escala fue editada después de publicada y vuelve a recorrer la cascada desde cero
 }
 
 enum MotivoNoDisponibleAutorizador {

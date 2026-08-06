@@ -6,13 +6,11 @@ import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import {
   Home, Tag, Plane, Users, CalendarCheck, CalendarDays, PlusCircle,
-  ShieldCheck, UserCog, History, FileText, BarChart3, Wrench, Lock,
+  ShieldCheck, UserCog, ClipboardList, FileText, BarChart3, Wrench, Lock,
   ScrollText, Menu, LogOut, KeyRound,
 } from "lucide-react"
 import { ROLES_ADMIN } from "@/lib/autorizacion"
 
-// Cada módulo con "modulo" definido se filtra según permisos?.[modulo]?.puede_ver.
-// Los que no tienen "modulo" (como Inicio) siempre quedan visibles.
 const modulosAntes = [
   { nombre: "Inicio",            ruta: "/dashboard",                Icono: Home  },
   { nombre: "Tipos de Misiones", ruta: "/dashboard/tipos-misiones", Icono: Tag,   modulo: "TIPOS_MISIONES" },
@@ -96,8 +94,6 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
   const vePersonas = permisos?.PERSONAS?.puede_ver
   const veEscalas  = permisos?.ESCALAS?.puede_ver
 
-  // Filtramos cada lista según el permiso puede_ver del módulo correspondiente.
-  // Un módulo sin "modulo" definido (como Inicio) siempre queda visible.
   const modulosAntesVisibles = modulosAntes.filter(
     (m) => !m.modulo || permisos?.[m.modulo]?.puede_ver
   )
@@ -120,7 +116,6 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
       }`}
     >
 
-      {/* Encabezado: logo + título a la izquierda (solo si está expandido), ☰ siempre visible a la derecha */}
       <div className={`border-b border-gray-700 flex items-center ${colapsado ? "justify-center py-4" : "justify-between px-4 py-4"}`}>
         {!colapsado && (
           <div className="flex items-center gap-2 min-w-0">
@@ -197,7 +192,7 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
                       activo={pathname === "/dashboard/escalas/nueva"} colapsado={colapsado} />
                   </li>
                   <li>
-                    <SubItemEscalas nombre="Historial" ruta="/dashboard/escalas/historial" Icono={History}
+                    <SubItemEscalas nombre="Gestión" ruta="/dashboard/escalas/historial" Icono={ClipboardList}
                       activo={pathname === "/dashboard/escalas/historial"} colapsado={colapsado} />
                   </li>
                   {esCargoDeCascada && (

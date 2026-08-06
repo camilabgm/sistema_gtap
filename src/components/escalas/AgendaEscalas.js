@@ -4,7 +4,13 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import GanttAeronavesDia from "./GanttAeronavesDia"
 import PanelDetalleEscala from "./PanelDetalleEscala"
-import { formatearHora } from "@/lib/escalas"
+import {
+  formatearFechaHoraCompacta,
+  calcularVentanaEnElDia,
+  estadoDetallado,
+  ESTADO_DETALLADO_CLASES,
+  TOOLTIP_ESTADO_DETALLADO,
+} from "@/lib/escalas"
 
 const NOMBRES_DIA = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"]
 
@@ -24,14 +30,7 @@ function lunesDeLaSemana(fecha) {
   return d
 }
 
-function badgeEstadoAutorizacion(escala) {
-  if (escala.estado === "RECHAZADA") return { texto: "Rechazada", clase: "bg-red-100 text-red-700" }
-  if (escala.estado === "ABORTADA")  return { texto: "Abortada",  clase: "bg-gray-200 text-gray-600" }
-  if (escala.autorizada)             return { texto: "Autorizada", clase: "bg-green-100 text-green-700" }
-  return { texto: "Pendiente", clase: "bg-amber-100 text-amber-700" }
-}
-
-export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
+export default function AgendaEscalas({ puedeCrear }) {
   const [offsetSemanas, setOffsetSemanas] = useState(0)
   const [fechaSeleccionada, setFechaSeleccionada] = useState(null)
   const [escalasSemana, setEscalasSemana] = useState([])
@@ -60,8 +59,6 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
     }
   }, [offsetSemanas]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Separado en su propia función para poder llamarlo también después
-  // de abortar una escala (refresco sin recargar toda la página).
   const cargarEscalasSemana = useCallback(async () => {
     setCargando(true)
     setError(null)
@@ -84,11 +81,39 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
     cargarEscalasSemana()
   }, [cargarEscalasSemana])
 
-  function escalasDe(fechaISO) {
-    return escalasSemana.filter((e) => `${e.fecha}`.slice(0, 10) === fechaISO)
+  // ÚNICO criterio de agrupación por día en toda la Agenda: el vuelo
+  // REAL (hora_despegue_estimada/hora_arribo_estimada), nunca la fecha
+  // administrativa de la Solicitud. Así, elegir un día significa lo
+  // mismo en Lista y en Aeronaves — "qué vuela ese día" — sin importar
+  // cuándo se cargó el pedido. Una escala sin itinerario cargado
+  // (borrador, o publicada sin horario) no tiene ventana real todavía,
+  // así que no aparece en ningún lado de la Agenda — sigue existiendo y
+  // siendo editable desde Gestión de Escalas.
+  function escalasQueVuelanEse(fechaISO) {
+    return escalasSemana.filter(
+      (e) => calcularVentanaEnElDia(e.hora_despegue_estimada, e.hora_arribo_estimada, fechaISO) !== null
+    )
   }
 
-  const escalasDelDia = fechaSeleccionada ? escalasDe(fechaSeleccionada) : []
+  const escalasDelDia = fechaSeleccionada ? escalasQueVuelanEse(fechaSeleccionada) : []
+  // Aeronaves solo muestra lo efectivamente AUTORIZADO — un plan
+  // pendiente todavía no representa un uso real de la aeronave.
+  const escalasDelDiaAutorizadas = escalasDelDia.filter((e) => e.autorizada)
+
+  const inicioSemanaISO = formatearISO(lunesMostrado)
+  const finSemanaISO    = formatearISO(domingoMostrado)
+
+  // "Vuelos en esta semana" — mismo criterio: solapamiento real con la
+  // semana visible, no la fecha de Solicitud.
+  function vuelaEnLaSemana(e) {
+    if (!e.hora_despegue_estimada) return false
+    const inicioSemana = new Date(`${inicioSemanaISO}T00:00:00`)
+    const finSemana     = new Date(`${finSemanaISO}T23:59:59.999`)
+    const despegue = new Date(e.hora_despegue_estimada)
+    const llegada  = e.hora_arribo_estimada ? new Date(e.hora_arribo_estimada) : despegue
+    return despegue <= finSemana && llegada >= inicioSemana
+  }
+  const escalasSemanaReal = escalasSemana.filter(vuelaEnLaSemana)
 
   const etiquetaSemana =
     offsetSemanas === 0 ? "Semana actual" : offsetSemanas < 0 ? "Semana pasada" : "Próxima semana"
@@ -98,8 +123,8 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
 
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Escalas</h1>
-          <p className="text-sm text-gray-500 mt-1">Agenda de vuelos programados</p>
+          <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
+          <p className="text-sm text-gray-500 mt-1">Qué vuela, cuándo — solo escalas ya publicadas y con horario cargado</p>
         </div>
         {puedeCrear && (
           <Link
@@ -118,7 +143,7 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-sm text-gray-500">Vuelos en esta semana</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{escalasSemana.length}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{escalasSemanaReal.length}</p>
         </div>
       </div>
 
@@ -155,7 +180,7 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
           const iso = formatearISO(d)
           const esSeleccionado = iso === fechaSeleccionada
           const esHoy = iso === formatearISO(hoy)
-          const cantidad = escalasDe(iso).length
+          const cantidad = escalasQueVuelanEse(iso).length
 
           return (
             <button
@@ -224,9 +249,8 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
         <p className="text-sm text-red-600">{error}</p>
       ) : vista === "AERONAVES" ? (
         <GanttAeronavesDia
-          escalasDelDia={escalasDelDia}
+          escalasDelDia={escalasDelDiaAutorizadas}
           fechaSeleccionada={fechaSeleccionada}
-          puedeEditar={puedeEditar}
           onActualizada={cargarEscalasSemana}
         />
       ) : escalasDelDia.length === 0 ? (
@@ -249,7 +273,8 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
                 .map((t) => `${t.persona.grado} ${t.persona.apellido}`)
                 .join(", ") || "Sin tripulación cargada"
 
-              const badge = badgeEstadoAutorizacion(e)
+              const estado = estadoDetallado(e)
+              const tooltipEstado = TOOLTIP_ESTADO_DETALLADO[estado.clave]
               const expandida = filaExpandidaId === e.id
 
               return (
@@ -258,20 +283,27 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
                     onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
                     className="w-full flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                   >
-                    <div className="text-center min-w-[52px]">
-                      <p className="text-sm font-medium text-gray-900">{formatearHora(e.hora_despegue_estimada)}</p>
+                    <div className="text-center min-w-[92px]">
+                      <p className="text-sm font-bold text-gray-900">
+                        {formatearFechaHoraCompacta(e.hora_despegue_estimada)}
+                      </p>
                     </div>
                     <div className="w-px self-stretch bg-gray-200" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-bold text-gray-900 truncate">
                         {e.aeronave?.matricula || "Sin aeronave"} · {ruta}
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5 truncate">
                         {tripulacionTexto} · {e.tipo_mision?.codigo || "Sin tipo de misión"}
                       </p>
                     </div>
-                    <span className={`px-2 py-1 text-xs rounded-full font-medium shrink-0 ${badge.clase}`}>
-                      {badge.texto}
+                    <span
+                      title={tooltipEstado}
+                      className={`px-2 py-1 text-xs rounded-full font-medium shrink-0 whitespace-nowrap ${
+                        ESTADO_DETALLADO_CLASES[estado.clave] || "bg-gray-100 text-gray-600"
+                      } ${tooltipEstado ? "cursor-help" : ""}`}
+                    >
+                      {estado.texto}
                     </span>
                   </button>
 
@@ -279,7 +311,7 @@ export default function AgendaEscalas({ puedeCrear, puedeEditar }) {
                     <div className="mt-1">
                       <PanelDetalleEscala
                         escala={e}
-                        puedeEditar={puedeEditar}
+                        puedeEditar={false}
                         onCerrar={() => setFilaExpandidaId(null)}
                         onActualizada={cargarEscalasSemana}
                       />

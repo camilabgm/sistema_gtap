@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { yaPasoLaHora } from "@/lib/escalas"
 
 const ETIQUETAS_MOTIVO_DERIVACION = {
   TAREA_ADMINISTRATIVA: "Tarea administrativa",
@@ -321,15 +322,26 @@ export default function PendientesAutorizar() {
                   .map((t) => `${t.persona.grado} ${t.persona.apellido}`)
                   .join(", ") || "Sin tripulación"
                 const fechaSolicitud = e.solicitudes?.[0]?.fecha_recepcion
+                // Ya pasó la hora estimada de despegue y nunca se autorizó
+                // — el endpoint de autorizar la rechaza igual, así que no
+                // tiene sentido mostrar el botón para esta fila puntual.
+                const vencida = yaPasoLaHora(e.hora_despegue_estimada)
 
                 return (
                   <div key={e.id} className="bg-white border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900">
-                          {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
-                          {e.nro_orden && ` · Orden #${e.nro_orden}`}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-gray-900">
+                            {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
+                            {e.nro_orden && ` · Orden #${e.nro_orden}`}
+                          </p>
+                          {vencida && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-100 text-rose-700 shrink-0">
+                              Vencida
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-500 mt-1">
                           Vuelo: {formatearFechaHora(e.hora_despegue_estimada)} → {formatearFechaHora(e.hora_arribo_estimada)}
                         </p>
@@ -339,17 +351,24 @@ export default function PendientesAutorizar() {
                             Solicitud recibida: {formatearFechaHora(fechaSolicitud)}
                           </p>
                         )}
+                        {vencida && pendientes.podesActuar && (
+                          <p className="text-xs text-rose-600 mt-1">
+                            Ya pasó la hora — hay que editarla para reprogramarla antes de poder autorizarla.
+                          </p>
+                        )}
                       </div>
 
                       {pendientes.podesActuar && (
                         <div className="flex gap-2 shrink-0">
-                          <button
-                            onClick={() => handleAutorizar(e.id)}
-                            disabled={accionando === e.id}
-                            className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-                          >
-                            {accionando === e.id ? "..." : "Autorizar"}
-                          </button>
+                          {!vencida && (
+                            <button
+                              onClick={() => handleAutorizar(e.id)}
+                              disabled={accionando === e.id}
+                              className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                            >
+                              {accionando === e.id ? "..." : "Autorizar"}
+                            </button>
+                          )}
                           <button
                             onClick={() => { setRechazandoId(rechazandoId === e.id ? null : e.id); setMotivoRechazo("") }}
                             className="border border-red-200 text-red-600 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-red-50 transition-colors"

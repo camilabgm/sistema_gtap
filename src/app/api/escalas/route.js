@@ -5,19 +5,13 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
+import { validarCanalConArchivo } from "@/lib/validacionEscala"
 
-const CANALES_VALIDOS = ["WHATSAPP", "PDF", "IMAGEN", "WORD", "VERBAL"]
-
-function validarDatosSolicitud({ solicitante, fecha, canal, hayArchivo }) {
+function validarDatosSolicitud({ solicitante, fecha, canal, nombreArchivo }) {
   if (!solicitante || !`${solicitante}`.trim()) return "El solicitante es obligatorio"
   if (!fecha) return "La fecha es obligatoria"
   if (isNaN(new Date(fecha).getTime())) return "La fecha no es válida"
-  if (!canal) return "El canal es obligatorio"
-  if (!CANALES_VALIDOS.includes(canal)) return "El canal no es válido"
-  if (canal !== "VERBAL" && !hayArchivo) {
-    return "Debe adjuntar el archivo de la solicitud (salvo que el canal sea VERBAL)"
-  }
-  return null
+  return validarCanalConArchivo(canal, nombreArchivo)
 }
 
 export async function GET(request) {
@@ -41,8 +35,18 @@ export async function GET(request) {
       if (isNaN(fechaDesde.getTime()) || isNaN(fechaHasta.getTime())) {
         return NextResponse.json({ error: "Fechas de filtro inválidas" }, { status: 400 })
       }
-      where.fecha = { gte: fechaDesde, lte: fechaHasta }
+
+      const finDelRango = new Date(fechaHasta)
+      finDelRango.setUTCHours(23, 59, 59, 999)
+
       where.es_borrador = false
+      where.OR = [
+        { fecha: { gte: fechaDesde, lte: fechaHasta } },
+        {
+          hora_despegue_estimada: { lte: finDelRango },
+          hora_arribo_estimada: { gte: fechaDesde },
+        },
+      ]
     }
 
     const escalas = await prisma.escala.findMany({
@@ -108,7 +112,10 @@ export async function POST(request) {
     const hayArchivo =
       archivo && typeof archivo.arrayBuffer === "function" && archivo.size > 0
 
-    const errorValidacion = validarDatosSolicitud({ solicitante, fecha, canal, hayArchivo })
+    const errorValidacion = validarDatosSolicitud({
+      solicitante, fecha, canal,
+      nombreArchivo: hayArchivo ? archivo.name : null,
+    })
     if (errorValidacion) {
       return NextResponse.json({ error: errorValidacion }, { status: 400 })
     }

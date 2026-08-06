@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import PanelDetalleEscala from "./PanelDetalleEscala"
-import { ETIQUETAS_ESTADO, calcularEstadoVisual, calcularVentanaEnElDia, estaPendienteDeAutorizacion, formatearHora, useTick } from "@/lib/escalas"
+import { useTick } from "@/lib/useTick"
+import { ETIQUETAS_ESTADO, calcularEstadoVisual, calcularVentanaEnElDia, formatearHora } from "@/lib/escalas"
 
 const MINUTOS_EN_DIA = 24 * 60
 const HORAS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"))
@@ -20,14 +21,10 @@ function porcentaje(minutos) {
   return (minutos / MINUTOS_EN_DIA) * 100
 }
 
-function fondoBloque(colorBase, pendiente) {
-  if (!pendiente) return { backgroundColor: colorBase }
-  return {
-    backgroundImage: `repeating-linear-gradient(45deg, ${colorBase}, ${colorBase} 6px, ${colorBase}cc 6px, ${colorBase}cc 12px)`,
-  }
-}
-
-export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, puedeEditar, onActualizada }) {
+// Sin `puedeEditar`: Agenda (Lista y Aeronaves) es puramente de consulta
+// — todas las acciones viven en Gestión de Escalas. El panel de detalle
+// acá siempre se abre en modo solo-lectura.
+export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, onActualizada }) {
   const [aeronaves, setAeronaves] = useState([])
   const [cargando, setCargando] = useState(true)
   const [escalaExpandidaId, setEscalaExpandidaId] = useState(null)
@@ -70,13 +67,6 @@ export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, pu
               {etiqueta}
             </div>
           ))}
-          <div className="flex items-center gap-1.5">
-            <span
-              className="w-2 h-2 rounded-sm"
-              style={{ backgroundImage: `repeating-linear-gradient(45deg, ${COLORES_ESTADO.PROGRAMADA}, ${COLORES_ESTADO.PROGRAMADA} 3px, ${COLORES_ESTADO.PROGRAMADA}cc 3px, ${COLORES_ESTADO.PROGRAMADA}cc 6px)` }}
-            />
-            ⏳ Pendiente de autorización
-          </div>
         </div>
 
         <div className="flex border-b border-gray-100">
@@ -133,7 +123,6 @@ export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, pu
                     const { minutosInicio, minutosFin, continuaAntes, continuaDespues } = ventana
 
                     const estadoVisual = calcularEstadoVisual(e)
-                    const pendiente = estaPendienteDeAutorizacion(e)
                     const colorBase = COLORES_ESTADO[estadoVisual] || COLORES_ESTADO.PROGRAMADA
                     const primerTramo = e.itinerarios?.[0]
                     const ultimoTramo = e.itinerarios?.[e.itinerarios.length - 1]
@@ -147,21 +136,21 @@ export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, pu
                         title={textoCompleto}
                         onClick={() => setEscalaExpandidaId(escalaExpandidaId === e.id ? null : e.id)}
                         className={`absolute top-2 bottom-2 rounded-md px-1.5 flex items-center justify-center overflow-hidden text-left cursor-pointer transition-opacity hover:opacity-90 ${
-                          pendiente ? "border-2 border-dashed border-white/60" : ""
-                        } ${escalaExpandidaId === e.id ? "ring-2 ring-offset-1 ring-gray-400" : ""}`}
+                          escalaExpandidaId === e.id ? "ring-2 ring-offset-1 ring-gray-400" : ""
+                        }`}
                         style={{
                           left: `${porcentaje(minutosInicio)}%`,
                           width: `${porcentaje(duracion)}%`,
                           minWidth: "26px",
-                          ...fondoBloque(colorBase, pendiente),
+                          backgroundColor: colorBase,
                         }}
                       >
                         {duracion >= 60 ? (
                           <p className="text-xs font-medium truncate text-white w-full">
-                            {continuaAntes && "◀ "}{pendiente && "⏳ "}{formatearHora(e.hora_despegue_estimada)} {ruta}{continuaDespues && " ▶"}
+                            {continuaAntes && "◀ "}{formatearHora(e.hora_despegue_estimada)} {ruta}{continuaDespues && " ▶"}
                           </p>
                         ) : (
-                          <span className="text-xs text-white">{pendiente ? "⏳" : continuaDespues ? "▶" : "●"}</span>
+                          <span className="text-xs text-white">{continuaDespues ? "▶" : "●"}</span>
                         )}
                       </button>
                     )
@@ -177,7 +166,7 @@ export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, pu
         <div className="mt-2">
           <PanelDetalleEscala
             escala={escalaExpandida}
-            puedeEditar={puedeEditar}
+            puedeEditar={false}
             onCerrar={() => setEscalaExpandidaId(null)}
             onActualizada={onActualizada}
           />

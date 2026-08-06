@@ -2,17 +2,18 @@
 //
 // PUT /api/escalas/<id>/autorizar
 //
-// Recalcula EN VIVO quién es el autorizante activo (no confía en lo que
-// haya quedado guardado al publicar) y, si quien llama es esa persona,
-// marca la escala como autorizada. Vuelve a escribir el recorrido
-// completo de la cascada en EscalaAutorizacion, para que el historial
-// quede fiel al momento real de autorizar.
+// Recalcula EN VIVO quién es el autorizante activo y, si quien llama es
+// esa persona, marca la escala como autorizada. Ahora también rechaza
+// si ya pasó la hora estimada de despegue — no tiene sentido operativo
+// autorizar un vuelo cuyo horario ya pasó; la escala tiene que
+// reprogramarse primero (sigue siendo editable justamente para eso).
 
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import { calcularAutorizanteActivo } from "@/lib/cascadaAutorizacion"
+import { yaPasoLaHora } from "@/lib/escalas"
 
 export async function PUT(request, { params }) {
   try {
@@ -29,7 +30,7 @@ export async function PUT(request, { params }) {
 
     const escala = await prisma.escala.findFirst({
       where: { id: escalaId, deleted_at: null },
-      select: { es_borrador: true, autorizada: true, estado: true },
+      select: { es_borrador: true, autorizada: true, estado: true, hora_despegue_estimada: true },
     })
     if (!escala) {
       return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
@@ -42,6 +43,12 @@ export async function PUT(request, { params }) {
     }
     if (["ABORTADA", "RECHAZADA"].includes(escala.estado)) {
       return NextResponse.json({ error: "La escala ya no está disponible para autorizar" }, { status: 409 })
+    }
+    if (yaPasoLaHora(escala.hora_despegue_estimada)) {
+      return NextResponse.json(
+        { error: "Ya pasó la hora de despegue estimada. Editá la escala para reprogramarla antes de autorizarla." },
+        { status: 409 }
+      )
     }
 
     const { autorizanteRol, autorizantePersonaId, pasos } = await calcularAutorizanteActivo()

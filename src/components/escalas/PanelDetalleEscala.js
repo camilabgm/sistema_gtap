@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO_ABORTO, calcularEstadoVisual, puedeAbortarAhora, estaPendienteDeAutorizacion, formatearHora, formatearRangoVuelo, useTick } from "@/lib/escalas"
-
+import { useTick } from "@/lib/useTick"
+import { ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO_ABORTO, calcularEstadoVisual, puedeAbortarAhora, estaPendienteDeAutorizacion, formatearHora, formatearRangoVuelo } from "@/lib/escalas"
 const MOTIVOS_ABORTO = Object.keys(ETIQUETAS_MOTIVO_ABORTO)
 
 export default function PanelDetalleEscala({ escala, puedeEditar, onCerrar, onActualizada }) {
