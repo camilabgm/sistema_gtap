@@ -2,8 +2,9 @@
 //
 // GET    /api/escalas/<id>     → detalle completo, para precargar edición
 // PUT    /api/escalas/<id>     → completa el borrador
-// DELETE /api/escalas/<id>     → borrado lógico. Ver puedeEliminarse() en
-//                                 lib/escalas.js para la regla exacta.
+// DELETE /api/escalas/<id>     → borrado lógico EN CASCADA. Depende
+//                                 únicamente de ESCALAS.puede_eliminar
+//                                 — sin restricción de estado.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -12,7 +13,6 @@ import { authOptions } from "@/auth"
 import { calcularVentana, verificarAeronave, verificarTripulante } from "@/lib/disponibilidad"
 import { parsearSubtipos } from "@/lib/tiposMision"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
-import { puedeEliminarse } from "@/lib/escalas"
 import {
   validarItinerarios,
   validarTripulacion,
@@ -203,12 +203,6 @@ export async function PUT(request, { params }) {
     const canalEfectivo = canalTocado ? canalValor : (solicitudActual?.canal ?? null)
     const nombreArchivoParaValidar = hayArchivoNuevo ? archivoNuevo.name : solicitudActual?.archivo
 
-    // FIX: antes se revalidaba SIEMPRE que hubiera solicitudActual, sin
-    // importar si el canal realmente cambió — como el frontend reenvía
-    // el mismo canal en cada guardado, esto bloqueaba cualquier edición
-    // (aunque no tocara canal/archivo) si había un desajuste viejo entre
-    // canal y archivo cargado antes de la validación estricta. Ahora
-    // solo se revalida si el canal cambió de verdad o si hay archivo nuevo.
     const canalRealmenteCambio = canalTocado && canalValor !== solicitudActual?.canal
     if (solicitudActual && (canalRealmenteCambio || hayArchivoNuevo)) {
       const errCanal = validarCanalConArchivo(canalEfectivo, nombreArchivoParaValidar)
@@ -379,8 +373,16 @@ export async function PUT(request, { params }) {
   }
 }
 
-// DELETE — borrado lógico. Regla en puedeEliminarse() de lib/escalas.js:
-// eliminable únicamente si nunca llegó a autorizarse.
+// DELETE — borrado lógico EN CASCADA. Depende únicamente del permiso
+// ESCALAS.puede_eliminar de la matriz — sin ninguna restricción de
+// estado (antes no se podía borrar algo Autorizado/Cumplido/Abortado;
+// eso se sacó a pedido explícito: la matriz ya define los 5 grupos
+// habilitados, igual que para crear/editar/ver).
+//
+// Borra la Escala Y todos sus hijos (itinerarios, tripulación,
+// solicitudes, autorizaciones, acuses, post-vuelo) en la misma
+// transacción — para que no queden registros sueltos apuntando a una
+// escala que ya no existe.
 export async function DELETE(request, { params }) {
   try {
     const session = await getServerSession(authOptions)
@@ -399,22 +401,23 @@ export async function DELETE(request, { params }) {
 
     const escala = await prisma.escala.findFirst({
       where: { id: escalaId, deleted_at: null },
-      select: { es_borrador: true, estado: true, autorizada: true },
+      select: { id: true },
     })
     if (!escala) {
       return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
     }
 
-    if (!puedeEliminarse(escala)) {
-      return NextResponse.json(
-        { error: "Esta escala ya fue autorizada en algún momento y no se puede eliminar" },
-        { status: 409 }
-      )
-    }
+    await prisma.$transaction(async (tx) => {
+      const ahora = new Date()
+      const dataBorrado = { deleted_at: ahora, eliminado_por: session.user.id }
 
-    await prisma.escala.update({
-      where: { id: escalaId },
-      data: { deleted_at: new Date(), eliminado_por: session.user.id },
+      await tx.escala.update({ where: { id: escalaId }, data: dataBorrado })
+      await tx.escalaItinerario.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+      await tx.escalaTripulacion.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+      await tx.solicitud.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+      await tx.escalaAutorizacion.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+      await tx.acuseRecibo.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+      await tx.postVuelo.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
     })
 
     return NextResponse.json({ ok: true })

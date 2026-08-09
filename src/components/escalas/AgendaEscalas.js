@@ -81,14 +81,6 @@ export default function AgendaEscalas({ puedeCrear }) {
     cargarEscalasSemana()
   }, [cargarEscalasSemana])
 
-  // ÚNICO criterio de agrupación por día en toda la Agenda: el vuelo
-  // REAL (hora_despegue_estimada/hora_arribo_estimada), nunca la fecha
-  // administrativa de la Solicitud. Así, elegir un día significa lo
-  // mismo en Lista y en Aeronaves — "qué vuela ese día" — sin importar
-  // cuándo se cargó el pedido. Una escala sin itinerario cargado
-  // (borrador, o publicada sin horario) no tiene ventana real todavía,
-  // así que no aparece en ningún lado de la Agenda — sigue existiendo y
-  // siendo editable desde Gestión de Escalas.
   function escalasQueVuelanEse(fechaISO) {
     return escalasSemana.filter(
       (e) => calcularVentanaEnElDia(e.hora_despegue_estimada, e.hora_arribo_estimada, fechaISO) !== null
@@ -96,15 +88,11 @@ export default function AgendaEscalas({ puedeCrear }) {
   }
 
   const escalasDelDia = fechaSeleccionada ? escalasQueVuelanEse(fechaSeleccionada) : []
-  // Aeronaves solo muestra lo efectivamente AUTORIZADO — un plan
-  // pendiente todavía no representa un uso real de la aeronave.
   const escalasDelDiaAutorizadas = escalasDelDia.filter((e) => e.autorizada)
 
   const inicioSemanaISO = formatearISO(lunesMostrado)
   const finSemanaISO    = formatearISO(domingoMostrado)
 
-  // "Vuelos en esta semana" — mismo criterio: solapamiento real con la
-  // semana visible, no la fecha de Solicitud.
   function vuelaEnLaSemana(e) {
     if (!e.hora_despegue_estimada) return false
     const inicioSemana = new Date(`${inicioSemanaISO}T00:00:00`)
@@ -312,6 +300,7 @@ export default function AgendaEscalas({ puedeCrear }) {
                       <PanelDetalleEscala
                         escala={e}
                         puedeEditar={false}
+                        mostrarPostVuelo={false}
                         onCerrar={() => setFilaExpandidaId(null)}
                         onActualizada={cargarEscalasSemana}
                       />

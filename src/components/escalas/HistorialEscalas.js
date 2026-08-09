@@ -10,7 +10,6 @@ import {
   TOOLTIP_ESTADO_DETALLADO,
   puedeEditarAhora,
   motivoNoEditable,
-  puedeEliminarse,
   formatearFechaHoraCompacta,
 } from "@/lib/escalas"
 import { formatearFechaSoloDia } from "@/lib/fechaSoloDia"
@@ -67,7 +66,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
   async function handleEliminar(escala) {
     const referencia = escala.nro_orden ? `#${escala.nro_orden}` : `#${escala.id}`
     const confirmar = window.confirm(
-      `¿Eliminar la escala ${referencia}? Esta acción no se puede deshacer desde la interfaz.`
+      `¿Eliminar la escala ${referencia}? Esto también borra su itinerario, tripulación, solicitud, autorizaciones y post-vuelo si tiene. Esta acción no se puede deshacer desde la interfaz.`
     )
     if (!confirmar) return
 
@@ -130,7 +129,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
       return true
     })
     .slice()
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
 
   function descargarPDF() {
     const doc = new jsPDF({ orientation: "landscape" })
@@ -310,7 +309,6 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                 const estado = estadoDetallado(e)
                 const editable = puedeEditarAhora(e)
                 const motivo = motivoNoEditable(e)
-                const eliminable = puedeEliminarse(e)
                 const expandida = filaExpandidaId === e.id
                 const tooltipEstado = TOOLTIP_ESTADO_DETALLADO[estado.clave]
 
@@ -361,7 +359,10 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                               </span>
                             )
                           )}
-                          {puedeEliminar && eliminable && (
+                          {/* Eliminar ahora depende únicamente del permiso
+                              ESCALAS.puede_eliminar — sin importar el
+                              estado de la escala. */}
+                          {puedeEliminar && (
                             <button
                               onClick={() => handleEliminar(e)}
                               disabled={eliminandoId === e.id}
@@ -376,12 +377,10 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                     {expandida && (
                       <tr>
                         <td colSpan={8} className="px-4 pb-4 bg-gray-50">
-                          {/* Acá SÍ se pasa el permiso real — este es el único
-                              lugar del sistema donde "Ver" también puede
-                              mostrar "Abortar escala" si corresponde. */}
                           <PanelDetalleEscala
                             escala={e}
                             puedeEditar={puedeEditar}
+                            mostrarPostVuelo={true}
                             onCerrar={() => setFilaExpandidaId(null)}
                             onActualizada={cargarEscalas}
                           />

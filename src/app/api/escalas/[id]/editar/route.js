@@ -300,7 +300,10 @@ export async function PUT(request, { params }) {
       }
 
       if (itinerarios !== undefined) {
-        await tx.escalaItinerario.deleteMany({ where: { escala_id: escalaId } })
+        await tx.acuseRecibo.updateMany({
+        where: { escala_id: escalaId, deleted_at: null },
+        data: { deleted_at: new Date(), eliminado_por: session.user.id },
+        })
         for (const t of itinerarios) {
           await tx.escalaItinerario.create({
             data: {

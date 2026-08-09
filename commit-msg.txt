@@ -1,43 +1,54 @@
-﻿feat: flujo de re-autorizacion de escalas y reorganizacion de pantallas
+﻿feat: modulo Post-Vuelo completo, cascada de eliminacion, dashboard y acuse de recibo
 
-Edicion de escalas publicadas:
-- Nuevo endpoint PUT /api/escalas/[id]/editar: resetea autorizacion,
-  revierte RECHAZADA a PROGRAMADA, borra acuses de recibo
-- Nuevo GET /api/escalas/[id] para precargar la pantalla de edicion
-- Nuevo DELETE /api/escalas/[id] con borrado logico
-- Nuevo componente EditarEscala.js: pantalla unica para completar
-  borrador o editar publicada, con Guardar y publicar en un solo paso
+Post-Vuelo (modulo nuevo):
+- Modelo PostVuelo con novedad (SIN_NOVEDAD/INCIDENTE/ACCIDENTE),
+  combustible, pasajeros, aterrizajes, horas de vuelo/tierra/total
+- Carga progresiva por tramo: hora real de salida/llegada en
+  EscalaItinerario, cualquiera de la tripulacion puede ir completando
+- Horas de vuelo/tierra/total calculadas SIEMPRE del lado del servidor,
+  sumando los tramos reales - nunca un input manual
+- Cierre final (destino real, combustible, pasajeros, novedad) solo
+  habilitado cuando todos los tramos ya tienen su hora real
+- Al guardar un tramo con post-vuelo ya cerrado, el cierre se
+  resincroniza solo en la misma operacion
+- Escala pasa a CUMPLIDA al cerrar el post-vuelo, vuelve a PROGRAMADA
+  si se elimina
+- Cola de Post-Vuelo (/dashboard/post-vuelo): lista solo lo que le
+  corresponde reportar a cada persona (tripulante o permiso amplio)
+- PostVuelo.escala_id ya no es @unique - permite multiples filas por
+  escala a lo largo del tiempo (solo una activa, sin deleted_at)
 
-Estados mas precisos:
-- estadoDetallado() distingue Programada-Pendiente, Programada-Autorizada,
-  Vencida-Sin-autorizar, y el resto de los estados existentes
-- puedeEditarAhora, puedeEliminarse, puedeAbortarAhora ajustados a la
-  regla real: solo importa el tiempo si la escala llego a autorizarse
-- PUT /autorizar rechaza si ya paso la hora sin autorizar
+Escalas - Eliminar:
+- Se saca la restriccion de estado (antes no dejaba borrar Autorizada/
+  Cumplida/Abortada) - ahora depende solo de ESCALAS.puede_eliminar,
+  segun la matriz de permisos
+- Borrado en cascada: al eliminar una Escala, se marcan como
+  eliminados tambien itinerarios, tripulacion, solicitudes,
+  autorizaciones, acuses y post-vuelo, todo en una sola transaccion
 
-Canal, archivo y numero de orden:
-- Validacion real de formato de archivo contra el canal elegido
-- Numero de orden editable en cualquier momento, no solo al publicar
-- Se saco WHATSAPP de los canales (redundante con los demas)
+Acuse de Recibo (nuevo):
+- Se crea automaticamente al autorizar una escala: un acuse por cada
+  tripulante (Piloto/Copiloto/Tecnico) y por quien tenga el Rol
+  "Supervisor de Semana" asignado en ese momento
+- Boton de "Acusar recibo" dentro del panel de detalle de la escala
+- Badge de pendientes en el sidebar, marcado especificamente en Agenda
+- Queda anotado en memoria: el checklist de Inspeccion Pre-vuelo
+  (firma fisica del Supervisor de Semana) es una pieza aparte,
+  diferida a Fase 2 - no bloquea este acuse liviano
 
-Disponibilidad:
-- condicionSolape() ya no bloquea con escalas rechazadas o vencidas
-  sin autorizar; una pendiente con hora vigente sigue bloqueando
+Dashboard:
+- Nueva seccion "Lo que te toca hacer" (acuses, post-vuelo,
+  autorizaciones pendientes) - solo aparece si hay algo pendiente
+- Personal activo y Alertas gateados por PERSONAS.puede_ver
+- Estado de modulos visible solo para ROLES_ADMIN, Post-Vuelo marcado
+  activo
 
-Reorganizacion Agenda / Gestion de Escalas:
-- Agenda pasa a ser de solo consulta, reanclada al dia REAL de vuelo
-  (antes usaba la fecha de Solicitud, causaba inconsistencias)
-- Historial renombrado a "Gestion de Escalas": unico lugar con
-  acciones (Ver, Editar, Eliminar, Abortar)
-- Filtros por Estado (multi), Aeronave y rango de fechas
-
-Cargos de Autorizacion:
-- Comandante ya no muestra fila de Adjunto (nunca existe ese puesto)
-
-Fixes de bugs encontrados en el camino:
-- useTick separado de lib/escalas.js (rompia el build del servidor)
-- fechaSoloDia.js: corrige desfasaje de un dia por huso horario UTC
-- nro_orden no se guardaba por mal uso de normalizarNroOrden
-- validacion de canal se disparaba aunque no se tocara el campo
-- Abortar aparecia en un borrador sin publicar
-- limpieza de roles huerfanos en la tabla roles
+Fixes encontrados en el camino:
+- pendientes-autorizar/route.js no traia rol_en_vuelo ni solicitante
+  (mostraba "rol sin especificar" y solicitante vacio)
+- Filtrar relacion uno-a-uno con where en el select de Prisma tiraba
+  PrismaClientValidationError - se resolvio con consulta aparte
+- PanelDetalleEscala no distinguia error real de "no hay datos" al
+  cargar post-vuelo - quedaba en blanco sin avisar
+- Escala sin ningun tramo cargado rompia el panel de post-vuelo -
+  ahora muestra un aviso explicando que falta el itinerario

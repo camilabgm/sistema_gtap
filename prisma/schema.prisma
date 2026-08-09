@@ -418,8 +418,6 @@ model Escala {
   fecha                  DateTime        @db.Date
   hora_despegue_estimada DateTime?
   hora_arribo_estimada   DateTime?
-  hora_real_salida       DateTime?
-  hora_real_arribo       DateTime?
   solicitante            String // ej. FFMM, Presidencia, ANDE, CODI
   observaciones          String?
   estado                 EstadoEscala    @default(PROGRAMADA)
@@ -454,7 +452,7 @@ model Escala {
   solicitudes    Solicitud[]
   autorizaciones EscalaAutorizacion[]
   acuses         AcuseRecibo[]
-  post_vuelo     PostVuelo?
+  post_vuelos    PostVuelo[]
 
   // Auditoría
   creado_por    Int?
@@ -640,20 +638,34 @@ model CargoAutorizacion {
   @@map("cargos_autorizacion")
 }
 
+// ─────────────────────────────  MODELO M5  ────────────────────────────
+
 model PostVuelo {
   id        Int    @id @default(autoincrement())
-  escala_id Int    @unique // un post-vuelo por escala
+  escala_id Int // ya no es @unique — puede haber varias filas por escala a lo largo del tiempo (solo una sin deleted_at a la vez, eso se valida en el código, no en la base)
   escala    Escala @relation(fields: [escala_id], references: [id])
 
-  minutos_volados       Int // suma del tiempo de cada tramo, en minutos exactos (se muestra como HH:MM). Es la entrada del SICEM.
-  combustible_consumido Decimal? @db.Decimal(8, 2)
-  novedad               Novedad  @default(SIN_NOVEDAD)
-  detalle_novedad       String?
-  cargado_por           Int? // id del usuario; puede ser cualquiera
-  fecha_registro        DateTime @default(now())
+  // Horas de vuelo y de tierra por separado — SICEM (a futuro) va a sumar
+  // solo horas_vuelo_minutos por aeronave, sin que se le mezcle tiempo en
+  // tierra. total_minutos se guarda para que Informes/Manifiesto puedan
+  // sumarlo directo, pero SOLO lo escribe el servidor — nunca es un
+  // input, se recalcula siempre que se crea o edita el registro.
+  horas_vuelo_minutos  Int
+  horas_tierra_minutos Int
+  total_minutos        Int
 
-  // Auditoría
-  creado_por    Int?
+  destino_real          String
+  combustible_consumido Decimal? @db.Decimal(8, 2)
+  pasajeros             Int?
+  aterrizajes           Int
+
+  novedad         Novedad @default(SIN_NOVEDAD)
+  detalle_novedad String?
+
+  observaciones String?
+
+  // Auditoría — mismo patrón que el resto del sistema.
+  creado_por    Int
   editado_por   Int?
   eliminado_por Int?
   created_at    DateTime  @default(now())

@@ -3,10 +3,16 @@
 // PUT /api/escalas/<id>/autorizar
 //
 // Recalcula EN VIVO quién es el autorizante activo y, si quien llama es
-// esa persona, marca la escala como autorizada. Ahora también rechaza
-// si ya pasó la hora estimada de despegue — no tiene sentido operativo
-// autorizar un vuelo cuyo horario ya pasó; la escala tiene que
-// reprogramarse primero (sigue siendo editable justamente para eso).
+// esa persona, marca la escala como autorizada. Rechaza si ya pasó la
+// hora estimada de despegue sin autorizar.
+//
+// Al autorizar, crea el Acuse de Recibo pendiente para:
+//   - cada tripulante (Piloto/Copiloto/Técnico de Vuelo), vía EscalaTripulacion
+//   - quien tenga el Rol de acceso "Supervisor de Semana" en este momento
+//
+// Esto es SOLO el acuse liviano ("me enteré de que existe esta escala")
+// — no reemplaza el checklist de Inspección Pre-vuelo (25 ítems, firma
+// física), que sigue diferido a la Fase 2 y es una pieza aparte.
 
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
@@ -30,7 +36,16 @@ export async function PUT(request, { params }) {
 
     const escala = await prisma.escala.findFirst({
       where: { id: escalaId, deleted_at: null },
-      select: { es_borrador: true, autorizada: true, estado: true, hora_despegue_estimada: true },
+      select: {
+        es_borrador: true,
+        autorizada: true,
+        estado: true,
+        hora_despegue_estimada: true,
+        tripulacion: {
+          where: { deleted_at: null },
+          select: { persona_id: true, rol_en_vuelo: true },
+        },
+      },
     })
     if (!escala) {
       return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
@@ -60,6 +75,15 @@ export async function PUT(request, { params }) {
       )
     }
 
+    // Quién tiene hoy el Rol de acceso "Supervisor de Semana" — no
+    // depende de ningún módulo de guardia rotativa, se lee directo de
+    // la asignación de Rol que ya administrás vos misma. Puede no haber
+    // nadie (Rol vacante) — en ese caso, simplemente no se crea ese acuse.
+    const supervisoresDeSemana = await prisma.usuario.findMany({
+      where: { activo: true, deleted_at: null, rol: { nombre: "Supervisor de Semana" } },
+      select: { persona_id: true },
+    })
+
     const actualizada = await prisma.$transaction(async (tx) => {
       for (let i = 0; i < pasos.length; i++) {
         const paso = pasos[i]
@@ -75,7 +99,7 @@ export async function PUT(request, { params }) {
         })
       }
 
-      return tx.escala.update({
+      const resultado = await tx.escala.update({
         where: { id: escalaId },
         data: {
           autorizada: true,
@@ -85,6 +109,27 @@ export async function PUT(request, { params }) {
           editado_por: session.user.id,
         },
       })
+
+      const acusesACrear = [
+        ...escala.tripulacion.map((t) => ({
+          escala_id: escalaId,
+          persona_id: t.persona_id,
+          rol: t.rol_en_vuelo, // mismos valores que RolAcuse
+          creado_por: session.user.id,
+        })),
+        ...supervisoresDeSemana.map((u) => ({
+          escala_id: escalaId,
+          persona_id: u.persona_id,
+          rol: "SUPERVISOR_SEMANA",
+          creado_por: session.user.id,
+        })),
+      ]
+
+      if (acusesACrear.length > 0) {
+        await tx.acuseRecibo.createMany({ data: acusesACrear, skipDuplicates: true })
+      }
+
+      return resultado
     })
 
     return NextResponse.json(actualizada)

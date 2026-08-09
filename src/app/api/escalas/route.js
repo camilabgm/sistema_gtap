@@ -65,6 +65,9 @@ export async function GET(request) {
         motivo_abortada: true,
         observacion_aborto: true,
         motivo_rechazo: true,
+        // NUEVO: necesario para poder ordenar Gestión de Escalas por
+        // "último tocado" (creado o editado) en vez de por fecha de misión.
+        updated_at: true,
         aeronave: { select: { matricula: true } },
         tipo_mision: { select: { codigo: true, nombre: true } },
         itinerarios: {

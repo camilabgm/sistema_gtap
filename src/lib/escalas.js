@@ -61,12 +61,6 @@ export function calcularEstadoVisual(escala) {
   return "PROGRAMADA"
 }
 
-// FIX: un borrador puede tener estado "PROGRAMADA" y hora_despegue_estimada
-// cargada (si ya completaste el itinerario) sin haberse publicado nunca —
-// esos dos campos no dependen de la publicación. Sin este chequeo, un
-// borrador sin publicar podía mostrar "Abortar escala", algo que no
-// tiene sentido operativo (no se puede abortar algo que nunca despegó
-// ni fue autorizado a volar).
 export function puedeAbortarAhora(escala) {
   if (escala.es_borrador) return false
   if (escala.estado !== "PROGRAMADA") return false
@@ -103,10 +97,10 @@ export function motivoNoEditable(escala) {
   return null
 }
 
-export function puedeEliminarse(escala) {
-  if (escala.es_borrador) return true
-  return !escala.autorizada && escala.estado !== "ABORTADA"
-}
+// NOTA: puedeEliminarse() se sacó de acá — Eliminar ahora depende
+// únicamente del permiso ESCALAS.puede_eliminar de la matriz, sin
+// ninguna regla de estado adicional. La matriz ya define los 5 grupos
+// habilitados para esta acción, igual que para crear/editar/ver.
 
 export function calcularVentanaEnElDia(horaDespegueIso, horaArriboIso, fechaSeleccionadaISO) {
   if (!horaDespegueIso) return null

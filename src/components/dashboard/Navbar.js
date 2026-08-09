@@ -7,7 +7,7 @@ import { useState, useEffect } from "react"
 import {
   Home, Tag, Plane, Users, CalendarCheck, CalendarDays, PlusCircle,
   ShieldCheck, UserCog, ClipboardList, FileText, BarChart3, Wrench, Lock,
-  ScrollText, Menu, LogOut, KeyRound,
+  ScrollText, Menu, LogOut, KeyRound, PlaneLanding,
 } from "lucide-react"
 import { ROLES_ADMIN } from "@/lib/autorizacion"
 
@@ -51,6 +51,41 @@ function ItemModulo({ nombre, ruta, Icono, activo, colapsado }) {
   )
 }
 
+function ItemModuloConBadge({ nombre, ruta, Icono, activo, badge, colapsado }) {
+  if (colapsado) {
+    return (
+      <Link
+        href={ruta}
+        title={badge > 0 ? `${nombre} (${badge})` : nombre}
+        className={`relative flex items-center justify-center py-2.5 rounded-md transition-colors ${
+          activo ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+        }`}
+      >
+        <Icono size={18} />
+        {badge > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full" />}
+      </Link>
+    )
+  }
+  return (
+    <Link
+      href={ruta}
+      className={`flex items-center justify-between px-4 py-2 rounded-md text-sm transition-colors ${
+        activo ? "bg-blue-600 text-white font-medium" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+      }`}
+    >
+      <span className="flex items-center gap-3">
+        <Icono size={18} className="shrink-0" />
+        {nombre}
+      </span>
+      {badge > 0 && (
+        <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+          {badge}
+        </span>
+      )}
+    </Link>
+  )
+}
+
 function SubItemEscalas({ nombre, ruta, Icono, activo, badge, colapsado }) {
   if (colapsado) {
     return (
@@ -89,6 +124,8 @@ function SubItemEscalas({ nombre, ruta, Icono, activo, badge, colapsado }) {
 export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCascada, colapsado, onToggleColapsado }) {
   const pathname = usePathname()
   const [pendientesParaMi, setPendientesParaMi] = useState(0)
+  const [postVueloParaMi, setPostVueloParaMi] = useState(0)
+  const [acusesParaMi, setAcusesParaMi] = useState(0)
 
   const dentroDeEscalas = pathname.startsWith("/dashboard/escalas")
   const vePersonas = permisos?.PERSONAS?.puede_ver
@@ -108,6 +145,20 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
       .then((data) => setPendientesParaMi(data?.podesActuar ? data.escalas.length : 0))
       .catch(() => {})
   }, [pathname, esCargoDeCascada])
+
+  useEffect(() => {
+    fetch("/api/post-vuelo/pendientes", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setPostVueloParaMi(Array.isArray(data) ? data.length : 0))
+      .catch(() => {})
+  }, [pathname])
+
+  useEffect(() => {
+    fetch("/api/acuses/pendientes", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setAcusesParaMi(Array.isArray(data) ? data.length : 0))
+      .catch(() => {})
+  }, [pathname])
 
   return (
     <div
@@ -162,30 +213,46 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
               {colapsado ? (
                 <Link
                   href="/dashboard/escalas"
-                  title="Escalas"
-                  className={`flex items-center justify-center py-2.5 rounded-md transition-colors ${
+                  title={acusesParaMi > 0 ? `Escalas (${acusesParaMi} por acusar recibo)` : "Escalas"}
+                  className={`relative flex items-center justify-center py-2.5 rounded-md transition-colors ${
                     dentroDeEscalas ? "text-white bg-gray-800" : "text-gray-300 hover:bg-gray-700 hover:text-white"
                   }`}
                 >
                   <CalendarDays size={18} />
+                  {acusesParaMi > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full" />}
                 </Link>
               ) : (
                 <Link
                   href="/dashboard/escalas"
-                  className={`flex items-center gap-3 px-4 py-2 rounded-md text-sm transition-colors ${
+                  className={`flex items-center justify-between px-4 py-2 rounded-md text-sm transition-colors ${
                     dentroDeEscalas ? "text-white font-medium" : "text-gray-300 hover:bg-gray-700 hover:text-white"
                   }`}
                 >
-                  <CalendarDays size={18} className="shrink-0" />
-                  <span>Escalas</span>
+                  <span className="flex items-center gap-3">
+                    <CalendarDays size={18} className="shrink-0" />
+                    Escalas
+                  </span>
+                  {/* Indicador general — visible aunque el submenú esté
+                      colapsado (por ejemplo, navegando en otra sección
+                      del sistema). No dice DÓNDE adentro de Escalas hay
+                      que ir — para eso está el badge de Agenda, abajo. */}
+                  {acusesParaMi > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                      {acusesParaMi}
+                    </span>
+                  )}
                 </Link>
               )}
 
               {dentroDeEscalas && (
                 <ul className="mt-1 space-y-0.5">
                   <li>
+                    {/* FIX: ahora también marca acá — mismo patrón que ya
+                        usa "Pendientes de autorizar" con el suyo. Así,
+                        una vez adentro de Escalas, queda claro que Agenda
+                        es el lugar puntual para resolver el acuse. */}
                     <SubItemEscalas nombre="Agenda" ruta="/dashboard/escalas" Icono={CalendarDays}
-                      activo={pathname === "/dashboard/escalas"} colapsado={colapsado} />
+                      activo={pathname === "/dashboard/escalas"} badge={acusesParaMi} colapsado={colapsado} />
                   </li>
                   <li>
                     <SubItemEscalas nombre="Nueva escala" ruta="/dashboard/escalas/nueva" Icono={PlusCircle}
@@ -211,6 +278,17 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
               )}
             </li>
           )}
+
+          <li>
+            <ItemModuloConBadge
+              nombre="Post-Vuelo"
+              ruta="/dashboard/post-vuelo"
+              Icono={PlaneLanding}
+              activo={pathname === "/dashboard/post-vuelo"}
+              badge={postVueloParaMi}
+              colapsado={colapsado}
+            />
+          </li>
 
           {modulosDespuesVisibles.map((modulo) => (
             <li key={modulo.ruta}>

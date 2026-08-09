@@ -21,15 +21,12 @@ function porcentaje(minutos) {
   return (minutos / MINUTOS_EN_DIA) * 100
 }
 
-// Sin `puedeEditar`: Agenda (Lista y Aeronaves) es puramente de consulta
-// — todas las acciones viven en Gestión de Escalas. El panel de detalle
-// acá siempre se abre en modo solo-lectura.
 export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, onActualizada }) {
   const [aeronaves, setAeronaves] = useState([])
   const [cargando, setCargando] = useState(true)
   const [escalaExpandidaId, setEscalaExpandidaId] = useState(null)
 
-  useTick() // recalcula estados en vivo (Programada -> En vuelo) sin necesidad de clic
+  useTick()
 
   useEffect(() => {
     fetch("/api/aeronaves", { credentials: "include" })
@@ -167,6 +164,7 @@ export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, on
           <PanelDetalleEscala
             escala={escalaExpandida}
             puedeEditar={false}
+            mostrarPostVuelo={false}
             onCerrar={() => setEscalaExpandidaId(null)}
             onActualizada={onActualizada}
           />
