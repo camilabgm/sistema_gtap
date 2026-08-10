@@ -1,8 +1,7 @@
 "use client"
-
 import { useState } from "react"
+import { formatearFechaHora } from "@/lib/fechaHora"
 
-// Colores para cada tipo de resultado (badges de colores en la tabla)
 const COLORES_RESULTADO = {
   EXITOSO:               "bg-green-100 text-green-800",
   USUARIO_NO_EXISTE:     "bg-red-100 text-red-800",
@@ -11,7 +10,6 @@ const COLORES_RESULTADO = {
   CUENTA_BLOQUEADA:      "bg-orange-100 text-orange-800",
 }
 
-// Texto legible para cada resultado (en vez de mostrar "CREDENCIALES_INVALIDAS" en mayúsculas)
 const ETIQUETAS_RESULTADO = {
   EXITOSO:               "Exitoso",
   USUARIO_NO_EXISTE:     "Usuario no existe",
@@ -24,7 +22,6 @@ export default function TablaLogIntentos({ intentos }) {
   const [filtroResultado, setFiltroResultado] = useState("TODOS")
   const [busquedaUsuario, setBusquedaUsuario] = useState("")
 
-  // Filtrar los intentos según lo que el usuario seleccionó/escribió
   const intentosFiltrados = intentos.filter((intento) => {
     const cumpleResultado =
       filtroResultado === "TODOS" || intento.resultado === filtroResultado
@@ -33,21 +30,8 @@ export default function TablaLogIntentos({ intentos }) {
     return cumpleResultado && cumpleUsuario
   })
 
-  // Convierte "2026-05-13T14:35:00.000Z" en "13/05/2026 14:35:00"
-  const formatearFecha = (fechaISO) => {
-    const fecha    = new Date(fechaISO)
-    const dia      = fecha.getDate().toString().padStart(2, '0')
-    const mes      = (fecha.getMonth() + 1).toString().padStart(2, '0')
-    const anio     = fecha.getFullYear()
-    const horas    = fecha.getHours().toString().padStart(2, '0')
-    const minutos  = fecha.getMinutes().toString().padStart(2, '0')
-    const segundos = fecha.getSeconds().toString().padStart(2, '0')
-    return `${dia}/${mes}/${anio} ${horas}:${minutos}:${segundos}`
-  }
-
   return (
     <div>
-      {/* ===== FILTROS ===== */}
       <div className="flex flex-wrap gap-4 mb-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -80,12 +64,10 @@ export default function TablaLogIntentos({ intentos }) {
         </div>
       </div>
 
-      {/* ===== CONTADOR ===== */}
       <p className="text-sm text-gray-500 mb-2">
         Mostrando {intentosFiltrados.length} de {intentos.length} registros
       </p>
 
-      {/* ===== TABLA ===== */}
       <div className="overflow-x-auto bg-white rounded-lg shadow">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
@@ -108,7 +90,7 @@ export default function TablaLogIntentos({ intentos }) {
             {intentosFiltrados.map((intento) => (
               <tr key={intento.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-gray-600">
-                  {formatearFecha(intento.created_at)}
+                  {formatearFechaHora(intento.created_at)}
                 </td>
                 <td className="px-4 py-3 font-medium text-gray-800">
                   {intento.username}

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso, conAdmin } from "@/lib/api-helpers"
 import { normalizarEspecialidades } from "@/lib/personas"
+import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 
 export const PUT = conPermiso("PERSONAS", "puede_editar", async (request, { params }, session) => {
   const { id } = await params
@@ -47,7 +48,7 @@ export const PUT = conPermiso("PERSONAS", "puede_editar", async (request, { para
       apellido:            body.apellido.trim(),
       grado:               body.grado.trim(),
       nro_documento:       body.nro_documento.trim(),
-      fecha_nacimiento:    body.fecha_nacimiento ? new Date(body.fecha_nacimiento) : null,
+      fecha_nacimiento:    normalizarFechaSoloDia(body.fecha_nacimiento),
       escuadron:           body.escuadron,
       unidad:              body.unidad,
       especialidades:      especialidades.valor,

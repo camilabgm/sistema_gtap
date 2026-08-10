@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
+import { fechaSoloDiaAInputValue } from "@/lib/fechaSoloDia"
 
 const OPCIONES_ESPECIALIDAD = [
   { valor: "PILOTO",           etiqueta: "Piloto" },
@@ -19,8 +20,7 @@ export default function PersonasForm({ persona, onGuardado, onCerrar }) {
     apellido:            persona?.apellido            || "",
     grado:               persona?.grado               || "",
     nro_documento:       persona?.nro_documento       || "",
-    fecha_nacimiento:    persona?.fecha_nacimiento
-      ? new Date(persona.fecha_nacimiento).toISOString().slice(0, 10) : "",
+    fecha_nacimiento:    fechaSoloDiaAInputValue(persona?.fecha_nacimiento),
     escuadron:           persona?.escuadron           || "PLANA_MAYOR",
     unidad:              persona?.unidad              || "",
     especialidades:      persona?.especialidades      || [],

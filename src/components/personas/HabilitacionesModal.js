@@ -2,21 +2,19 @@
 // src/components/personas/HabilitacionesModal.js
 
 import { useState, useEffect } from "react"
+import { normalizarFechaSoloDia, formatearFechaSoloDia } from "@/lib/fechaSoloDia"
 
 // Calcula la fecha de vencimiento según período y año de inicio
 function calcularVencimiento(periodo, anio) {
   if (!periodo || !anio) return null
   const a = parseInt(anio)
-  if (periodo === "1P") return new Date(`${a}-09-30`)
-  if (periodo === "2P") return new Date(`${a + 1}-03-31`)
+  if (periodo === "1P") return normalizarFechaSoloDia(`${a}-09-30`)
+  if (periodo === "2P") return normalizarFechaSoloDia(`${a + 1}-03-31`)
   return null
 }
 
 function formatFecha(fecha) {
-  if (!fecha) return "—"
-  return new Date(fecha).toLocaleDateString("es-PY", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-  })
+  return formatearFechaSoloDia(fecha)
 }
 
 function badgeVencimiento(vence) {
@@ -34,14 +32,12 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
   const [cargandoDatos,      setCargandoDatos]       = useState(true)
   const [mostrarFormSemestral, setMostrarFormSemestral] = useState(false)
 
-  // Form para agregar período semestral
   const [nuevoPeriodo,       setNuevoPeriodo]        = useState("")
   const [nuevoAnio,          setNuevoAnio]           = useState("")
   const [nuevaFechaExamen,   setNuevaFechaExamen]    = useState("")
   const [guardandoSemestral, setGuardandoSemestral]  = useState(false)
   const [errorSemestral,     setErrorSemestral]      = useState("")
 
-  // Checkboxes de habilitaciones manuales
   const [anualHabilitada,    setAnualHabilitada]     = useState(persona.hab_anual_habilitada || false)
   const [operacionalHabilitada, setOperacionalHabilitada] = useState(persona.nivel_operacional_habilitado || false)
   const [guardandoCheck,     setGuardandoCheck]      = useState(false)
@@ -126,7 +122,6 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Encabezado */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-lg font-semibold text-gray-800">Control de Habilitaciones</h2>
@@ -139,7 +134,6 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
 
         <div className="px-6 py-5 space-y-6">
 
-          {/* Aviso de solo lectura para quien no es administrador */}
           {!esAdministrador && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
               <p className="text-xs text-gray-500">
@@ -148,13 +142,11 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
             </div>
           )}
 
-          {/* ── HABILITACIÓN MÉDICA ─────────────────────────── */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
               Habilitación médica
             </h3>
 
-            {/* Semestral */}
             <div className="border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-medium text-gray-700">Semestral</p>
@@ -168,7 +160,6 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
                 )}
               </div>
 
-              {/* Form para agregar período */}
               {esAdministrador && mostrarFormSemestral && (
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                   {errorSemestral && (
@@ -223,7 +214,6 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
                 </div>
               )}
 
-              {/* Historial */}
               {cargandoDatos ? (
                 <p className="text-xs text-gray-400 py-2">Cargando historial...</p>
               ) : habilitaciones.length === 0 ? (
@@ -267,7 +257,6 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
               )}
             </div>
 
-            {/* Anual */}
             <div className="border border-gray-200 rounded-lg p-4">
               <label className={`flex items-center gap-3 ${esAdministrador ? "cursor-pointer" : "cursor-not-allowed"}`}>
                 <input type="checkbox"
@@ -294,7 +283,6 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
             </div>
           </div>
 
-          {/* ── HABILITACIÓN OPERACIONAL ──────────────────────── */}
           <div>
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
               Habilitación operacional

@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
-
-function hoyComoFecha() {
-  const hoy = new Date()
-  return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
-}
+import { normalizarFechaSoloDia, hoyEnParaguay } from "@/lib/fechaSoloDia"
 
 export const GET = conPermiso("PERSONAS", "puede_ver", async (request, context, session) => {
   const { searchParams } = new URL(request.url)
   const fechaParam = searchParams.get("fecha")
-  const fecha = fechaParam ? new Date(fechaParam) : hoyComoFecha()
+  const fecha = fechaParam ? normalizarFechaSoloDia(fechaParam) : hoyEnParaguay()
 
   const novedades = await prisma.parteDiario.findMany({
     where: { fecha, deleted_at: null },
@@ -33,7 +29,7 @@ export const POST = conPermiso("PERSONAS", "puede_editar", async (request, conte
     return NextResponse.json({ error: "persona_id es obligatorio" }, { status: 400 })
   }
 
-  const fecha = hoyComoFecha()
+  const fecha = hoyEnParaguay()
 
   const novedad = await prisma.parteDiario.upsert({
     where:  { fecha_persona_id: { fecha, persona_id: parseInt(persona_id) } },

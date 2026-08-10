@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
 import { normalizarEspecialidades } from "@/lib/personas"
+import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 
 export const GET = conPermiso("PERSONAS", "puede_ver", async (request, context, session) => {
   const personas = await prisma.persona.findMany({
@@ -71,7 +72,7 @@ export const POST = conPermiso("PERSONAS", "puede_crear", async (request, contex
       apellido:            body.apellido.trim(),
       grado:               body.grado.trim(),
       nro_documento:       body.nro_documento.trim(),
-      fecha_nacimiento:    body.fecha_nacimiento ? new Date(body.fecha_nacimiento) : null,
+      fecha_nacimiento:    normalizarFechaSoloDia(body.fecha_nacimiento),
       escuadron:           body.escuadron,
       unidad:              body.unidad,
       especialidades:      especialidades.valor,

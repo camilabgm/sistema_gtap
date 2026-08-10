@@ -2,10 +2,11 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso, conAdmin } from "@/lib/api-helpers"
+import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 
 function calcularVencimiento(periodo, anio) {
-  if (periodo === "1P") return new Date(`${anio}-09-30`)
-  if (periodo === "2P") return new Date(`${anio + 1}-03-31`)
+  if (periodo === "1P") return normalizarFechaSoloDia(`${anio}-09-30`)
+  if (periodo === "2P") return normalizarFechaSoloDia(`${anio + 1}-03-31`)
   throw new Error("Período inválido")
 }
 
@@ -43,6 +44,7 @@ export const POST = conAdmin("HABILITACIONES_MEDICAS", async (request, context, 
   }
 
   const vence = calcularVencimiento(periodo, parseInt(anio))
+  const fechaExamenNormalizada = normalizarFechaSoloDia(fecha_examen)
 
   const existente = await prisma.habilitacionMedica.findUnique({
     where: {
@@ -65,7 +67,7 @@ export const POST = conAdmin("HABILITACIONES_MEDICAS", async (request, context, 
     const restaurado = await prisma.habilitacionMedica.update({
       where: { id: existente.id },
       data: {
-        fecha_examen: new Date(fecha_examen),
+        fecha_examen: fechaExamenNormalizada,
         vence,
         deleted_at:    null,
         eliminado_por: null,
@@ -80,7 +82,7 @@ export const POST = conAdmin("HABILITACIONES_MEDICAS", async (request, context, 
       persona_id:   parseInt(persona_id),
       periodo,
       anio:         parseInt(anio),
-      fecha_examen: new Date(fecha_examen),
+      fecha_examen: fechaExamenNormalizada,
       vence,
       creado_por:   session.user.id,
     },

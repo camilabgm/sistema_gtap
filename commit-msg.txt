@@ -1,6 +1,12 @@
-﻿feat: auditoria de permisos Escalas + Post-Vuelo (Capa 1 y Capa 2)
+﻿fix: bug de zona horaria en Personas, Habilitaciones y Parte Diario
 
-- api-helpers.js: agrega conCascada para endpoints gateados por esCargoDeCascada
-- Capa 2 (18 archivos route.js): estandariza a conPermiso/conAdmin/conCascada/conSesion
-- Capa 1 (7 archivos page.js): estandariza a tienePermiso() + SinPermisos
-- Sin bugs de permisos encontrados en el codigo existente
+- fechaSoloDia.js: agrega normalizarFechaSoloDia() y hoyEnParaguay(),
+  ademas de las funciones que ya existian (formatearFechaSoloDia,
+  fechaSoloDiaAInputValue)
+- fechaHora.js (nuevo): formatearFechaHora() para timestamps con hora
+  real (created_at/updated_at), mostrados en hora de Paraguay
+- Corrige HabilitacionMedica.vence, Persona.fecha_nacimiento y
+  ParteDiario.fecha para trabajar siempre en UTC (el bug las corria un
+  dia hacia atras en husos detras de UTC, como Paraguay)
+- Corrige TablaLogIntentos para mostrar la hora en zona de Paraguay
+  en vez de la hora del navegador de quien mira la pantalla
