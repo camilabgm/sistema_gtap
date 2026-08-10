@@ -1,17 +1,14 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
+import { tienePermiso } from "@/lib/permisos"
+import SinPermisos from "@/components/shared/SinPermisos"
 import FormularioEscala from "@/components/escalas/FormularioEscala"
 
 export default async function NuevaEscalaPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.permisos?.ESCALAS?.puede_crear) {
-    return (
-      <div className="p-8">
-        <h1 className="text-xl font-semibold text-gray-900">Sin permisos</h1>
-        <p className="mt-2 text-gray-600">No tenés permiso para crear escalas.</p>
-      </div>
-    )
+  if (!tienePermiso(session, "ESCALAS", "puede_crear")) {
+    return <SinPermisos mensaje="No tenés permiso para crear escalas." />
   }
 
   return <FormularioEscala />

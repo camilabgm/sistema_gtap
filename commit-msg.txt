@@ -1,54 +1,6 @@
-﻿feat: modulo Post-Vuelo completo, cascada de eliminacion, dashboard y acuse de recibo
+﻿feat: auditoria de permisos Escalas + Post-Vuelo (Capa 1 y Capa 2)
 
-Post-Vuelo (modulo nuevo):
-- Modelo PostVuelo con novedad (SIN_NOVEDAD/INCIDENTE/ACCIDENTE),
-  combustible, pasajeros, aterrizajes, horas de vuelo/tierra/total
-- Carga progresiva por tramo: hora real de salida/llegada en
-  EscalaItinerario, cualquiera de la tripulacion puede ir completando
-- Horas de vuelo/tierra/total calculadas SIEMPRE del lado del servidor,
-  sumando los tramos reales - nunca un input manual
-- Cierre final (destino real, combustible, pasajeros, novedad) solo
-  habilitado cuando todos los tramos ya tienen su hora real
-- Al guardar un tramo con post-vuelo ya cerrado, el cierre se
-  resincroniza solo en la misma operacion
-- Escala pasa a CUMPLIDA al cerrar el post-vuelo, vuelve a PROGRAMADA
-  si se elimina
-- Cola de Post-Vuelo (/dashboard/post-vuelo): lista solo lo que le
-  corresponde reportar a cada persona (tripulante o permiso amplio)
-- PostVuelo.escala_id ya no es @unique - permite multiples filas por
-  escala a lo largo del tiempo (solo una activa, sin deleted_at)
-
-Escalas - Eliminar:
-- Se saca la restriccion de estado (antes no dejaba borrar Autorizada/
-  Cumplida/Abortada) - ahora depende solo de ESCALAS.puede_eliminar,
-  segun la matriz de permisos
-- Borrado en cascada: al eliminar una Escala, se marcan como
-  eliminados tambien itinerarios, tripulacion, solicitudes,
-  autorizaciones, acuses y post-vuelo, todo en una sola transaccion
-
-Acuse de Recibo (nuevo):
-- Se crea automaticamente al autorizar una escala: un acuse por cada
-  tripulante (Piloto/Copiloto/Tecnico) y por quien tenga el Rol
-  "Supervisor de Semana" asignado en ese momento
-- Boton de "Acusar recibo" dentro del panel de detalle de la escala
-- Badge de pendientes en el sidebar, marcado especificamente en Agenda
-- Queda anotado en memoria: el checklist de Inspeccion Pre-vuelo
-  (firma fisica del Supervisor de Semana) es una pieza aparte,
-  diferida a Fase 2 - no bloquea este acuse liviano
-
-Dashboard:
-- Nueva seccion "Lo que te toca hacer" (acuses, post-vuelo,
-  autorizaciones pendientes) - solo aparece si hay algo pendiente
-- Personal activo y Alertas gateados por PERSONAS.puede_ver
-- Estado de modulos visible solo para ROLES_ADMIN, Post-Vuelo marcado
-  activo
-
-Fixes encontrados en el camino:
-- pendientes-autorizar/route.js no traia rol_en_vuelo ni solicitante
-  (mostraba "rol sin especificar" y solicitante vacio)
-- Filtrar relacion uno-a-uno con where en el select de Prisma tiraba
-  PrismaClientValidationError - se resolvio con consulta aparte
-- PanelDetalleEscala no distinguia error real de "no hay datos" al
-  cargar post-vuelo - quedaba en blanco sin avisar
-- Escala sin ningun tramo cargado rompia el panel de post-vuelo -
-  ahora muestra un aviso explicando que falta el itinerario
+- api-helpers.js: agrega conCascada para endpoints gateados por esCargoDeCascada
+- Capa 2 (18 archivos route.js): estandariza a conPermiso/conAdmin/conCascada/conSesion
+- Capa 1 (7 archivos page.js): estandariza a tienePermiso() + SinPermisos
+- Sin bugs de permisos encontrados en el codigo existente

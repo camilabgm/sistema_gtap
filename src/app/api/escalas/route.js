@@ -1,9 +1,8 @@
 // Destino: src/app/api/escalas/route.js
 
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
+import { conPermiso } from "@/lib/api-helpers"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
 import { validarCanalConArchivo } from "@/lib/validacionEscala"
 
@@ -14,97 +13,74 @@ function validarDatosSolicitud({ solicitante, fecha, canal, nombreArchivo }) {
   return validarCanalConArchivo(canal, nombreArchivo)
 }
 
-export async function GET(request) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-    if (!session.user.permisos?.ESCALAS?.puede_ver) {
-      return NextResponse.json({ error: "No tenés permiso para ver escalas" }, { status: 403 })
-    }
+export const GET = conPermiso("ESCALAS", "puede_ver", async (request, context, session) => {
+  const { searchParams } = new URL(request.url)
+  const desde = searchParams.get("desde")
+  const hasta = searchParams.get("hasta")
 
-    const { searchParams } = new URL(request.url)
-    const desde = searchParams.get("desde")
-    const hasta = searchParams.get("hasta")
-
-    const where = { deleted_at: null }
-    if (desde && hasta) {
-      const fechaDesde = new Date(desde)
-      const fechaHasta = new Date(hasta)
-      if (isNaN(fechaDesde.getTime()) || isNaN(fechaHasta.getTime())) {
-        return NextResponse.json({ error: "Fechas de filtro inválidas" }, { status: 400 })
-      }
-
-      const finDelRango = new Date(fechaHasta)
-      finDelRango.setUTCHours(23, 59, 59, 999)
-
-      where.es_borrador = false
-      where.OR = [
-        { fecha: { gte: fechaDesde, lte: fechaHasta } },
-        {
-          hora_despegue_estimada: { lte: finDelRango },
-          hora_arribo_estimada: { gte: fechaDesde },
-        },
-      ]
+  const where = { deleted_at: null }
+  if (desde && hasta) {
+    const fechaDesde = new Date(desde)
+    const fechaHasta = new Date(hasta)
+    if (isNaN(fechaDesde.getTime()) || isNaN(fechaHasta.getTime())) {
+      return NextResponse.json({ error: "Fechas de filtro inválidas" }, { status: 400 })
     }
 
-    const escalas = await prisma.escala.findMany({
-      where,
-      orderBy: [{ fecha: "asc" }, { hora_despegue_estimada: "asc" }],
-      select: {
-        id: true,
-        nro_orden: true,
-        fecha: true,
-        hora_despegue_estimada: true,
-        hora_arribo_estimada: true,
-        solicitante: true,
-        estado: true,
-        es_borrador: true,
-        autorizada: true,
-        motivo_abortada: true,
-        observacion_aborto: true,
-        motivo_rechazo: true,
-        // NUEVO: necesario para poder ordenar Gestión de Escalas por
-        // "último tocado" (creado o editado) en vez de por fecha de misión.
-        updated_at: true,
-        aeronave: { select: { matricula: true } },
-        tipo_mision: { select: { codigo: true, nombre: true } },
-        itinerarios: {
-          where: { deleted_at: null },
-          orderBy: { orden: "asc" },
-          select: { orden: true, origen: true, destino: true },
-        },
-        tripulacion: {
-          where: { deleted_at: null },
-          select: {
-            rol_en_vuelo: true,
-            persona: { select: { grado: true, apellido: true } },
-          },
+    const finDelRango = new Date(fechaHasta)
+    finDelRango.setUTCHours(23, 59, 59, 999)
+
+    where.es_borrador = false
+    where.OR = [
+      { fecha: { gte: fechaDesde, lte: fechaHasta } },
+      {
+        hora_despegue_estimada: { lte: finDelRango },
+        hora_arribo_estimada: { gte: fechaDesde },
+      },
+    ]
+  }
+
+  const escalas = await prisma.escala.findMany({
+    where,
+    orderBy: [{ fecha: "asc" }, { hora_despegue_estimada: "asc" }],
+    select: {
+      id: true,
+      nro_orden: true,
+      fecha: true,
+      hora_despegue_estimada: true,
+      hora_arribo_estimada: true,
+      solicitante: true,
+      estado: true,
+      es_borrador: true,
+      autorizada: true,
+      motivo_abortada: true,
+      observacion_aborto: true,
+      motivo_rechazo: true,
+      updated_at: true,
+      aeronave: { select: { matricula: true } },
+      tipo_mision: { select: { codigo: true, nombre: true } },
+      itinerarios: {
+        where: { deleted_at: null },
+        orderBy: { orden: "asc" },
+        select: { orden: true, origen: true, destino: true },
+      },
+      tripulacion: {
+        where: { deleted_at: null },
+        select: {
+          rol_en_vuelo: true,
+          persona: { select: { grado: true, apellido: true } },
         },
       },
-    })
+    },
+  })
 
-    return NextResponse.json(escalas)
-  } catch (error) {
-    console.error("Error GET escalas:", error)
-    return NextResponse.json({ error: "Error interno al listar las escalas" }, { status: 500 })
-  }
-}
+  return NextResponse.json(escalas)
+})
 
-export async function POST(request) {
+export const POST = conPermiso("ESCALAS", "puede_crear", async (request, context, session) => {
   let escalaCreada = null
   let rutaGuardada = null
 
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-    if (!session.user.permisos?.ESCALAS?.puede_crear) {
-      return NextResponse.json({ error: "No tenés permiso para crear escalas" }, { status: 403 })
-    }
-
     const formData = await request.formData()
     const solicitante   = formData.get("solicitante")
     const fecha         = formData.get("fecha")
@@ -158,7 +134,7 @@ export async function POST(request) {
 
     return NextResponse.json(escalaCreada, { status: 201 })
   } catch (error) {
-    console.error("Error POST escalas:", error)
+    console.error("Error interno POST escalas:", error)
 
     if (rutaGuardada) {
       await borrarArchivoSolicitud(rutaGuardada).catch(() => {})
@@ -169,4 +145,4 @@ export async function POST(request) {
 
     return NextResponse.json({ error: "Error interno al crear la escala" }, { status: 500 })
   }
-}
+})

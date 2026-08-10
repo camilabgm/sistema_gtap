@@ -2,14 +2,11 @@
 //
 // GET    /api/escalas/<id>     → detalle completo, para precargar edición
 // PUT    /api/escalas/<id>     → completa el borrador
-// DELETE /api/escalas/<id>     → borrado lógico EN CASCADA. Depende
-//                                 únicamente de ESCALAS.puede_eliminar
-//                                 — sin restricción de estado.
+// DELETE /api/escalas/<id>     → borrado lógico EN CASCADA
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/auth"
+import { conPermiso } from "@/lib/api-helpers"
 import { calcularVentana, verificarAeronave, verificarTripulante } from "@/lib/disponibilidad"
 import { parsearSubtipos } from "@/lib/tiposMision"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
@@ -26,98 +23,77 @@ import {
   validarCanalConArchivo,
 } from "@/lib/validacionEscala"
 
-export async function GET(request, { params }) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-    if (!session.user.permisos?.ESCALAS?.puede_ver) {
-      return NextResponse.json({ error: "No tenés permiso para ver escalas" }, { status: 403 })
-    }
+export const GET = conPermiso("ESCALAS", "puede_ver", async (request, context, session) => {
+  const { id } = await context.params
+  const escalaId = parseInt(id, 10)
+  if (!Number.isInteger(escalaId) || escalaId <= 0) {
+    return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
+  }
 
-    const { id } = await params
-    const escalaId = parseInt(id, 10)
-    if (!Number.isInteger(escalaId) || escalaId <= 0) {
-      return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
-    }
-
-    const escala = await prisma.escala.findFirst({
-      where: { id: escalaId, deleted_at: null },
-      select: {
-        id: true,
-        nro_orden: true,
-        fecha: true,
-        es_borrador: true,
-        estado: true,
-        autorizada: true,
-        rol_autoriza: true,
-        fecha_autorizacion: true,
-        rechazada_por: true,
-        motivo_rechazo: true,
-        fecha_rechazo: true,
-        hora_despegue_estimada: true,
-        hora_arribo_estimada: true,
-        solicitante: true,
-        observaciones: true,
-        subtipo_elegido: true,
-        aeronave_id: true,
-        aeronave: { select: { id: true, matricula: true, tipo: true } },
-        tipo_mision_id: true,
-        tipo_mision: {
-          select: { id: true, codigo: true, nombre: true, tiene_subtipo: true, subtipo: true },
-        },
-        itinerarios: {
-          where: { deleted_at: null },
-          orderBy: { orden: "asc" },
-          select: {
-            id: true,
-            orden: true,
-            origen: true,
-            destino: true,
-            hora_estimada_salida: true,
-            hora_estimada_llegada: true,
-          },
-        },
-        tripulacion: {
-          where: { deleted_at: null },
-          select: {
-            persona_id: true,
-            rol_en_vuelo: true,
-            persona: { select: { id: true, nombre: true, apellido: true, grado: true } },
-          },
-        },
-        solicitudes: {
-          orderBy: { fecha_recepcion: "asc" },
-          take: 1,
-          select: { id: true, canal: true, archivo: true, nombre_archivo_original: true, fecha_recepcion: true },
+  const escala = await prisma.escala.findFirst({
+    where: { id: escalaId, deleted_at: null },
+    select: {
+      id: true,
+      nro_orden: true,
+      fecha: true,
+      es_borrador: true,
+      estado: true,
+      autorizada: true,
+      rol_autoriza: true,
+      fecha_autorizacion: true,
+      rechazada_por: true,
+      motivo_rechazo: true,
+      fecha_rechazo: true,
+      hora_despegue_estimada: true,
+      hora_arribo_estimada: true,
+      solicitante: true,
+      observaciones: true,
+      subtipo_elegido: true,
+      aeronave_id: true,
+      aeronave: { select: { id: true, matricula: true, tipo: true } },
+      tipo_mision_id: true,
+      tipo_mision: {
+        select: { id: true, codigo: true, nombre: true, tiene_subtipo: true, subtipo: true },
+      },
+      itinerarios: {
+        where: { deleted_at: null },
+        orderBy: { orden: "asc" },
+        select: {
+          id: true,
+          orden: true,
+          origen: true,
+          destino: true,
+          hora_estimada_salida: true,
+          hora_estimada_llegada: true,
         },
       },
-    })
-    if (!escala) {
-      return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
-    }
-
-    return NextResponse.json(escala)
-  } catch (error) {
-    console.error("Error GET escala:", error)
-    return NextResponse.json({ error: "Error interno al obtener la escala" }, { status: 500 })
+      tripulacion: {
+        where: { deleted_at: null },
+        select: {
+          persona_id: true,
+          rol_en_vuelo: true,
+          persona: { select: { id: true, nombre: true, apellido: true, grado: true } },
+        },
+      },
+      solicitudes: {
+        orderBy: { fecha_recepcion: "asc" },
+        take: 1,
+        select: { id: true, canal: true, archivo: true, nombre_archivo_original: true, fecha_recepcion: true },
+      },
+    },
+  })
+  if (!escala) {
+    return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
   }
-}
 
-export async function PUT(request, { params }) {
+  return NextResponse.json(escala)
+})
+
+export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context, session) => {
   let rutaGuardadaNueva = null
 
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-    if (!session.user.permisos?.ESCALAS?.puede_editar) {
-      return NextResponse.json({ error: "No tenés permiso para editar escalas" }, { status: 403 })
-    }
-
-    const { id } = await params
+    const { id } = await context.params
     const escalaId = parseInt(id, 10)
     if (!Number.isInteger(escalaId) || escalaId <= 0) {
       return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
@@ -362,7 +338,7 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json(actualizada)
   } catch (error) {
-    console.error("Error PUT escalas:", error)
+    console.error("Error interno PUT escalas:", error)
     if (rutaGuardadaNueva) {
       await borrarArchivoSolicitud(rutaGuardadaNueva).catch(() => {})
     }
@@ -371,58 +347,37 @@ export async function PUT(request, { params }) {
     }
     return NextResponse.json({ error: "Error interno al completar la escala" }, { status: 500 })
   }
-}
+})
 
 // DELETE — borrado lógico EN CASCADA. Depende únicamente del permiso
-// ESCALAS.puede_eliminar de la matriz — sin ninguna restricción de
-// estado (antes no se podía borrar algo Autorizado/Cumplido/Abortado;
-// eso se sacó a pedido explícito: la matriz ya define los 5 grupos
-// habilitados, igual que para crear/editar/ver).
-//
-// Borra la Escala Y todos sus hijos (itinerarios, tripulación,
-// solicitudes, autorizaciones, acuses, post-vuelo) en la misma
-// transacción — para que no queden registros sueltos apuntando a una
-// escala que ya no existe.
-export async function DELETE(request, { params }) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-    if (!session.user.permisos?.ESCALAS?.puede_eliminar) {
-      return NextResponse.json({ error: "No tenés permiso para eliminar escalas" }, { status: 403 })
-    }
-
-    const { id } = await params
-    const escalaId = parseInt(id, 10)
-    if (!Number.isInteger(escalaId) || escalaId <= 0) {
-      return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
-    }
-
-    const escala = await prisma.escala.findFirst({
-      where: { id: escalaId, deleted_at: null },
-      select: { id: true },
-    })
-    if (!escala) {
-      return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
-    }
-
-    await prisma.$transaction(async (tx) => {
-      const ahora = new Date()
-      const dataBorrado = { deleted_at: ahora, eliminado_por: session.user.id }
-
-      await tx.escala.update({ where: { id: escalaId }, data: dataBorrado })
-      await tx.escalaItinerario.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
-      await tx.escalaTripulacion.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
-      await tx.solicitud.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
-      await tx.escalaAutorizacion.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
-      await tx.acuseRecibo.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
-      await tx.postVuelo.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
-    })
-
-    return NextResponse.json({ ok: true })
-  } catch (error) {
-    console.error("Error DELETE escala:", error)
-    return NextResponse.json({ error: "Error interno al eliminar la escala" }, { status: 500 })
+// ESCALAS.puede_eliminar — sin ninguna restricción de estado.
+export const DELETE = conPermiso("ESCALAS", "puede_eliminar", async (request, context, session) => {
+  const { id } = await context.params
+  const escalaId = parseInt(id, 10)
+  if (!Number.isInteger(escalaId) || escalaId <= 0) {
+    return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
   }
-}
+
+  const escala = await prisma.escala.findFirst({
+    where: { id: escalaId, deleted_at: null },
+    select: { id: true },
+  })
+  if (!escala) {
+    return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const ahora = new Date()
+    const dataBorrado = { deleted_at: ahora, eliminado_por: session.user.id }
+
+    await tx.escala.update({ where: { id: escalaId }, data: dataBorrado })
+    await tx.escalaItinerario.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+    await tx.escalaTripulacion.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+    await tx.solicitud.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+    await tx.escalaAutorizacion.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+    await tx.acuseRecibo.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+    await tx.postVuelo.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+  })
+
+  return NextResponse.json({ ok: true })
+})

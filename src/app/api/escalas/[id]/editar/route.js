@@ -1,34 +1,10 @@
 // Destino: src/app/api/escalas/[id]/editar/route.js
 //
-// PUT /api/escalas/<id>/editar
-//
-// Edita una escala YA PUBLICADA (es_borrador: false). Cualquier cambio
-// la manda de nuevo a autorización completa — no hay campos "livianos"
-// que se salteen la re-autorización.
-//
-// Qué hace, en orden:
-//   1. Verifica que la escala esté en un estado editable y que todavía
-//      no haya pasado la hora estimada de despegue.
-//   2. Valida y aplica los cambios (helpers compartidos con completar-borrador).
-//   3. Resetea la autorización: autorizada, autorizada_por, rol_autoriza
-//      y fecha_autorizacion vuelven a su estado inicial. Si estaba
-//      RECHAZADA, vuelve a PROGRAMADA y limpia rechazada_por/
-//      motivo_rechazo/fecha_rechazo.
-//   4. Borra los acuses de recibo existentes.
-//
-// Sobre canal/archivo: el frontend reenvía SIEMPRE el canal actual
-// (es un <select> controlado), aunque no lo estés tocando. Por eso la
-// validación de canal↔archivo solo se dispara si el canal REALMENTE
-// cambió respecto al que ya tenía la Solicitud, o si subiste un archivo
-// nuevo — nunca solo porque el campo vino en el body. Sin esto, una
-// escala con un desajuste viejo (de antes de la validación estricta)
-// queda imposible de editar para NADA, aunque solo quieras cambiar el
-// Nro. de orden.
+// PUT /api/escalas/<id>/editar — edita una escala YA PUBLICADA.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/auth"
+import { conPermiso } from "@/lib/api-helpers"
 import { calcularVentana, verificarAeronave, verificarTripulante } from "@/lib/disponibilidad"
 import { parsearSubtipos } from "@/lib/tiposMision"
 import { puedeEditarAhora, yaPasoLaHora, ESTADOS_EDITABLES_PUBLICADA } from "@/lib/escalas"
@@ -46,19 +22,11 @@ import {
   validarCanalConArchivo,
 } from "@/lib/validacionEscala"
 
-export async function PUT(request, { params }) {
+export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context, session) => {
   let rutaGuardadaNueva = null
 
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-    if (!session.user.permisos?.ESCALAS?.puede_editar) {
-      return NextResponse.json({ error: "No tenés permiso para editar escalas" }, { status: 403 })
-    }
-
-    const { id } = await params
+    const { id } = await context.params
     const escalaId = parseInt(id, 10)
     if (!Number.isInteger(escalaId) || escalaId <= 0) {
       return NextResponse.json({ error: "Id de escala inválido" }, { status: 400 })
@@ -100,8 +68,6 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // Capturado ANTES de la transacción, sobre el dato original — el
-    // reset de estado más abajo depende de saber si venía de RECHAZADA.
     const veniaDeRechazada = escala.estado === "RECHAZADA"
 
     const solicitudActual = await prisma.solicitud.findFirst({
@@ -164,12 +130,6 @@ export async function PUT(request, { params }) {
     const canalEfectivo = canalTocado ? canalValor : (solicitudActual?.canal ?? null)
     const nombreArchivoEfectivo = hayArchivoNuevo ? archivoNuevo.name : solicitudActual?.archivo
 
-    // FIX: antes se revalidaba SIEMPRE que hubiera solicitudActual, sin
-    // importar si el canal realmente cambió — como el frontend reenvía
-    // el mismo canal en cada guardado, esto bloqueaba cualquier edición
-    // (aunque no tocara canal/archivo) si había un desajuste viejo entre
-    // canal y archivo cargado antes de la validación estricta. Ahora
-    // solo se revalida si el canal cambió de verdad o si hay archivo nuevo.
     const canalRealmenteCambio = canalTocado && canalValor !== solicitudActual?.canal
     if (solicitudActual && (canalRealmenteCambio || hayArchivoNuevo)) {
       const errCanal = validarCanalConArchivo(canalEfectivo, nombreArchivoEfectivo)
@@ -272,7 +232,6 @@ export async function PUT(request, { params }) {
     const actualizada = await prisma.$transaction(async (tx) => {
       const dataEscala = {
         editado_por: session.user.id,
-        // Reset de autorización — el corazón de la re-autorización.
         autorizada: false,
         autorizada_por: null,
         rol_autoriza: null,
@@ -345,8 +304,6 @@ export async function PUT(request, { params }) {
         await tx.solicitud.update({ where: { id: solicitudActual.id }, data: dataSolicitud })
       }
 
-      // Reset de acuses de recibo — todos los involucrados vuelven a
-      // tener que confirmar que vieron la versión actualizada.
       await tx.acuseRecibo.deleteMany({ where: { escala_id: escalaId } })
 
       return tx.escala.update({ where: { id: escalaId }, data: dataEscala })
@@ -358,7 +315,7 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json(actualizada)
   } catch (error) {
-    console.error("Error PUT editar escala:", error)
+    console.error("Error interno PUT editar escala:", error)
     if (rutaGuardadaNueva) {
       await borrarArchivoSolicitud(rutaGuardadaNueva).catch(() => {})
     }
@@ -367,4 +324,4 @@ export async function PUT(request, { params }) {
     }
     return NextResponse.json({ error: "Error interno al editar la escala" }, { status: 500 })
   }
-}
+})

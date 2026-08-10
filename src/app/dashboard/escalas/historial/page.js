@@ -1,23 +1,20 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
+import { tienePermiso } from "@/lib/permisos"
+import SinPermisos from "@/components/shared/SinPermisos"
 import HistorialEscalas from "@/components/escalas/HistorialEscalas"
 
 export default async function HistorialEscalasPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.permisos?.ESCALAS?.puede_ver) {
-    return (
-      <div className="p-8">
-        <h1 className="text-xl font-semibold text-gray-900">Sin permisos</h1>
-        <p className="mt-2 text-gray-600">No tenés permiso para ver escalas.</p>
-      </div>
-    )
+  if (!tienePermiso(session, "ESCALAS", "puede_ver")) {
+    return <SinPermisos mensaje="No tenés permiso para ver escalas." />
   }
 
   return (
     <HistorialEscalas
-      puedeEditar={!!session.user.permisos?.ESCALAS?.puede_editar}
-      puedeEliminar={!!session.user.permisos?.ESCALAS?.puede_eliminar}
+      puedeEditar={tienePermiso(session, "ESCALAS", "puede_editar")}
+      puedeEliminar={tienePermiso(session, "ESCALAS", "puede_eliminar")}
     />
   )
 }
