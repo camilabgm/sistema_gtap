@@ -329,9 +329,18 @@ export default function PendientesAutorizar() {
               {pendientes.escalas.length === 0 ? (
                 <p className="text-sm text-gray-600">No hay ninguna escala esperando autorización.</p>
               ) : pendientes.podesActuar ? (
-                <p className="text-sm font-medium text-blue-800">
-                  Tenés {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} para autorizar.
-                </p>
+                <div>
+                  <p className="text-sm font-medium text-blue-800">
+                    Tenés {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} para autorizar
+                    {pendientes.autorizanteActivo &&
+                      ` (como ${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}.
+                  </p>
+                  {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
+                    <p className="text-xs text-blue-700 mt-1">
+                      {textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div>
                   <p className="text-sm text-gray-700">

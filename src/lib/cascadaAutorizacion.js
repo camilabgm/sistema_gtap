@@ -9,10 +9,18 @@
 // ninguno de los dos sirve, se pasa al siguiente cargo.
 //
 // Para cada posición se hacen hasta tres chequeos, en este orden:
-//   1) Para titular Y adjunto: ¿la cuenta de Usuario está activa? Si
-//      quedó desactivada (sin que nadie haya actualizado
-//      CargoAutorizacion a mano), no puede seguir teniendo potestad de
-//      autorizar.
+//   1) Para titular Y adjunto: ¿la cuenta de Usuario está activa, Y la
+//      Persona detrás de esa cuenta también? CargoAutorizacion ya
+//      impide asignar a alguien inactivo DESDE el vamos (ver
+//      cargos-autorizacion/route.js) — este chequeo cubre el caso
+//      posterior: alguien que estaba bien asignado y DESPUÉS quedó
+//      inactivo, sea porque se le restringió el acceso puntualmente, o
+//      porque directamente causó baja del GTAP. Las dos causas
+//      terminan en el mismo resultado (no puede autorizar), así que
+//      comparten un solo motivo — no hace falta distinguirlas.
+//      Se mira también persona.activo, no solo usuario.activo, como
+//      red de seguridad ante datos de antes del fix que hace que
+//      desactivar una Persona cascada a su Usuario (personas/[id]/route.js).
 //   2) SOLO para el TITULAR (orden 1): ¿su Rol actual todavía
 //      corresponde a este cargo? El ADJUNTO no tiene este chequeo — su
 //      Rol nunca tiene por qué coincidir con el nombre del cargo (su
@@ -61,6 +69,7 @@ async function evaluarPosicion(rol, orden) {
           persona_id: true,
           activo: true,
           rol: { select: { nombre: true } },
+          persona: { select: { activo: true } },
         },
       },
     },
@@ -75,10 +84,10 @@ async function evaluarPosicion(rol, orden) {
   const nombreRolActual = cargo.usuario.rol?.nombre ?? null
 
   // Chequeo 1 (el más barato, y aplica a titular Y adjunto por igual):
-  // ¿la cuenta de Usuario sigue activa? Si alguien fue desvinculado del
-  // sistema sin que se actualizara CargoAutorizacion a mano, no puede
-  // seguir teniendo potestad de autorizar.
-  if (!cargo.usuario.activo) {
+  // ¿la cuenta de Usuario sigue activa, Y la Persona detrás también?
+  // Cubre tanto "le restringieron el acceso puntualmente" como "causó
+  // baja del GTAP" — las dos terminan en el mismo resultado.
+  if (!cargo.usuario.activo || !cargo.usuario.persona.activo) {
     return { resultado: "SALTAR", motivo: "CUENTA_INACTIVA", personaId }
   }
 

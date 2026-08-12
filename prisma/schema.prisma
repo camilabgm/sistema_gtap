@@ -174,7 +174,6 @@ model Persona {
   eliminado_por Int?
 
   usuario                Usuario?
-  historial_grados       HistorialGrado[]
   partes_diarios         ParteDiario[]
   habilitaciones_medicas HabilitacionMedica[]
 
@@ -207,25 +206,6 @@ model HabilitacionMedica {
   // No se puede cargar dos veces el mismo período para la misma persona
   @@unique([persona_id, periodo, anio])
   @@map("habilitaciones_medicas")
-}
-
-model HistorialGrado {
-  id          Int       @id @default(autoincrement())
-  grado       String
-  fecha_desde DateTime
-  fecha_hasta DateTime?
-
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
-  deleted_at    DateTime?
-  creado_por    Int?
-  editado_por   Int?
-  eliminado_por Int?
-
-  persona    Persona @relation(fields: [persona_id], references: [id])
-  persona_id Int
-
-  @@map("historial_grados")
 }
 
 model Rol {
