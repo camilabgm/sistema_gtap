@@ -84,8 +84,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     const solicitanteRes = normalizarSolicitante(solicitanteRaw === null ? undefined : solicitanteRaw)
     if (solicitanteRes.error) return NextResponse.json({ error: solicitanteRes.error }, { status: 400 })
 
-    // fecha_recepcion de la Solicitud — mismo patrón "tocado" que canal.
-    // Escala.fecha (la del vuelo) ya NO se lee del formData.
     const fechaRecepcionRaw = formData.get("fecha_recepcion")
     const fechaRecepcionRes = normalizarFecha(fechaRecepcionRaw === null ? undefined : fechaRecepcionRaw)
     if (fechaRecepcionRes.error) return NextResponse.json({ error: fechaRecepcionRes.error }, { status: 400 })
@@ -242,9 +240,14 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     const actualizada = await prisma.$transaction(async (tx) => {
       const dataEscala = {
         editado_por: session.user.id,
+        // Reset de autorización — el corazón de la re-autorización. Se
+        // suma orden_autorizante al mismo reset: si no, quedaría el
+        // valor de la autorización/rechazo anterior pegado a una escala
+        // que todavía nadie volvió a resolver.
         autorizada: false,
         autorizada_por: null,
         rol_autoriza: null,
+        orden_autorizante: null,
         fecha_autorizacion: null,
       }
 

@@ -115,6 +115,7 @@ enum MotivoEscalamiento {
   ROL_DESACTUALIZADO // el anterior sigue cargado en CargoAutorizacion, pero su Rol ya cambió
   SIN_ASIGNAR // este cargo no tiene a nadie cargado (ni titular ni adjunto)
   REAUTORIZACION // la escala fue editada después de publicada y vuelve a recorrer la cascada desde cero
+  CUENTA_INACTIVA
 }
 
 enum MotivoNoDisponibleAutorizador {
@@ -436,6 +437,9 @@ model Escala {
   autorizada_por     Int?
   rol_autoriza       RolAutorizador?
   fecha_autorizacion DateTime?
+  // Titular (1) o adjunto (2) de rol_autoriza, en el momento de
+  // autorizar O rechazar. Null en escalas resueltas antes de este campo.
+  orden_autorizante  Int?
 
   // Resultado si el autorizante decide RECHAZAR en vez de autorizar —
   // distinto de "abortada" (eso es sobre la aeronave/tripulación en el
@@ -553,6 +557,9 @@ model EscalaAutorizacion {
   // A quién le tocó la responsabilidad en este paso, y por qué le tocó
   rol_autorizador     RolAutorizador
   persona_id          Int? // la persona concreta que tenía ese rol ese día
+  // Titular (1) o adjunto (2) del cargo, en el momento en que se evaluó
+  // este paso. Null en filas viejas, de antes de este campo.
+  orden               Int?
   motivo_escalamiento MotivoEscalamiento
 
   // Qué pasó en este paso: ¿autorizó acá, o se le pasó al siguiente?

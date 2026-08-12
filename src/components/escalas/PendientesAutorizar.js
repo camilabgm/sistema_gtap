@@ -17,6 +17,37 @@ const ETIQUETAS_MOTIVO_DERIVACION = {
   OTRO: "Otro",
 }
 
+// Título del cargo, aclarando si quien lo ocupa ahora es el titular o
+// el adjunto — orden 2 = adjunto, cualquier otro valor (1, o ausente en
+// datos viejos) se muestra como titular sin aclaración.
+function etiquetaAutorizante(rolAutorizador, orden) {
+  if (!rolAutorizador) return null
+  const base = rolAutorizador.replace(/_/g, " ")
+  return orden === 2 ? `Adjunto de ${base}` : base
+}
+
+// Por qué la responsabilidad de autorizar llegó hasta el cargo/persona
+// activa, en vez de quedarse en el titular de base (Jefe de
+// Operaciones). INICIAL no tiene texto — significa que nadie fue
+// salteado, no hay nada que explicar.
+const ETIQUETAS_MOTIVO_ESCALAMIENTO = {
+  EN_VUELO: "estaba de vuelo",
+  PARTE_DIARIO: "tenía una novedad en el Parte Diario",
+  DERIVACION_MANUAL: "había derivado su autorización",
+  ROL_DESACTUALIZADO: "su Rol ya no corresponde a este cargo",
+  CUENTA_INACTIVA: "tiene la cuenta desactivada",
+  SIN_ASIGNAR: "no tiene a nadie asignado en este cargo",
+  REAUTORIZACION: "la escala volvió a autorización después de editarse",
+}
+
+function textoMotivoEscalamiento(motivo) {
+  if (!motivo || motivo === "INICIAL") return null
+  const descripcion = ETIQUETAS_MOTIVO_ESCALAMIENTO[motivo]
+  return descripcion
+    ? `Se saltó al responsable de base porque ${descripcion}.`
+    : null
+}
+
 export default function PendientesAutorizar() {
   const [tab, setTab] = useState("PENDIENTES") // "PENDIENTES" | "AUTORIZADAS"
 
@@ -302,14 +333,22 @@ export default function PendientesAutorizar() {
                   Tenés {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} para autorizar.
                 </p>
               ) : (
-                <p className="text-sm text-gray-700">
-                  Le corresponde autorizar a{" "}
-                  <span className="font-medium">
-                    {pendientes.autorizanteActivo?.nombre || "nadie disponible en este momento"}
-                  </span>
-                  {pendientes.autorizanteActivo && ` (${pendientes.autorizanteActivo.rol_autorizador.replace(/_/g, " ")})`}.
-                  {" "}Hay {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} esperando.
-                </p>
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Le corresponde autorizar a{" "}
+                    <span className="font-medium">
+                      {pendientes.autorizanteActivo?.nombre || "nadie disponible en este momento"}
+                    </span>
+                    {pendientes.autorizanteActivo &&
+                      ` (${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}.
+                    {" "}Hay {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} esperando.
+                  </p>
+                  {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
@@ -429,7 +468,7 @@ export default function PendientesAutorizar() {
                 </p>
                 {e.autorizada ? (
                   <p className="text-xs text-gray-500 mt-1">
-                    Autorizada por {e.autorizada_por_nombre} ({e.rol_autoriza?.replace(/_/g, " ")}) el {formatearFechaHora(e.fecha_autorizacion)}
+                    Autorizada por {e.autorizada_por_nombre} ({etiquetaAutorizante(e.rol_autoriza, e.orden_autorizante)}) el {formatearFechaHora(e.fecha_autorizacion)}
                   </p>
                 ) : (
                   <>

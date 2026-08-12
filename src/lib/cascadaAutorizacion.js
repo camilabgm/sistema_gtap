@@ -8,17 +8,22 @@
 // primero el TITULAR (orden 1), después el ADJUNTO (orden 2). Recién si
 // ninguno de los dos sirve, se pasa al siguiente cargo.
 //
-// Para cada posición se hacen hasta dos chequeos, en este orden:
-//   1) SOLO para el TITULAR (orden 1): ¿su Rol actual todavía
+// Para cada posición se hacen hasta tres chequeos, en este orden:
+//   1) Para titular Y adjunto: ¿la cuenta de Usuario está activa? Si
+//      quedó desactivada (sin que nadie haya actualizado
+//      CargoAutorizacion a mano), no puede seguir teniendo potestad de
+//      autorizar.
+//   2) SOLO para el TITULAR (orden 1): ¿su Rol actual todavía
 //      corresponde a este cargo? El ADJUNTO no tiene este chequeo — su
 //      Rol nunca tiene por qué coincidir con el nombre del cargo (su
 //      Rol refleja su función real: Piloto, Copiloto, General, etc.),
 //      así que evaluarlo por Rol lo descartaría siempre, sin importar
 //      si está disponible o no.
-//   2) Para titular Y adjunto: ¿está disponible ahora mismo? (en vuelo
+//   3) Para titular Y adjunto: ¿está disponible ahora mismo? (en vuelo
 //      / parte diario / derivación)
 //
-// Se usa al publicar una escala.
+// Se usa al publicar una escala, y para calcular quién puede
+// autorizar/rechazar en cualquier momento posterior.
 
 import prisma from "@/lib/prisma"
 import { estaDisponibleAhora } from "@/lib/disponibilidad"
@@ -43,8 +48,8 @@ export const CASCADA_AUTORIZACION = [
 //     → esta persona sirve, es el autorizante.
 //   { resultado: "SALTAR", motivo, personaId }
 //     → hay alguien cargado, pero no sirve ahora mismo (motivo:
-//       ROL_DESACTUALIZADO — solo titular —, EN_VUELO, PARTE_DIARIO o
-//       DERIVACION_MANUAL).
+//       CUENTA_INACTIVA, ROL_DESACTUALIZADO — solo titular —, EN_VUELO,
+//       PARTE_DIARIO o DERIVACION_MANUAL).
 //   { resultado: "SIN_ASIGNAR", personaId: null }
 //     → no hay nadie cargado en esta posición para este cargo.
 async function evaluarPosicion(rol, orden) {
@@ -54,6 +59,7 @@ async function evaluarPosicion(rol, orden) {
       usuario: {
         select: {
           persona_id: true,
+          activo: true,
           rol: { select: { nombre: true } },
         },
       },
@@ -68,15 +74,23 @@ async function evaluarPosicion(rol, orden) {
   const personaId = cargo.usuario.persona_id
   const nombreRolActual = cargo.usuario.rol?.nombre ?? null
 
-  // Chequeo 1 (barato): ¿su Rol actual todavía corresponde a este cargo?
-  // SOLO aplica al titular (orden 1) — el adjunto nunca tiene un Rol que
+  // Chequeo 1 (el más barato, y aplica a titular Y adjunto por igual):
+  // ¿la cuenta de Usuario sigue activa? Si alguien fue desvinculado del
+  // sistema sin que se actualizara CargoAutorizacion a mano, no puede
+  // seguir teniendo potestad de autorizar.
+  if (!cargo.usuario.activo) {
+    return { resultado: "SALTAR", motivo: "CUENTA_INACTIVA", personaId }
+  }
+
+  // Chequeo 2: ¿su Rol actual todavía corresponde a este cargo? SOLO
+  // aplica al titular (orden 1) — el adjunto nunca tiene un Rol que
   // deba coincidir con el nombre del cargo, así que este chequeo no le
-  // corresponde y se salta directo al Chequeo 2.
+  // corresponde y se salta directo al Chequeo 3.
   if (orden === 1 && !rolCoincideConCargo(nombreRolActual, rol)) {
     return { resultado: "SALTAR", motivo: "ROL_DESACTUALIZADO", personaId }
   }
 
-  // Chequeo 2: ¿está disponible ahora mismo?
+  // Chequeo 3: ¿está disponible ahora mismo?
   const disponibilidad = await estaDisponibleAhora(personaId)
   if (disponibilidad.disponible) {
     return { resultado: "AUTORIZA", personaId }
@@ -90,9 +104,10 @@ async function evaluarPosicion(rol, orden) {
 // con su propio motivo_escalamiento, por qué la responsabilidad LLEGÓ a
 // esa posición: la primera fila siempre es "INICIAL"; si esa persona no
 // sirve, la razón queda anotada en la fila SIGUIENTE. Así, leer solo la
-// última fila alcanza para saber quién autoriza ahora y por qué.
+// última fila alcanza para saber quién autoriza ahora, por qué, y si
+// esa posición es titular (orden 1) o adjunto (orden 2) del cargo.
 //
-// Devuelve { autorizanteRol, autorizantePersonaId, pasos }.
+// Devuelve { autorizanteRol, autorizantePersonaId, autorizanteOrden, pasos }.
 // Si nadie en toda la cascada sirve, autorizantePersonaId es null.
 export async function calcularAutorizanteActivo() {
   const pasos = []
@@ -106,11 +121,17 @@ export async function calcularAutorizanteActivo() {
       pasos.push({
         rol_autorizador: rol,
         persona_id: evaluacion.personaId,
+        orden,
         motivo_escalamiento: motivoDeEsteRol,
       })
 
       if (evaluacion.resultado === "AUTORIZA") {
-        return { autorizanteRol: rol, autorizantePersonaId: evaluacion.personaId, pasos }
+        return {
+          autorizanteRol: rol,
+          autorizantePersonaId: evaluacion.personaId,
+          autorizanteOrden: orden,
+          pasos,
+        }
       }
 
       motivoDeEsteRol = evaluacion.resultado === "SIN_ASIGNAR" ? "SIN_ASIGNAR" : evaluacion.motivo
@@ -118,5 +139,5 @@ export async function calcularAutorizanteActivo() {
   }
 
   // Nadie en toda la cascada (ni titulares ni adjuntos) pudo autorizar
-  return { autorizanteRol: null, autorizantePersonaId: null, pasos }
+  return { autorizanteRol: null, autorizantePersonaId: null, autorizanteOrden: null, pasos }
 }

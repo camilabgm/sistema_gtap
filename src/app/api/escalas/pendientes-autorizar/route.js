@@ -8,7 +8,7 @@ import { conCascada } from "@/lib/api-helpers"
 import { calcularAutorizanteActivo } from "@/lib/cascadaAutorizacion"
 
 export const GET = conCascada("ESCALAS", async (request, context, session) => {
-  const { autorizanteRol, autorizantePersonaId } = await calcularAutorizanteActivo()
+  const { autorizanteRol, autorizantePersonaId, autorizanteOrden, pasos } = await calcularAutorizanteActivo()
 
   let autorizanteActivo = null
   if (autorizantePersonaId) {
@@ -16,10 +16,17 @@ export const GET = conCascada("ESCALAS", async (request, context, session) => {
       where: { id: autorizantePersonaId },
       select: { nombre: true, apellido: true, grado: true },
     })
+    // El motivo del último paso explica por qué la responsabilidad
+    // llegó hasta esta posición (INICIAL = nadie fue salteado, el
+    // titular de base ya estaba disponible — no hace falta explicar
+    // nada en ese caso).
+    const ultimoPaso = pasos[pasos.length - 1]
     autorizanteActivo = {
       rol_autorizador: autorizanteRol,
       persona_id: autorizantePersonaId,
+      orden: autorizanteOrden,
       nombre: persona ? `${persona.grado} ${persona.apellido}` : "—",
+      motivo_escalamiento: ultimoPaso?.motivo_escalamiento ?? null,
     }
   }
 

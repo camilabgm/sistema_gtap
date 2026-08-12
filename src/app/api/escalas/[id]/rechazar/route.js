@@ -37,7 +37,7 @@ export const PUT = conSesion("ESCALAS", async (request, context, session) => {
     return NextResponse.json({ error: "La escala ya no está disponible para esta acción" }, { status: 409 })
   }
 
-  const { autorizantePersonaId } = await calcularAutorizanteActivo()
+  const { autorizantePersonaId, autorizanteOrden } = await calcularAutorizanteActivo()
 
   if (!autorizantePersonaId || autorizantePersonaId !== session.user.personaId) {
     return NextResponse.json(
@@ -51,6 +51,7 @@ export const PUT = conSesion("ESCALAS", async (request, context, session) => {
     data: {
       estado: "RECHAZADA",
       rechazada_por: session.user.id,
+      orden_autorizante: autorizanteOrden,
       motivo_rechazo: motivoRechazo,
       fecha_rechazo: new Date(),
       editado_por: session.user.id,

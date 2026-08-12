@@ -98,6 +98,7 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
           escala_id: escalaId,
           rol_autorizador: paso.rol_autorizador,
           persona_id: paso.persona_id,
+          orden: paso.orden,
           motivo_escalamiento: paso.motivo_escalamiento,
           autorizo: false,
           creado_por: session.user.id,

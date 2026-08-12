@@ -23,6 +23,7 @@ export const GET = conCascada("ESCALAS", async (request, context, session) => {
       autorizada: true,
       autorizada_por: true,
       rol_autoriza: true,
+      orden_autorizante: true,
       fecha_autorizacion: true,
       rechazada_por: true,
       motivo_rechazo: true,

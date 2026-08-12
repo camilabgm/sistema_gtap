@@ -50,7 +50,7 @@ export const PUT = conSesion("ESCALAS", async (request, context, session) => {
     )
   }
 
-  const { autorizanteRol, autorizantePersonaId, pasos } = await calcularAutorizanteActivo()
+  const { autorizanteRol, autorizantePersonaId, autorizanteOrden, pasos } = await calcularAutorizanteActivo()
 
   if (!autorizantePersonaId || autorizantePersonaId !== session.user.personaId) {
     return NextResponse.json(
@@ -72,6 +72,7 @@ export const PUT = conSesion("ESCALAS", async (request, context, session) => {
           escala_id: escalaId,
           rol_autorizador: paso.rol_autorizador,
           persona_id: paso.persona_id,
+          orden: paso.orden,
           motivo_escalamiento: paso.motivo_escalamiento,
           autorizo: i === pasos.length - 1,
           creado_por: session.user.id,
@@ -85,6 +86,7 @@ export const PUT = conSesion("ESCALAS", async (request, context, session) => {
         autorizada: true,
         autorizada_por: session.user.id,
         rol_autoriza: autorizanteRol,
+        orden_autorizante: autorizanteOrden,
         fecha_autorizacion: new Date(),
         editado_por: session.user.id,
       },
