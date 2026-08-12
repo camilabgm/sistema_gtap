@@ -2,18 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { yaPasoLaHora } from "@/lib/escalas"
+import { formatearFechaHora as formatearFechaHoraBase } from "@/lib/fechaHora"
+
+// Formato corto (día/mes/hora/minuto, sin año ni segundos) — el que ya
+// usaba esta pantalla. En vez de duplicar la función acá, se envuelve
+// la compartida de fechaHora.js con las opciones que la achican.
+function formatearFechaHora(iso) {
+  return formatearFechaHoraBase(iso, { year: undefined, second: undefined })
+}
 
 const ETIQUETAS_MOTIVO_DERIVACION = {
   TAREA_ADMINISTRATIVA: "Tarea administrativa",
   FUERA_DE_LA_UNIDAD: "Fuera de la unidad",
   OTRO: "Otro",
-}
-
-function formatearFechaHora(iso) {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleString("es-PY", {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-  })
 }
 
 export default function PendientesAutorizar() {

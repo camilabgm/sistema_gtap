@@ -5,11 +5,15 @@ import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
 import { validarCanalConArchivo } from "@/lib/validacionEscala"
+import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 
-function validarDatosSolicitud({ solicitante, fecha, canal, nombreArchivo }) {
+// fecha_recepcion es opcional — no hay ningún cálculo de disponibilidad
+// ni validación de Escalas que dependa de ella. Si viene vacía o no se
+// manda, normalizarFechaSoloDia() ya devuelve null sola, sin que haga
+// falta ningún chequeo extra acá.
+function validarDatosSolicitud({ solicitante, fechaRecepcion, canal, nombreArchivo }) {
   if (!solicitante || !`${solicitante}`.trim()) return "El solicitante es obligatorio"
-  if (!fecha) return "La fecha es obligatoria"
-  if (isNaN(new Date(fecha).getTime())) return "La fecha no es válida"
+  if (fechaRecepcion && isNaN(new Date(fechaRecepcion).getTime())) return "La fecha de recepción no es válida"
   return validarCanalConArchivo(canal, nombreArchivo)
 }
 
@@ -82,17 +86,17 @@ export const POST = conPermiso("ESCALAS", "puede_crear", async (request, context
 
   try {
     const formData = await request.formData()
-    const solicitante   = formData.get("solicitante")
-    const fecha         = formData.get("fecha")
-    const canal         = formData.get("canal")
-    const observaciones = formData.get("observaciones")
-    const archivo       = formData.get("archivo")
+    const solicitante     = formData.get("solicitante")
+    const fechaRecepcion  = formData.get("fecha_recepcion")
+    const canal           = formData.get("canal")
+    const observaciones   = formData.get("observaciones")
+    const archivo         = formData.get("archivo")
 
     const hayArchivo =
       archivo && typeof archivo.arrayBuffer === "function" && archivo.size > 0
 
     const errorValidacion = validarDatosSolicitud({
-      solicitante, fecha, canal,
+      solicitante, fechaRecepcion, canal,
       nombreArchivo: hayArchivo ? archivo.name : null,
     })
     if (errorValidacion) {
@@ -101,7 +105,6 @@ export const POST = conPermiso("ESCALAS", "puede_crear", async (request, context
 
     escalaCreada = await prisma.escala.create({
       data: {
-        fecha: new Date(fecha),
         solicitante: solicitante.trim(),
         observaciones: observaciones ? `${observaciones}`.trim() : null,
         es_borrador: true,
@@ -125,6 +128,7 @@ export const POST = conPermiso("ESCALAS", "puede_crear", async (request, context
       data: {
         escala_id: escalaCreada.id,
         canal,
+        fecha_recepcion: normalizarFechaSoloDia(fechaRecepcion),
         archivo: rutaGuardada,
         nombre_archivo_original: nombreOriginal,
         recibido_por: session.user.id,

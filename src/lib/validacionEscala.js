@@ -9,6 +9,7 @@
 // acá, aplica automáticamente a los tres flujos.
 
 import prisma from "@/lib/prisma"
+import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 
 const ROLES_EN_VUELO = ["PILOTO", "COPILOTO", "TECNICO_DE_VUELO"]
 
@@ -21,6 +22,11 @@ export function validarItinerarios(itinerarios) {
     if (!t.hora_estimada_salida || !t.hora_estimada_llegada) {
       return "Cada tramo necesita hora estimada de salida y de llegada"
     }
+    // Acá alcanza con new Date() crudo, aunque el string no tenga zona:
+    // como salida y llegada se parsean con la MISMA interpretación (la
+    // que sea), la comparación de orden entre las dos no cambia — el
+    // bug de zona horaria afecta el VALOR guardado, no el orden relativo
+    // entre dos valores parseados igual.
     const salida  = new Date(t.hora_estimada_salida).getTime()
     const llegada = new Date(t.hora_estimada_llegada).getTime()
     if (isNaN(salida) || isNaN(llegada)) return "Hay un tramo con horarios inválidos"
@@ -93,10 +99,14 @@ export function normalizarSolicitante(valor) {
   return { tocado: true, valor: recortado, error: null }
 }
 
+// Escala.fecha es "solo día" (@db.Date) — mismo tratamiento que
+// HabilitacionMedica.vence, Persona.fecha_nacimiento y ParteDiario.fecha:
+// se normaliza siempre a medianoche UTC, para no correr un día para
+// atrás en husos detrás de UTC como Paraguay.
 export function normalizarFecha(valor) {
   if (valor === undefined) return { tocado: false, valor: undefined, error: null }
-  const fecha = new Date(valor)
-  if (isNaN(fecha.getTime())) return { tocado: true, valor: null, error: "La fecha no es válida" }
+  const fecha = normalizarFechaSoloDia(valor)
+  if (!fecha) return { tocado: true, valor: null, error: "La fecha no es válida" }
   return { tocado: true, valor: fecha, error: null }
 }
 

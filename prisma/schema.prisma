@@ -415,7 +415,13 @@ model LogIntentoLogin {
 model Escala {
   id                     Int             @id @default(autoincrement())
   nro_orden              String?         @unique
-  fecha                  DateTime        @db.Date
+  // Fecha del vuelo — ya NO se carga a mano en el formulario. Se
+  // calcula sola a partir de la hora estimada de salida más temprana
+  // del itinerario, convertida a hora de Paraguay (ver
+  // fechaEnParaguayDesdeInstante() en lib/fechaHora.js). Por eso es
+  // opcional: en un borrador recién creado, antes de cargar el
+  // itinerario, todavía no hay ningún valor que calcular.
+  fecha                  DateTime?       @db.Date
   hora_despegue_estimada DateTime?
   hora_arribo_estimada   DateTime?
   solicitante            String // ej. FFMM, Presidencia, ANDE, CODI
@@ -522,7 +528,11 @@ model Solicitud {
   archivo                 String? // ruta del archivo guardado; null si VERBAL
   nombre_archivo_original String?
   recibido_por            Int? // id del usuario que cargó el pedido
-  fecha_recepcion         DateTime       @default(now())
+  // Cuándo llegó la solicitud a la unidad — dato que carga la persona
+  // que registra la escala, no un timestamp automático. Es "solo día"
+  // (@db.Date), igual criterio que Escala.fecha: la hora exacta no
+  // importa acá, importa el día. Obligatorio.
+  fecha_recepcion         DateTime?      @db.Date
 
   // Auditoría
   creado_por    Int?

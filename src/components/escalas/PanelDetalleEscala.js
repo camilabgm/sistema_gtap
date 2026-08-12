@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useTick } from "@/lib/useTick"
 import { ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO_ABORTO, calcularEstadoVisual, puedeAbortarAhora, estaPendienteDeAutorizacion, formatearHora, formatearRangoVuelo } from "@/lib/escalas"
 import { puedeCargarPostVuelo } from "@/lib/postVuelo"
+import { fechaUTCAInputParaguay, formatearFechaHora } from "@/lib/fechaHora"
 
 const MOTIVOS_ABORTO = Object.keys(ETIQUETAS_MOTIVO_ABORTO)
 
@@ -26,13 +27,6 @@ function formatearMinutos(min) {
   const h = Math.floor(min / 60)
   const m = min % 60
   return `${h}h ${m}min`
-}
-
-function toDatetimeLocalValue(iso) {
-  if (!iso) return ""
-  const d = new Date(iso)
-  const pad = (n) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export default function PanelDetalleEscala({ escala, puedeEditar, mostrarPostVuelo = true, onCerrar, onActualizada }) {
@@ -157,8 +151,8 @@ export default function PanelDetalleEscala({ escala, puedeEditar, mostrarPostVue
         const valoresIniciales = {}
         for (const t of data.escala.itinerarios) {
           valoresIniciales[t.id] = {
-            salida: toDatetimeLocalValue(t.hora_real_salida || t.hora_estimada_salida),
-            llegada: toDatetimeLocalValue(t.hora_real_llegada || t.hora_estimada_llegada),
+            salida: fechaUTCAInputParaguay(t.hora_real_salida || t.hora_estimada_salida),
+            llegada: fechaUTCAInputParaguay(t.hora_real_llegada || t.hora_estimada_llegada),
           }
         }
         setTramoValores(valoresIniciales)
@@ -346,7 +340,7 @@ export default function PanelDetalleEscala({ escala, puedeEditar, mostrarPostVue
             </div>
           ) : (
             <p className="text-xs text-gray-400">
-              ✓ Acusaste recibo el {new Date(acuse.fecha_acuse).toLocaleString("es-PY", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              ✓ Acusaste recibo el {formatearFechaHora(acuse.fecha_acuse, { year: undefined, second: undefined })}
             </p>
           )}
         </div>

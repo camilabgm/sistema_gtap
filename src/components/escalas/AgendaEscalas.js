@@ -40,6 +40,7 @@ export default function AgendaEscalas({ puedeCrear }) {
   const [filaExpandidaId, setFilaExpandidaId] = useState(null)
 
   const hoy = new Date()
+  const hoyISO = formatearISO(hoy)
   const lunesActual = lunesDeLaSemana(hoy)
   const lunesMostrado = new Date(lunesActual)
   lunesMostrado.setDate(lunesMostrado.getDate() + offsetSemanas * 7)
@@ -53,7 +54,7 @@ export default function AgendaEscalas({ puedeCrear }) {
 
   useEffect(() => {
     if (offsetSemanas === 0) {
-      setFechaSeleccionada(formatearISO(hoy))
+      setFechaSeleccionada(hoyISO)
     } else {
       setFechaSeleccionada(formatearISO(lunesMostrado))
     }
@@ -167,7 +168,7 @@ export default function AgendaEscalas({ puedeCrear }) {
         {diasSemana.map((d) => {
           const iso = formatearISO(d)
           const esSeleccionado = iso === fechaSeleccionada
-          const esHoy = iso === formatearISO(hoy)
+          const esHoy = iso === hoyISO
           const cantidad = escalasQueVuelanEse(iso).length
 
           return (
@@ -239,6 +240,7 @@ export default function AgendaEscalas({ puedeCrear }) {
         <GanttAeronavesDia
           escalasDelDia={escalasDelDiaAutorizadas}
           fechaSeleccionada={fechaSeleccionada}
+          hoyISO={hoyISO}
           onActualizada={cargarEscalasSemana}
         />
       ) : escalasDelDia.length === 0 ? (

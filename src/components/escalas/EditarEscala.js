@@ -9,19 +9,20 @@ import { useState, useEffect, useRef } from "react"
 import { parsearSubtipos } from "@/lib/tiposMision"
 import { puedeEditarAhora, motivoNoEditable } from "@/lib/escalas"
 import { fechaSoloDiaAInputValue } from "@/lib/fechaSoloDia"
+import { fechaUTCAInputParaguay } from "@/lib/fechaHora"
 
 const ROLES_EN_VUELO = ["PILOTO", "COPILOTO", "TECNICO_DE_VUELO"]
 const CANALES = ["PDF", "IMAGEN", "WORD", "VERBAL"]
 
-function toDatetimeLocalValue(iso) {
-  if (!iso) return ""
-  const d = new Date(iso)
-  const pad = (n) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 function crearTramoVacio(orden) {
   return { orden, origen: "", destino: "", hora_estimada_salida: "", hora_estimada_llegada: "" }
+}
+
+// Misma regla que FormularioEscala.js: la búsqueda de disponibilidad
+// necesita al menos una salida Y una llegada cargadas entre todos los
+// tramos — no hace falta que sea el mismo tramo.
+function tieneVentanaMinima(tramos) {
+  return tramos.some((t) => t.hora_estimada_salida) && tramos.some((t) => t.hora_estimada_llegada)
 }
 
 export default function EditarEscala({ escalaId }) {
@@ -32,7 +33,7 @@ export default function EditarEscala({ escalaId }) {
   const [tiposMision, setTiposMision] = useState([])
 
   const [solicitante, setSolicitante] = useState("")
-  const [fecha, setFecha] = useState("")
+  const [fechaRecepcion, setFechaRecepcion] = useState("")
   const [canal, setCanal] = useState("PDF")
   const archivoNuevoRef = useRef(null)
   const [observaciones, setObservaciones] = useState("")
@@ -79,7 +80,9 @@ export default function EditarEscala({ escalaId }) {
 
       setEscala(data)
       setSolicitante(data.solicitante || "")
-      setFecha(fechaSoloDiaAInputValue(data.fecha))
+      // fecha_recepcion es "solo día" (@db.Date) — usa fechaSoloDiaAInputValue
+      // (UTC), NUNCA fechaUTCAInputParaguay (esa es para horas reales).
+      setFechaRecepcion(fechaSoloDiaAInputValue(data.solicitudes?.[0]?.fecha_recepcion))
       setCanal(data.solicitudes?.[0]?.canal || "PDF")
       setObservaciones(data.observaciones || "")
       setTipoMisionId(data.tipo_mision_id ? String(data.tipo_mision_id) : "")
@@ -93,8 +96,8 @@ export default function EditarEscala({ escalaId }) {
               orden: t.orden,
               origen: t.origen,
               destino: t.destino,
-              hora_estimada_salida: toDatetimeLocalValue(t.hora_estimada_salida),
-              hora_estimada_llegada: toDatetimeLocalValue(t.hora_estimada_llegada),
+              hora_estimada_salida: fechaUTCAInputParaguay(t.hora_estimada_salida),
+              hora_estimada_llegada: fechaUTCAInputParaguay(t.hora_estimada_llegada),
             }))
           : [crearTramoVacio(1)]
       )
@@ -126,15 +129,17 @@ export default function EditarEscala({ escalaId }) {
     if (!opcionesSubtipo.includes(subtipoElegido)) setSubtipoElegido("")
   }, [tipoMisionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const ventanaLista = tieneVentanaMinima(tramos)
+
   async function buscarCandidatos() {
-    if (!fecha) return
+    if (!ventanaLista) return
     setCargandoCandidatos(true)
     try {
       const res = await fetch("/api/escalas/candidatos-disponibles", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fecha, itinerarios: tramos, escala_id: Number(escalaId) }),
+        body: JSON.stringify({ itinerarios: tramos, escala_id: Number(escalaId) }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -152,7 +157,7 @@ export default function EditarEscala({ escalaId }) {
     if (cargando) return
     const temporizador = setTimeout(() => { buscarCandidatos() }, 500)
     return () => clearTimeout(temporizador)
-  }, [fecha, JSON.stringify(tramos), cargando]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(tramos), cargando]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function agregarTramo() {
     setTramos((prev) => [...prev, crearTramoVacio(prev.length + 1)])
@@ -207,6 +212,11 @@ export default function EditarEscala({ escalaId }) {
     setErrorPublicar(null)
     setConflictosPublicar([])
 
+    if (!fechaRecepcion) {
+      setErrorGuardar("La fecha de recepción es obligatoria")
+      return
+    }
+
     if (!esBorrador) {
       const confirmar = window.confirm(
         "Esta escala ya fue publicada. Guardar estos cambios la va a mandar de nuevo a autorización completa (vuelve a Pendientes de Autorizar).\n\n¿Confirmás?"
@@ -224,14 +234,15 @@ export default function EditarEscala({ escalaId }) {
 
     const formData = new FormData()
     formData.append("solicitante", solicitante)
-    formData.append("fecha", fecha)
+    formData.append("fecha_recepcion", fechaRecepcion)
     formData.append("canal", canal)
     formData.append("nro_orden", nroOrden || "")
     formData.append("aeronave_id", aeronaveId || "")
     formData.append("tipo_mision_id", tipoMisionId || "")
     formData.append("subtipo_elegido", subtipoElegido || "")
-    // El itinerario SOLO se manda si está completo — un tramo a medio
-    // llenar no debe bloquear el guardado de los demás campos.
+    // El itinerario SOLO se manda si está completo. La fecha del vuelo
+    // (Escala.fecha) se recalcula sola en el servidor a partir de este
+    // itinerario, no se manda desde acá.
     if (itinerarioCompleto) {
       formData.append("itinerarios", JSON.stringify(tramos))
     }
@@ -396,12 +407,12 @@ export default function EditarEscala({ escalaId }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha <span className="text-red-500">*</span>
+              Fecha de recepción <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
+              value={fechaRecepcion}
+              onChange={(e) => setFechaRecepcion(e.target.value)}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -421,7 +432,7 @@ export default function EditarEscala({ escalaId }) {
           <p className="text-xs text-gray-500">
             Archivo actual:{" "}
             {escala.solicitudes[0].nombre_archivo_original ? (
-                 <a
+              <a
                 href={`/api/solicitudes/${escala.solicitudes[0].id}/archivo`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -497,7 +508,9 @@ export default function EditarEscala({ escalaId }) {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Itinerario</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Itinerario <span className="text-gray-400 font-normal">(la fecha del vuelo se calcula sola, a partir de la hora de salida)</span>
+          </label>
           <div className="space-y-2">
             {tramos.map((t, i) => (
               <div key={i} className="grid grid-cols-5 gap-2 items-end bg-gray-50 p-2 rounded-md">
@@ -528,12 +541,12 @@ export default function EditarEscala({ escalaId }) {
           <p className="text-xs text-blue-700">
             {cargandoCandidatos
               ? "Actualizando disponibilidad..."
-              : "Aeronave y tripulación se actualizan solas al cambiar fecha o itinerario."}
+              : "Aeronave y tripulación se actualizan solas al cambiar el itinerario."}
           </p>
           <button
             type="button"
             onClick={buscarCandidatos}
-            disabled={!fecha || cargandoCandidatos}
+            disabled={!ventanaLista || cargandoCandidatos}
             className="text-xs text-blue-700 font-medium hover:underline disabled:opacity-50 disabled:no-underline shrink-0 ml-3"
           >
             🔄 Actualizar disponibilidad
@@ -542,60 +555,69 @@ export default function EditarEscala({ escalaId }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Aeronave</label>
-          <select value={aeronaveId} onChange={(e) => setAeronaveId(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <select value={aeronaveId} onChange={(e) => setAeronaveId(e.target.value)} disabled={!ventanaLista} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
             <option value="">Seleccionar...</option>
             {candidatosAeronaves.map((a) => <option key={a.id} value={a.id}>{a.matricula}</option>)}
           </select>
+          {!ventanaLista && <p className="text-xs text-gray-400 mt-1">Completá la hora de salida y llegada del itinerario para ver disponibilidad.</p>}
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Tripulación</label>
-          <div className="space-y-2">
-            {tripulacion.map((t, i) => {
-              const personasParaFila = candidatosPersonas.filter((p) => (p.especialidades || []).includes(t.rol_en_vuelo))
-              return (
-                <div key={i} className="flex gap-2 items-end bg-gray-50 p-2 rounded-md">
-                  <div className="flex-1 min-w-0">
-                    <label className="block text-xs text-gray-500 mb-0.5">Persona</label>
-                    <select
-                      value={t.persona_id}
-                      onChange={(e) => actualizarTripulante(i, "persona_id", e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {personasParaFila.map((p) => (
-                        <option key={p.id} value={p.id}>{p.grado} {p.apellido}, {p.nombre}</option>
-                      ))}
-                    </select>
-                    {fecha && personasParaFila.length === 0 && (
-                      <p className="text-xs text-amber-600 mt-1">Sin candidatos con este rol disponibles</p>
-                    )}
-                  </div>
-                  <div className="w-44 shrink-0">
-                    <label className="block text-xs text-gray-500 mb-0.5">Rol</label>
-                    <select
-                      value={t.rol_en_vuelo}
-                      onChange={(e) => actualizarTripulante(i, "rol_en_vuelo", e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-                    >
-                      {ROLES_EN_VUELO.map((r) => (
-                        <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => quitarTripulante(i)}
-                    disabled={tripulacion.length === 1}
-                    className="text-xs text-red-500 hover:text-red-700 disabled:opacity-30 pb-2 shrink-0"
-                  >
-                    Quitar
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-          <button type="button" onClick={agregarTripulante} className="mt-2 text-xs text-blue-600 hover:underline font-medium">+ Agregar tripulante</button>
+          {!ventanaLista ? (
+            <p className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+              Completá la hora de salida y llegada del itinerario para poder elegir tripulación.
+            </p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {tripulacion.map((t, i) => {
+                  const personasParaFila = candidatosPersonas.filter((p) => (p.especialidades || []).includes(t.rol_en_vuelo))
+                  return (
+                    <div key={i} className="flex gap-2 items-end bg-gray-50 p-2 rounded-md">
+                      <div className="flex-1 min-w-0">
+                        <label className="block text-xs text-gray-500 mb-0.5">Persona</label>
+                        <select
+                          value={t.persona_id}
+                          onChange={(e) => actualizarTripulante(i, "persona_id", e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                        >
+                          <option value="">Seleccionar...</option>
+                          {personasParaFila.map((p) => (
+                            <option key={p.id} value={p.id}>{p.grado} {p.apellido}, {p.nombre}</option>
+                          ))}
+                        </select>
+                        {personasParaFila.length === 0 && (
+                          <p className="text-xs text-amber-600 mt-1">Sin candidatos con este rol disponibles</p>
+                        )}
+                      </div>
+                      <div className="w-44 shrink-0">
+                        <label className="block text-xs text-gray-500 mb-0.5">Rol</label>
+                        <select
+                          value={t.rol_en_vuelo}
+                          onChange={(e) => actualizarTripulante(i, "rol_en_vuelo", e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                        >
+                          {ROLES_EN_VUELO.map((r) => (
+                            <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => quitarTripulante(i)}
+                        disabled={tripulacion.length === 1}
+                        className="text-xs text-red-500 hover:text-red-700 disabled:opacity-30 pb-2 shrink-0"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+              <button type="button" onClick={agregarTripulante} className="mt-2 text-xs text-blue-600 hover:underline font-medium">+ Agregar tripulante</button>
+            </>
+          )}
         </div>
 
         {errorGuardar && (

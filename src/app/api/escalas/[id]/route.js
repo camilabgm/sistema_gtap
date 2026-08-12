@@ -10,6 +10,8 @@ import { conPermiso } from "@/lib/api-helpers"
 import { calcularVentana, verificarAeronave, verificarTripulante } from "@/lib/disponibilidad"
 import { parsearSubtipos } from "@/lib/tiposMision"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
+import { paraguayInputAFechaUTC, fechaEnParaguayDesdeInstante } from "@/lib/fechaHora"
+import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 import {
   validarItinerarios,
   validarTripulacion,
@@ -78,7 +80,7 @@ export const GET = conPermiso("ESCALAS", "puede_ver", async (request, context, s
       solicitudes: {
         orderBy: { fecha_recepcion: "asc" },
         take: 1,
-        select: { id: true, canal: true, archivo: true, nombre_archivo_original: true, fecha_recepcion: true },
+        select: { id: true, canal: true, fecha_recepcion: true, archivo: true, nombre_archivo_original: true },
       },
     },
   })
@@ -131,9 +133,12 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     const solicitanteRes = normalizarSolicitante(solicitanteRaw === null ? undefined : solicitanteRaw)
     if (solicitanteRes.error) return NextResponse.json({ error: solicitanteRes.error }, { status: 400 })
 
-    const fechaRaw = formData.get("fecha")
-    const fechaRes = normalizarFecha(fechaRaw === null ? undefined : fechaRaw)
-    if (fechaRes.error) return NextResponse.json({ error: fechaRes.error }, { status: 400 })
+    // fecha_recepcion de la Solicitud — mismo patrón "tocado" que canal.
+    // Escala.fecha (la del vuelo) ya NO se lee del formData — se
+    // recalcula sola más abajo, a partir del itinerario.
+    const fechaRecepcionRaw = formData.get("fecha_recepcion")
+    const fechaRecepcionRes = normalizarFecha(fechaRecepcionRaw === null ? undefined : fechaRecepcionRaw)
+    if (fechaRecepcionRes.error) return NextResponse.json({ error: fechaRecepcionRes.error }, { status: 400 })
 
     const nroOrdenNuevo = normalizarNroOrden(formData.get("nro_orden"))
 
@@ -226,8 +231,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     const limpiarSubtipoPorCambioDeTipo =
       tipoMision.tocado && tipoMisionNuevoInfo && !tipoMisionNuevoInfo.tiene_subtipo && !subtipoElegido.tocado
 
-    const fechaEfectiva = fechaRes.tocado ? fechaRes.valor : escala.fecha
-
     let itinerarioEfectivo = itinerarios
     if (itinerarioEfectivo === undefined) {
       itinerarioEfectivo = await prisma.escalaItinerario.findMany({
@@ -236,6 +239,15 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
       })
     }
     const ventana = calcularVentana(itinerarioEfectivo)
+
+    // La "fecha" de referencia para chequear habilitación médica y
+    // Parte Diario sale del itinerario efectivo (nuevo o ya guardado en
+    // la base) — no de un campo aparte del formulario. Si todavía no
+    // hay ningún tramo con salida y llegada cargadas, no hay fecha
+    // (escala.fecha puede ser null en un borrador recién creado).
+    const fechaEfectiva = ventana
+      ? normalizarFechaSoloDia(fechaEnParaguayDesdeInstante(ventana.inicio))
+      : escala.fecha
 
     const errores = []
 
@@ -249,6 +261,10 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
       ? tripulacion
       : escala.tripulacion.map((t) => ({ persona_id: t.persona_id }))
     for (const t of tripAChequear) {
+      if (!fechaEfectiva) {
+        errores.push("Completá la hora estimada de salida y llegada del itinerario antes de asignar tripulación")
+        break
+      }
       const r = await verificarTripulante(parseInt(t.persona_id, 10), fechaEfectiva, ventana, escalaId)
       if (!r.ok) errores.push(r.motivo)
     }
@@ -274,7 +290,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     const actualizada = await prisma.$transaction(async (tx) => {
       const dataEscala = { editado_por: session.user.id }
       if (solicitanteRes.tocado) dataEscala.solicitante = solicitanteRes.valor
-      if (fechaRes.tocado)       dataEscala.fecha        = fechaRes.valor
       if (nroOrdenNuevo !== undefined) dataEscala.nro_orden = nroOrdenNuevo
       if (aeronave.tocado)   dataEscala.aeronave_id    = aeronave.valor
       if (tipoMision.tocado) dataEscala.tipo_mision_id = tipoMision.valor
@@ -295,14 +310,16 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
               orden:                 t.orden,
               origen:                `${t.origen}`.trim().toUpperCase(),
               destino:               `${t.destino}`.trim().toUpperCase(),
-              hora_estimada_salida:  new Date(t.hora_estimada_salida),
-              hora_estimada_llegada: new Date(t.hora_estimada_llegada),
+              hora_estimada_salida:  paraguayInputAFechaUTC(t.hora_estimada_salida),
+              hora_estimada_llegada: paraguayInputAFechaUTC(t.hora_estimada_llegada),
               creado_por:            session.user.id,
             },
           })
         }
         dataEscala.hora_despegue_estimada = ventana ? ventana.inicio : null
         dataEscala.hora_arribo_estimada   = ventana ? ventana.fin    : null
+        // Fecha del vuelo, recalculada junto con el resto del itinerario.
+        dataEscala.fecha = ventana ? normalizarFechaSoloDia(fechaEnParaguayDesdeInstante(ventana.inicio)) : null
       }
 
       if (tripulacion !== undefined) {
@@ -319,13 +336,14 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
         }
       }
 
-      if (solicitudActual && (canalRealmenteCambio || hayArchivoNuevo)) {
+      if (solicitudActual && (canalRealmenteCambio || hayArchivoNuevo || fechaRecepcionRes.tocado)) {
         const dataSolicitud = { editado_por: session.user.id }
         if (canalRealmenteCambio) dataSolicitud.canal = canalValor
         if (hayArchivoNuevo) {
           dataSolicitud.archivo = rutaGuardadaNueva
           dataSolicitud.nombre_archivo_original = nombreOriginalNuevo
         }
+        if (fechaRecepcionRes.tocado) dataSolicitud.fecha_recepcion = fechaRecepcionRes.valor
         await tx.solicitud.update({ where: { id: solicitudActual.id }, data: dataSolicitud })
       }
 

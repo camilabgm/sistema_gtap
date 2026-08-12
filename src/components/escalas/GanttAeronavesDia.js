@@ -21,7 +21,15 @@ function porcentaje(minutos) {
   return (minutos / MINUTOS_EN_DIA) * 100
 }
 
-export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, onActualizada }) {
+// hoyISO llega como prop desde AgendaEscalas (calculado UNA sola vez ahí,
+// con la misma lógica que usa para "qué día es hoy" en toda la pantalla).
+// Antes este componente lo recalculaba acá adentro con
+// new Date().toISOString() — UTC — mientras minutosAhora usaba
+// getHours()/getMinutes() — hora local del navegador. Mezclaba dos
+// criterios distintos en la misma función, lo que podía hacer que
+// "¿hoy?" diera false en el momento equivocado. Recibirlo por prop
+// asegura que todo el Gantt use el mismo "hoy" que el resto de la Agenda.
+export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, hoyISO, onActualizada }) {
   const [aeronaves, setAeronaves] = useState([])
   const [cargando, setCargando] = useState(true)
   const [escalaExpandidaId, setEscalaExpandidaId] = useState(null)
@@ -35,7 +43,6 @@ export default function GanttAeronavesDia({ escalasDelDia, fechaSeleccionada, on
       .finally(() => setCargando(false))
   }, [])
 
-  const hoyISO = new Date().toISOString().slice(0, 10)
   const esHoy = fechaSeleccionada === hoyISO
   const minutosAhora = esHoy ? new Date().getHours() * 60 + new Date().getMinutes() : null
 

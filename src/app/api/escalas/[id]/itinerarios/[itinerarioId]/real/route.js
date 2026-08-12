@@ -6,6 +6,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conSesion } from "@/lib/api-helpers"
 import { esTripulanteDeEscala } from "@/lib/postVuelo"
+import { paraguayInputAFechaUTC } from "@/lib/fechaHora"
 
 export const PUT = conSesion("POST_VUELO", async (request, context, session) => {
   const { id, itinerarioId } = await context.params
@@ -51,10 +52,10 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
   const data = { editado_por: session.user.id }
 
   if (body.hora_real_salida !== undefined) {
-    data.hora_real_salida = body.hora_real_salida ? new Date(body.hora_real_salida) : null
+    data.hora_real_salida = body.hora_real_salida ? paraguayInputAFechaUTC(body.hora_real_salida) : null
   }
   if (body.hora_real_llegada !== undefined) {
-    data.hora_real_llegada = body.hora_real_llegada ? new Date(body.hora_real_llegada) : null
+    data.hora_real_llegada = body.hora_real_llegada ? paraguayInputAFechaUTC(body.hora_real_llegada) : null
   }
 
   const salidaEfectiva = data.hora_real_salida !== undefined ? data.hora_real_salida : tramo.hora_real_salida

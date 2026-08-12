@@ -141,7 +141,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
 
     autoTable(doc, {
       startY: 26,
-      head: [["Solicitante", "Fecha solicitud", "Aeronave", "Salida", "N. Orden", "Tripulación", "Tipo de misión", "Estado"]],
+      head: [["Solicitante", "Fecha del vuelo", "Aeronave", "Salida", "N. Orden", "Tripulación", "Tipo de misión", "Estado"]],
       body: filtradas.map((e) => [
         e.solicitante || "—",
         formatearFechaSoloDia(e.fecha),

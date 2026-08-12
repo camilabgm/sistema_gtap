@@ -6,6 +6,8 @@
 // rompe el build del lado servidor. El hook useTick() vive aparte, en
 // lib/useTick.js — NO reintroducir acá.
 
+import { fechaUTCAInputParaguay } from "@/lib/fechaHora"
+
 export const ETIQUETAS_ESTADO = {
   PROGRAMADA: "Programada",
   EN_DESARROLLO: "En vuelo",
@@ -42,9 +44,14 @@ export const TOOLTIP_ESTADO_DETALLADO = {
   VENCIDA_SIN_AUTORIZAR: "Ya pasó la hora de despegue estimada y nadie la autorizó — no se puede autorizar así como está. Editala para reprogramarla, o eliminala si ya no corresponde.",
 }
 
+// Hora de despegue/llegada — SIEMPRE en hora de Paraguay explícita, sin
+// importar la zona horaria del navegador de quien mire la pantalla.
 export function formatearHora(iso) {
   if (!iso) return "—"
-  return new Date(iso).toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit" })
+  return new Date(iso).toLocaleTimeString("es-PY", {
+    hour: "2-digit", minute: "2-digit",
+    timeZone: "America/Asuncion",
+  })
 }
 
 export function calcularEstadoVisual(escala) {
@@ -124,10 +131,12 @@ export function calcularVentanaEnElDia(horaDespegueIso, horaArriboIso, fechaSele
   }
 }
 
+// SIEMPRE en hora de Paraguay explícita — mismo motivo que formatearHora.
 export function formatearFechaHoraCompacta(iso) {
   if (!iso) return "—"
   return new Date(iso).toLocaleString("es-PY", {
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+    timeZone: "America/Asuncion",
   })
 }
 
@@ -135,9 +144,13 @@ export function formatearRangoVuelo(horaDespegueIso, horaArriboIso) {
   if (!horaDespegueIso) return "—"
   if (!horaArriboIso) return `${formatearHora(horaDespegueIso)} – —`
 
-  const despegue = new Date(horaDespegueIso)
-  const llegada  = new Date(horaArriboIso)
-  const mismoDia = despegue.toDateString() === llegada.toDateString()
+  // "¿Mismo día?" comparado en hora de PARAGUAY explícitamente — antes
+  // usaba toDateString(), que depende de la zona horaria de la máquina
+  // que ejecuta el código, el mismo problema de fondo que ya venimos
+  // corrigiendo en todos lados.
+  const diaDespegue = fechaUTCAInputParaguay(horaDespegueIso).slice(0, 10)
+  const diaLlegada  = fechaUTCAInputParaguay(horaArriboIso).slice(0, 10)
+  const mismoDia = diaDespegue === diaLlegada
 
   if (mismoDia) {
     return `${formatearHora(horaDespegueIso)} – ${formatearHora(horaArriboIso)}`

@@ -4,18 +4,29 @@
 // Se usa al completar una escala, al publicarla, y se reutilizará en el dashboard.
 
 import prisma from "@/lib/prisma"
+import { paraguayInputAFechaUTC } from "@/lib/fechaHora"
 
 // Ventana de OCUPACIÓN a partir de los tramos: desde la salida más temprana
 // hasta la llegada más tardía. Incluye el tiempo en tierra entre tramos.
 // Devuelve null si no se puede calcular (faltan horarios).
+//
+// calcularVentana() recibe itinerarios de DOS orígenes distintos según
+// quién la llama, y paraguayInputAFechaUTC() maneja los dos casos bien:
+//   - Desde crear/editar/candidatos-disponibles: vienen del body del
+//     cliente, strings de <input type="datetime-local"> sin zona — se
+//     interpretan como hora de Paraguay.
+//   - Desde publicar: vienen ya leídos de la base (Date objects
+//     correctamente guardados) — se devuelven tal cual, sin reinterpretar.
 export function calcularVentana(itinerarios) {
   if (!Array.isArray(itinerarios) || itinerarios.length === 0) return null
 
   const salidas = []
   const llegadas = []
   for (const t of itinerarios) {
-    if (t.hora_estimada_salida)  salidas.push(new Date(t.hora_estimada_salida).getTime())
-    if (t.hora_estimada_llegada) llegadas.push(new Date(t.hora_estimada_llegada).getTime())
+    const salida  = paraguayInputAFechaUTC(t.hora_estimada_salida)
+    const llegada = paraguayInputAFechaUTC(t.hora_estimada_llegada)
+    if (salida)  salidas.push(salida.getTime())
+    if (llegada) llegadas.push(llegada.getTime())
   }
   if (salidas.length === 0 || llegadas.length === 0) return null
 

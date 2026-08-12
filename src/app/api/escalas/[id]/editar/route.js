@@ -9,6 +9,8 @@ import { calcularVentana, verificarAeronave, verificarTripulante } from "@/lib/d
 import { parsearSubtipos } from "@/lib/tiposMision"
 import { puedeEditarAhora, yaPasoLaHora, ESTADOS_EDITABLES_PUBLICADA } from "@/lib/escalas"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
+import { paraguayInputAFechaUTC, fechaEnParaguayDesdeInstante } from "@/lib/fechaHora"
+import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 import {
   validarItinerarios,
   validarTripulacion,
@@ -82,9 +84,11 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     const solicitanteRes = normalizarSolicitante(solicitanteRaw === null ? undefined : solicitanteRaw)
     if (solicitanteRes.error) return NextResponse.json({ error: solicitanteRes.error }, { status: 400 })
 
-    const fechaRaw = formData.get("fecha")
-    const fechaRes = normalizarFecha(fechaRaw === null ? undefined : fechaRaw)
-    if (fechaRes.error) return NextResponse.json({ error: fechaRes.error }, { status: 400 })
+    // fecha_recepcion de la Solicitud — mismo patrón "tocado" que canal.
+    // Escala.fecha (la del vuelo) ya NO se lee del formData.
+    const fechaRecepcionRaw = formData.get("fecha_recepcion")
+    const fechaRecepcionRes = normalizarFecha(fechaRecepcionRaw === null ? undefined : fechaRecepcionRaw)
+    if (fechaRecepcionRes.error) return NextResponse.json({ error: fechaRecepcionRes.error }, { status: 400 })
 
     const nroOrdenNuevo = normalizarNroOrden(formData.get("nro_orden"))
 
@@ -177,8 +181,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     const limpiarSubtipoPorCambioDeTipo =
       tipoMision.tocado && tipoMisionNuevoInfo && !tipoMisionNuevoInfo.tiene_subtipo && !subtipoElegido.tocado
 
-    const fechaEfectiva = fechaRes.tocado ? fechaRes.valor : escala.fecha
-
     let itinerarioEfectivo = itinerarios
     if (itinerarioEfectivo === undefined) {
       itinerarioEfectivo = await prisma.escalaItinerario.findMany({
@@ -195,6 +197,10 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
       )
     }
 
+    const fechaEfectiva = ventana
+      ? normalizarFechaSoloDia(fechaEnParaguayDesdeInstante(ventana.inicio))
+      : escala.fecha
+
     const errores = []
 
     const aeronaveAChequear = aeronave.tocado ? aeronave.valor : escala.aeronave_id
@@ -207,6 +213,10 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
       ? tripulacion
       : escala.tripulacion.map((t) => ({ persona_id: t.persona_id }))
     for (const t of tripAChequear) {
+      if (!fechaEfectiva) {
+        errores.push("Completá la hora estimada de salida y llegada del itinerario antes de asignar tripulación")
+        break
+      }
       const r = await verificarTripulante(parseInt(t.persona_id, 10), fechaEfectiva, ventana, escalaId)
       if (!r.ok) errores.push(r.motivo)
     }
@@ -246,7 +256,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
       }
 
       if (solicitanteRes.tocado) dataEscala.solicitante = solicitanteRes.valor
-      if (fechaRes.tocado)       dataEscala.fecha        = fechaRes.valor
       if (nroOrdenNuevo !== undefined) dataEscala.nro_orden = nroOrdenNuevo
       if (aeronave.tocado)   dataEscala.aeronave_id    = aeronave.valor
       if (tipoMision.tocado) dataEscala.tipo_mision_id = tipoMision.valor
@@ -270,14 +279,15 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
               orden:                 t.orden,
               origen:                `${t.origen}`.trim().toUpperCase(),
               destino:               `${t.destino}`.trim().toUpperCase(),
-              hora_estimada_salida:  new Date(t.hora_estimada_salida),
-              hora_estimada_llegada: new Date(t.hora_estimada_llegada),
+              hora_estimada_salida:  paraguayInputAFechaUTC(t.hora_estimada_salida),
+              hora_estimada_llegada: paraguayInputAFechaUTC(t.hora_estimada_llegada),
               creado_por:            session.user.id,
             },
           })
         }
         dataEscala.hora_despegue_estimada = ventana ? ventana.inicio : null
         dataEscala.hora_arribo_estimada   = ventana ? ventana.fin    : null
+        dataEscala.fecha = ventana ? normalizarFechaSoloDia(fechaEnParaguayDesdeInstante(ventana.inicio)) : null
       }
 
       if (tripulacion !== undefined) {
@@ -294,13 +304,14 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
         }
       }
 
-      if (solicitudActual && (canalRealmenteCambio || hayArchivoNuevo)) {
+      if (solicitudActual && (canalRealmenteCambio || hayArchivoNuevo || fechaRecepcionRes.tocado)) {
         const dataSolicitud = { editado_por: session.user.id }
         if (canalRealmenteCambio) dataSolicitud.canal = canalValor
         if (hayArchivoNuevo) {
           dataSolicitud.archivo = rutaGuardadaNueva
           dataSolicitud.nombre_archivo_original = nombreOriginalNuevo
         }
+        if (fechaRecepcionRes.tocado) dataSolicitud.fecha_recepcion = fechaRecepcionRes.valor
         await tx.solicitud.update({ where: { id: solicitudActual.id }, data: dataSolicitud })
       }
 
