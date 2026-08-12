@@ -28,12 +28,19 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
   const [busqueda,              setBusqueda]              = useState("")
   const [filtroEspecialidad,    setFiltroEspecialidad]    = useState("TODAS")
   const [filtroEscuadron,       setFiltroEscuadron]       = useState("TODOS")
+  const [mostrarInactivas,      setMostrarInactivas]      = useState(false)
+  const [cargandoLista,         setCargandoLista]         = useState(false)
   const [modalAbierto,          setModalAbierto]          = useState(false)
   const [modalUsuario,          setModalUsuario]          = useState(false)
   const [modalHabilitaciones,   setModalHabilitaciones]   = useState(false)
   const [personaSeleccionada,   setPersonaSeleccionada]   = useState(null)
   const [eliminando,            setEliminando]            = useState(null)
   const [modalPermisos,         setModalPermisos]         = useState(false)
+
+  // Puede ver el filtro de inactivas quien puede editar — no tiene
+  // sentido mostrarle la lista de inactivas a quien no puede hacer
+  // nada con ellas (ni reactivar, ni editar).
+  const puedeVerInactivas = !!permisos?.puede_editar
 
   const personasFiltradas = personas.filter((p) => {
     const texto = busqueda.toLowerCase()
@@ -60,8 +67,27 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
   function handleCerrarHabilitaciones() { setModalHabilitaciones(false); setPersonaSeleccionada(null) }
 
   async function recargarDatos() {
-    const res = await fetch("/api/personas")
+    setCargandoLista(true)
+    const url = mostrarInactivas && puedeVerInactivas
+      ? "/api/personas?incluirInactivas=true"
+      : "/api/personas"
+    const res = await fetch(url, { credentials: "include" })
     setPersonas(await res.json())
+    setCargandoLista(false)
+  }
+
+  function toggleMostrarInactivas() {
+    setMostrarInactivas((prev) => {
+      const nuevoValor = !prev
+      // Recarga con el valor NUEVO — no el que todavía tiene el estado
+      // en este render.
+      setCargandoLista(true)
+      const url = nuevoValor ? "/api/personas?incluirInactivas=true" : "/api/personas"
+      fetch(url, { credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => { setPersonas(data); setCargandoLista(false) })
+      return nuevoValor
+    })
   }
 
   async function handleGuardado()         { handleCerrar();                await recargarDatos() }
@@ -73,10 +99,42 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
     await recargarDatos()
   }
 
-  async function handleEliminar(id) {
-    if (!window.confirm("¿Estás segura de que querés desactivar esta persona?")) return
+  async function handleDesactivar(id) {
+    if (!window.confirm("¿Estás segura de que querés desactivar esta persona? Si tiene acceso al sistema, también se le desactiva.")) return
     setEliminando(id)
-    await fetch(`/api/personas/${id}`, { method: "DELETE" })
+    await fetch(`/api/personas/${id}`, { method: "DELETE", credentials: "include" })
+    await recargarDatos()
+    setEliminando(null)
+  }
+
+  async function handleReactivarPersona(persona) {
+    if (!window.confirm(`¿Reactivar a ${persona.apellido}, ${persona.nombre}?`)) return
+    setEliminando(persona.id)
+    const res = await fetch(`/api/personas/${persona.id}/reactivar`, { method: "PUT", credentials: "include" })
+    if (!res.ok) {
+      const datos = await res.json()
+      alert(datos.error || "Error al reactivar")
+    }
+    await recargarDatos()
+    setEliminando(null)
+  }
+
+  async function handleDesactivarUsuario(persona) {
+    if (!window.confirm(`¿Desactivar el acceso al sistema de ${persona.apellido}, ${persona.nombre}? La persona sigue activa, solo pierde el login.`)) return
+    setEliminando(persona.id)
+    await fetch(`/api/usuarios/${persona.usuario.id}`, { method: "DELETE", credentials: "include" })
+    await recargarDatos()
+    setEliminando(null)
+  }
+
+  async function handleReactivarUsuario(persona) {
+    if (!window.confirm(`¿Reactivar el acceso al sistema de ${persona.apellido}, ${persona.nombre}?`)) return
+    setEliminando(persona.id)
+    const res = await fetch(`/api/usuarios/${persona.usuario.id}/reactivar`, { method: "PUT", credentials: "include" })
+    if (!res.ok) {
+      const datos = await res.json()
+      alert(datos.error || "Error al reactivar el acceso")
+    }
     await recargarDatos()
     setEliminando(null)
   }
@@ -128,6 +186,19 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
       : <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">✗ No habilitado</span>
   }
 
+  // Acceso: distingue tres estados, no dos — con acceso, sin acceso
+  // (nunca se le creó Usuario), y acceso desactivado (tiene Usuario,
+  // pero está inactivo).
+  function badgeAcceso(persona) {
+    if (!persona.usuario) {
+      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Sin acceso</span>
+    }
+    if (!persona.usuario.activo) {
+      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Acceso desactivado</span>
+    }
+    return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">✓ Con acceso</span>
+  }
+
   // Varias especialidades por persona: se listan como texto separado por
   // coma. Si es solo una, se ve igual que antes.
   function textoEspecialidades(persona) {
@@ -151,7 +222,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
         )}
       </div>
 
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-4 mb-3">
         <input type="text"
           placeholder="Buscar por nombre, apellido o documento..."
           value={busqueda}
@@ -179,6 +250,20 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
         </select>
       </div>
 
+      {puedeVerInactivas && (
+        <label className="flex items-center gap-2 mb-4 text-sm text-gray-600 cursor-pointer w-fit">
+          <input
+            type="checkbox"
+            checked={mostrarInactivas}
+            onChange={toggleMostrarInactivas}
+            disabled={cargandoLista}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          Mostrar personas inactivas
+          {cargandoLista && <span className="text-xs text-gray-400">Cargando...</span>}
+        </label>
+      )}
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -201,9 +286,16 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
               </tr>
             ) : (
               personasFiltradas.map((persona) => (
-                <tr key={persona.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={persona.id} className={`transition-colors ${persona.activo === false ? "bg-gray-50 opacity-70" : "hover:bg-gray-50"}`}>
                   <td className="px-6 py-4 text-sm">
-                    <p className="font-medium text-gray-900">{persona.apellido}, {persona.nombre}</p>
+                    <p className="font-medium text-gray-900">
+                      {persona.apellido}, {persona.nombre}
+                      {persona.activo === false && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-200 text-gray-600 align-middle">
+                          Inactiva
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-gray-400">{persona.nro_documento}</p>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">{persona.grado}</td>
@@ -216,47 +308,69 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
                   </td>
                   <td className="px-6 py-4 text-sm">{badgeMedica(persona)}</td>
                   <td className="px-6 py-4 text-sm">{badgeOperacional(persona.nivel_operacional_habilitado)}</td>
-                  <td className="px-6 py-4 text-sm">
-                    {persona.usuario
-                      ? <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">✓ Con acceso</span>
-                      : <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Sin acceso</span>
-                    }
-                  </td>
+                  <td className="px-6 py-4 text-sm">{badgeAcceso(persona)}</td>
                   <td className="px-6 py-4 text-sm text-right">
-                    <div className="flex justify-end gap-2">
-                      {permisos?.puede_editar && (
-                        <button onClick={() => handleEditar(persona)}
-                          className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors">
-                          Editar
-                        </button>
-                      )}
-                      {permisos?.puede_editar && (
-                        <button onClick={() => handleAbrirHabilitaciones(persona)}
-                          className="px-3 py-1 text-xs text-teal-600 border border-teal-200 rounded hover:bg-teal-50 transition-colors">
-                          Habilitaciones
-                        </button>
-                      )}
-                      {permisos?.puede_editar && (
-                        <button onClick={() => handleAbrirUsuario(persona)}
-                          className="px-3 py-1 text-xs text-purple-600 border border-purple-200 rounded hover:bg-purple-50 transition-colors">
-                          {persona.usuario ? "Acceso" : "Dar acceso"}
-                        </button>
-                      )}
-                      {esAdministrador && persona.usuario && (
-                        <button onClick={() => handleAbrirPermisos(persona)}
-                          className="px-3 py-1 text-xs text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-50 transition-colors">
-                          Permisos
-                        </button>
-                      )}
-                      {permisos?.puede_eliminar && (
-                        <button onClick={() => handleEliminar(persona.id)}
-                          disabled={eliminando === persona.id}
-                          className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50">
-                          {eliminando === persona.id ? "..." : "Desactivar"}
-                        </button>
-                      )}
-                      {!permisos?.puede_editar && !permisos?.puede_eliminar && (
-                        <span className="text-xs text-gray-300">Sin acciones</span>
+                    <div className="flex justify-end gap-2 flex-wrap">
+                      {persona.activo === false ? (
+                        permisos?.puede_editar && (
+                          <button onClick={() => handleReactivarPersona(persona)}
+                            disabled={eliminando === persona.id}
+                            className="px-3 py-1 text-xs text-green-700 border border-green-200 rounded hover:bg-green-50 transition-colors disabled:opacity-50">
+                            {eliminando === persona.id ? "..." : "Reactivar"}
+                          </button>
+                        )
+                      ) : (
+                        <>
+                          {permisos?.puede_editar && (
+                            <button onClick={() => handleEditar(persona)}
+                              className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors">
+                              Editar
+                            </button>
+                          )}
+                          {permisos?.puede_editar && (
+                            <button onClick={() => handleAbrirHabilitaciones(persona)}
+                              className="px-3 py-1 text-xs text-teal-600 border border-teal-200 rounded hover:bg-teal-50 transition-colors">
+                              Habilitaciones
+                            </button>
+                          )}
+                          {permisos?.puede_editar && (
+                            <button onClick={() => handleAbrirUsuario(persona)}
+                              className="px-3 py-1 text-xs text-purple-600 border border-purple-200 rounded hover:bg-purple-50 transition-colors">
+                              {persona.usuario ? "Acceso" : "Dar acceso"}
+                            </button>
+                          )}
+                          {esAdministrador && persona.usuario && (
+                            <button onClick={() => handleAbrirPermisos(persona)}
+                              className="px-3 py-1 text-xs text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-50 transition-colors">
+                              Permisos
+                            </button>
+                          )}
+                          {permisos?.puede_editar && persona.usuario && (
+                            persona.usuario.activo ? (
+                              <button onClick={() => handleDesactivarUsuario(persona)}
+                                disabled={eliminando === persona.id}
+                                className="px-3 py-1 text-xs text-amber-600 border border-amber-200 rounded hover:bg-amber-50 transition-colors disabled:opacity-50">
+                                {eliminando === persona.id ? "..." : "Quitar acceso"}
+                              </button>
+                            ) : (
+                              <button onClick={() => handleReactivarUsuario(persona)}
+                                disabled={eliminando === persona.id}
+                                className="px-3 py-1 text-xs text-green-700 border border-green-200 rounded hover:bg-green-50 transition-colors disabled:opacity-50">
+                                {eliminando === persona.id ? "..." : "Restaurar acceso"}
+                              </button>
+                            )
+                          )}
+                          {permisos?.puede_eliminar && (
+                            <button onClick={() => handleDesactivar(persona.id)}
+                              disabled={eliminando === persona.id}
+                              className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50">
+                              {eliminando === persona.id ? "..." : "Desactivar"}
+                            </button>
+                          )}
+                          {!permisos?.puede_editar && !permisos?.puede_eliminar && (
+                            <span className="text-xs text-gray-300">Sin acciones</span>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>
@@ -268,6 +382,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <p className="text-xs text-gray-500">
             {personasFiltradas.length} de {personas.length} personas
+            {mostrarInactivas && puedeVerInactivas && " (incluye inactivas)"}
           </p>
         </div>
       </div>

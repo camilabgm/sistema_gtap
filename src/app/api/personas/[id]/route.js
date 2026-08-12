@@ -97,16 +97,36 @@ export const PATCH = conAdmin("PERSONAS", async (request, { params }, session) =
   return NextResponse.json(persona)
 })
 
+// Desactiva la Persona Y, si tiene Usuario vinculado, también lo
+// desactiva — en la misma transacción. Regla de una sola dirección: no
+// tiene sentido que alguien pueda seguir logueándose si ya no es
+// personal activo del GTAP. El camino inverso (desactivar el Usuario
+// sin tocar la Persona) sigue existiendo aparte, en
+// usuarios/[id]/route.js — sin cambios, ese sí queda asimétrico a
+// propósito.
 export const DELETE = conPermiso("PERSONAS", "puede_eliminar", async (request, { params }, session) => {
   const { id } = await params
+  const personaId = Number(id)
 
-  await prisma.persona.update({
-    where: { id: Number(id) },
-    data: {
-      activo:        false,
-      deleted_at:    new Date(),
-      eliminado_por: session.user.id,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.persona.update({
+      where: { id: personaId },
+      data: {
+        activo:        false,
+        deleted_at:    new Date(),
+        eliminado_por: session.user.id,
+      },
+    })
+
+    await tx.usuario.updateMany({
+      where: { persona_id: personaId, activo: true },
+      data: {
+        activo:               false,
+        deleted_at:           new Date(),
+        eliminado_por:        session.user.id,
+        sesion_invalidada_en: new Date(),
+      },
+    })
   })
 
   return NextResponse.json({ ok: true })

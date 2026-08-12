@@ -4,9 +4,18 @@ import { conPermiso } from "@/lib/api-helpers"
 import { normalizarEspecialidades } from "@/lib/personas"
 import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 
+// ?incluirInactivas=true trae también las desactivadas — pero solo si
+// quien pide tiene puede_editar. Sin ese permiso, el filtro se ignora
+// en silencio y siempre devuelve activas, aunque alguien arme la URL a
+// mano — el candado real está acá, no en que el frontend no muestre el
+// botón.
 export const GET = conPermiso("PERSONAS", "puede_ver", async (request, context, session) => {
+  const { searchParams } = new URL(request.url)
+  const pidioInactivas = searchParams.get("incluirInactivas") === "true"
+  const puedeVerInactivas = pidioInactivas && !!session.user.permisos?.PERSONAS?.puede_editar
+
   const personas = await prisma.persona.findMany({
-    where:   { activo: true },
+    where:   puedeVerInactivas ? {} : { activo: true },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
     include: {
       usuario: {
