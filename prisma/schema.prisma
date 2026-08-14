@@ -153,15 +153,12 @@ model Persona {
   contacto_emergencia String?
   nro_pasaporte       String?
 
-  // Habilitación médica anual — check manual de Operaciones
   hab_anual_habilitada Boolean @default(false)
 
-  // Habilitación operacional — check manual de Operaciones
   nivel_operacional_habilitado   Boolean   @default(false)
   nivel_operacional_aprobado_por Int?
   nivel_operacional_fecha        DateTime?
 
-  // Campos legacy — se mantienen para no perder datos históricos
   nivel_operacional       String?
   nivel_operacional_vence DateTime?
 
@@ -184,14 +181,12 @@ model Persona {
   @@map("personas")
 }
 
-// Historial de habilitaciones médicas semestrales (1P y 2P)
-// Un registro por período por persona — no sobreescribe, acumula.
 model HabilitacionMedica {
   id           Int      @id @default(autoincrement())
   persona_id   Int
   fecha_examen DateTime @db.Date
-  periodo      String // "1P" | "2P"
-  anio         Int // año de inicio del período
+  periodo      String
+  anio         Int
   vence        DateTime @db.Date
 
   created_at    DateTime  @default(now())
@@ -203,7 +198,6 @@ model HabilitacionMedica {
 
   persona Persona @relation(fields: [persona_id], references: [id])
 
-  // No se puede cargar dos veces el mismo período para la misma persona
   @@unique([persona_id, periodo, anio])
   @@map("habilitaciones_medicas")
 }
@@ -381,60 +375,34 @@ model LogIntentoLogin {
 
 // ─────────────────────────────  MODELO M4  ────────────────────────────
 
-//  NOTA 1: la disponibilidad administrativa del personal NO se modela
-//  acá. Se reutiliza el modelo ParteDiario que ya existe en M3.
-//  NOTA 2: cada escala guarda un inicio y un fin estimado (DateTime)
-//  para detectar choques de horario. Una aeronave o un tripulante
-//  PUEDEN tener varios vuelos el mismo día si NO se solapan en horario.
-//  NOTA 3: la VENTANA DE OCUPACIÓN (despegue → arribo final, incluye
-//  tiempo en tierra) es lo que usa el bloqueo de choques. Las HORAS
-//  VOLADAS (para SICEM/Informes) son la suma del tiempo de cada tramo
-//  del itinerario y NO incluyen el tiempo en tierra. Son números
-//  distintos.
-// ════════════════════════════════════════════════════════════════════
-
 model Escala {
   id                     Int             @id @default(autoincrement())
   nro_orden              String?         @unique
-  // Fecha del vuelo — ya NO se carga a mano en el formulario. Se
-  // calcula sola a partir de la hora estimada de salida más temprana
-  // del itinerario, convertida a hora de Paraguay (ver
-  // fechaEnParaguayDesdeInstante() en lib/fechaHora.js). Por eso es
-  // opcional: en un borrador recién creado, antes de cargar el
-  // itinerario, todavía no hay ningún valor que calcular.
   fecha                  DateTime?       @db.Date
   hora_despegue_estimada DateTime?
   hora_arribo_estimada   DateTime?
-  solicitante            String // ej. FFMM, Presidencia, ANDE, CODI
+  solicitante            String
   observaciones          String?
   estado                 EstadoEscala    @default(PROGRAMADA)
-  motivo_abortada        MotivoAbortada? // solo si estado = ABORTADA
+  motivo_abortada        MotivoAbortada?
   observacion_aborto     String?
   es_borrador            Boolean         @default(true)
 
-  // Resultado de la autorización (uno a uno con la escala)
   autorizada         Boolean         @default(false)
   autorizada_por     Int?
   rol_autoriza       RolAutorizador?
   fecha_autorizacion DateTime?
-  // Titular (1) o adjunto (2) de rol_autoriza, en el momento de
-  // autorizar O rechazar. Null en escalas resueltas antes de este campo.
   orden_autorizante  Int?
 
-  // Resultado si el autorizante decide RECHAZAR en vez de autorizar —
-  // distinto de "abortada" (eso es sobre la aeronave/tripulación en el
-  // momento operativo). Rechazada es una decisión humana del autorizante,
-  // antes de que la escala llegue a volar.
   rechazada_por  Int?
   motivo_rechazo String?
   fecha_rechazo  DateTime?
 
-  // Relaciones con módulos existentes (M1 y M2) — opcionales en borrador
   aeronave_id     Int?
   aeronave        Aeronave?   @relation(fields: [aeronave_id], references: [id])
   tipo_mision_id  Int?
   tipo_mision     TipoMision? @relation(fields: [tipo_mision_id], references: [id])
-  subtipo_elegido String? // el subtipo puntual elegido, si tipo_mision.tiene_subtipo
+  subtipo_elegido String?
 
   // Relaciones hijas (este módulo)
   itinerarios    EscalaItinerario[]
@@ -443,8 +411,9 @@ model Escala {
   autorizaciones EscalaAutorizacion[]
   acuses         AcuseRecibo[]
   post_vuelos    PostVuelo[]
+  pasajeros      EscalaPasajero[]
+  cargas         EscalaCarga[]
 
-  // Auditoría
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
@@ -460,18 +429,15 @@ model EscalaItinerario {
   escala_id Int
   escala    Escala @relation(fields: [escala_id], references: [id])
 
-  orden   Int // 1, 2, 3… el tramo dentro del vuelo
-  origen  String // OACI de partida del tramo, ej. SGAS
-  destino String // OACI de llegada del tramo, ej. SGFI
+  orden   Int
+  origen  String
+  destino String
 
-  // Tiempos por tramo. Horas del tramo = llegada - salida.
-  // El total de la escala = suma de las horas de todos los tramos.
   hora_estimada_salida  DateTime?
   hora_estimada_llegada DateTime?
   hora_real_salida      DateTime?
   hora_real_llegada     DateTime?
 
-  // Auditoría
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
@@ -491,7 +457,6 @@ model EscalaTripulacion {
   persona      Persona    @relation(fields: [persona_id], references: [id])
   rol_en_vuelo RolEnVuelo
 
-  // Auditoría
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
@@ -509,16 +474,11 @@ model Solicitud {
   escala    Escala @relation(fields: [escala_id], references: [id])
 
   canal                   CanalSolicitud
-  archivo                 String? // ruta del archivo guardado; null si VERBAL
+  archivo                 String?
   nombre_archivo_original String?
-  recibido_por            Int? // id del usuario que cargó el pedido
-  // Cuándo llegó la solicitud a la unidad — dato que carga la persona
-  // que registra la escala, no un timestamp automático. Es "solo día"
-  // (@db.Date), igual criterio que Escala.fecha: la hora exacta no
-  // importa acá, importa el día. Obligatorio.
+  recibido_por            Int?
   fecha_recepcion         DateTime?      @db.Date
 
-  // Auditoría
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
@@ -534,24 +494,16 @@ model EscalaAutorizacion {
   escala_id Int
   escala    Escala @relation(fields: [escala_id], references: [id])
 
-  // A quién le tocó la responsabilidad en este paso, y por qué le tocó
   rol_autorizador     RolAutorizador
-  persona_id          Int? // la persona concreta que tenía ese rol ese día
-  // Titular (1) o adjunto (2) del cargo, en el momento en que se evaluó
-  // este paso. Null en filas viejas, de antes de este campo.
+  persona_id          Int?
   orden               Int?
   motivo_escalamiento MotivoEscalamiento
 
-  // Qué pasó en este paso: ¿autorizó acá, o se le pasó al siguiente?
-  // true  = esta persona AUTORIZÓ la escala (cierra el recorrido)
-  // false = quedó registrada como paso, pero la responsabilidad siguió
   autorizo   Boolean @default(false)
   comentario String?
 
-  // Cuándo ocurrió este paso (para mostrarlo en la interfaz)
   fecha_paso DateTime @default(now())
 
-  // Auditoría
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
@@ -570,9 +522,8 @@ model AcuseRecibo {
   persona_id  Int
   persona     Persona   @relation(fields: [persona_id], references: [id])
   rol         RolAcuse
-  fecha_acuse DateTime? // null = todavía no acusó recibo
+  fecha_acuse DateTime?
 
-  // Auditoría
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
@@ -589,13 +540,12 @@ model AutorizadorNoDisponible {
   persona_id Int
   persona    Persona @relation(fields: [persona_id], references: [id])
 
-  desde DateTime  @default(now()) // cuándo empezó a derivar
-  hasta DateTime? // cuándo volvió; null = sigue derivado
+  desde DateTime  @default(now())
+  hasta DateTime?
 
   motivo         MotivoNoDisponibleAutorizador @default(TAREA_ADMINISTRATIVA)
-  motivo_detalle String? // texto libre si motivo = OTRO
+  motivo_detalle String?
 
-  // Auditoría
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
@@ -609,22 +559,15 @@ model AutorizadorNoDisponible {
 model CargoAutorizacion {
   id Int @id @default(autoincrement())
 
-  // Qué cargo de autorización es (lista cerrada de 5, ya existe el enum)
   rol_autorizador RolAutorizador
 
-  // Quién lo ocupa. Se conecta con Usuario, no con Persona.
   usuario_id Int
   usuario    Usuario @relation(fields: [usuario_id], references: [id])
 
-  // Orden dentro del cargo: 1 = titular, 2 = adjunto, 3… (Forma B)
   orden Int
 
-  // Nombramiento vigente. Al rotar cargos: viejo activo=false, nuevo activo=true.
-  // La regla "no dos con el mismo (cargo, orden) activos" se valida en el
-  // código del apartado de usuarios (crear y editar), NO acá en la base.
   activo Boolean @default(true)
 
-  // Auditoría (igual que el resto del sistema)
   creado_por    Int?
   editado_por   Int?
   eliminado_por Int?
@@ -639,14 +582,9 @@ model CargoAutorizacion {
 
 model PostVuelo {
   id        Int    @id @default(autoincrement())
-  escala_id Int // ya no es @unique — puede haber varias filas por escala a lo largo del tiempo (solo una sin deleted_at a la vez, eso se valida en el código, no en la base)
+  escala_id Int
   escala    Escala @relation(fields: [escala_id], references: [id])
 
-  // Horas de vuelo y de tierra por separado — SICEM (a futuro) va a sumar
-  // solo horas_vuelo_minutos por aeronave, sin que se le mezcle tiempo en
-  // tierra. total_minutos se guarda para que Informes/Manifiesto puedan
-  // sumarlo directo, pero SOLO lo escribe el servidor — nunca es un
-  // input, se recalcula siempre que se crea o edita el registro.
   horas_vuelo_minutos  Int
   horas_tierra_minutos Int
   total_minutos        Int
@@ -661,7 +599,6 @@ model PostVuelo {
 
   observaciones String?
 
-  // Auditoría — mismo patrón que el resto del sistema.
   creado_por    Int
   editado_por   Int?
   eliminado_por Int?
@@ -670,4 +607,47 @@ model PostVuelo {
   deleted_at    DateTime?
 
   @@map("post_vuelos")
+}
+
+// ─────────────────────────────  MODELO M6 — MANIFIESTO  ────────────────
+
+model EscalaPasajero {
+  id        Int    @id @default(autoincrement())
+  escala_id Int
+  escala    Escala @relation(fields: [escala_id], references: [id])
+
+  nro_documento String
+  nombre        String
+  apellido      String
+  nacionalidad  String
+
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  // Evita cargar dos veces al mismo documento en la misma escala por error.
+  @@unique([escala_id, nro_documento])
+  @@map("escala_pasajeros")
+}
+
+model EscalaCarga {
+  id        Int    @id @default(autoincrement())
+  escala_id Int
+  escala    Escala @relation(fields: [escala_id], references: [id])
+
+  tipo        String
+  descripcion String?
+  peso        Decimal? @db.Decimal(8, 2) // kg
+
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("escala_cargas")
 }

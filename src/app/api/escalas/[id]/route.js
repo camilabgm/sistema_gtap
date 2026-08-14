@@ -133,9 +133,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     const solicitanteRes = normalizarSolicitante(solicitanteRaw === null ? undefined : solicitanteRaw)
     if (solicitanteRes.error) return NextResponse.json({ error: solicitanteRes.error }, { status: 400 })
 
-    // fecha_recepcion de la Solicitud — mismo patrón "tocado" que canal.
-    // Escala.fecha (la del vuelo) ya NO se lee del formData — se
-    // recalcula sola más abajo, a partir del itinerario.
     const fechaRecepcionRaw = formData.get("fecha_recepcion")
     const fechaRecepcionRes = normalizarFecha(fechaRecepcionRaw === null ? undefined : fechaRecepcionRaw)
     if (fechaRecepcionRes.error) return NextResponse.json({ error: fechaRecepcionRes.error }, { status: 400 })
@@ -240,11 +237,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     }
     const ventana = calcularVentana(itinerarioEfectivo)
 
-    // La "fecha" de referencia para chequear habilitación médica y
-    // Parte Diario sale del itinerario efectivo (nuevo o ya guardado en
-    // la base) — no de un campo aparte del formulario. Si todavía no
-    // hay ningún tramo con salida y llegada cargadas, no hay fecha
-    // (escala.fecha puede ser null en un borrador recién creado).
     const fechaEfectiva = ventana
       ? normalizarFechaSoloDia(fechaEnParaguayDesdeInstante(ventana.inicio))
       : escala.fecha
@@ -318,7 +310,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
         }
         dataEscala.hora_despegue_estimada = ventana ? ventana.inicio : null
         dataEscala.hora_arribo_estimada   = ventana ? ventana.fin    : null
-        // Fecha del vuelo, recalculada junto con el resto del itinerario.
         dataEscala.fecha = ventana ? normalizarFechaSoloDia(fechaEnParaguayDesdeInstante(ventana.inicio)) : null
       }
 
@@ -395,6 +386,8 @@ export const DELETE = conPermiso("ESCALAS", "puede_eliminar", async (request, co
     await tx.escalaAutorizacion.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
     await tx.acuseRecibo.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
     await tx.postVuelo.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+    await tx.escalaPasajero.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
+    await tx.escalaCarga.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })
   })
 
   return NextResponse.json({ ok: true })

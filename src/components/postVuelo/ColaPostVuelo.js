@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, Fragment } from "react"
-import PanelDetalleEscala from "@/components/escalas/PanelDetalleEscala"
+import PanelPostVuelo from "./PanelPostVuelo"
 import { formatearFechaHoraCompacta } from "@/lib/escalas"
 
 export default function ColaPostVuelo() {
@@ -27,24 +27,24 @@ export default function ColaPostVuelo() {
   }, [])
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-
+    <div className="mx-auto max-w-4xl p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Post-Vuelo</h1>
-        <p className="text-sm text-gray-500 mt-1">Escalas que te falta reportar</p>
+        <p className="mt-1 text-sm text-gray-500">Escalas que te falta reportar</p>
       </div>
 
       {cargando ? (
-        <p className="text-sm text-gray-400">Cargando...</p>
+        <p className="text-sm text-gray-400">Cargando…</p>
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : escalas.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
+        <div className="rounded-lg border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
           No tenés ninguna escala pendiente de reportar. 🎉
         </div>
       ) : (
         <>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
             <p className="text-sm font-medium text-blue-800">
               Tenés {escalas.length} escala{escalas.length !== 1 && "s"} para reportar.
             </p>
@@ -68,35 +68,41 @@ export default function ColaPostVuelo() {
                 <Fragment key={e.id}>
                   <button
                     onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
-                    className="w-full flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    className={`flex w-full items-center gap-4 rounded-lg border px-4 py-3 text-left transition-colors ${
+                      expandida ? "border-blue-200 bg-blue-50/40" : "border-gray-200 bg-white hover:bg-gray-50"
+                    }`}
                   >
-                    <div className="text-center min-w-[92px]">
+                    <div className="min-w-[92px] text-center">
                       <p className="text-sm font-bold text-gray-900">
                         {formatearFechaHoraCompacta(e.hora_despegue_estimada)}
                       </p>
                     </div>
-                    <div className="w-px self-stretch bg-gray-200" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900 truncate">
-                        {e.aeronave?.matricula || "Sin aeronave"} · {ruta}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5 truncate">
+                    <div className="h-10 w-px shrink-0 bg-gray-200" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-gray-900">
+                          {e.aeronave?.matricula || "Sin aeronave"} · {ruta}
+                        </p>
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          Por reportar
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-gray-500">
                         {tripulacionTexto} · {e.tipo_mision?.codigo || "Sin tipo de misión"}
                         {e.solicitante && ` · Solicitante: ${e.solicitante}`}
                         {e.nro_orden && ` · Orden #${e.nro_orden}`}
                       </p>
                     </div>
-                    <span className="px-2 py-1 text-xs rounded-full font-medium bg-purple-100 text-purple-700 shrink-0">
+                    <span className="shrink-0 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600">
                       {expandida ? "Ocultar" : "Reportar"}
                     </span>
                   </button>
 
                   {expandida && (
                     <div className="mt-1">
-                      <PanelDetalleEscala
+                      <PanelPostVuelo
                         escala={e}
-                        puedeEditar={false}
-                        mostrarPostVuelo={true}
                         onCerrar={() => setFilaExpandidaId(null)}
                         onActualizada={cargarEscalas}
                       />
