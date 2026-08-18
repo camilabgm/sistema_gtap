@@ -6,6 +6,7 @@ import { conSesion, conPermiso } from "@/lib/api-helpers"
 import {
   puedeCargarPostVuelo,
   esTripulanteDeEscala,
+  esSupervisorSemanaDeEscala,
   calcularDefaultsPostVuelo,
   calcularHorasDesdeTramosReales,
 } from "@/lib/postVuelo"
@@ -40,6 +41,10 @@ async function cargarEscalaConDatos(escalaId) {
       tripulacion: {
         where: { deleted_at: null },
         select: { persona_id: true, rol_en_vuelo: true, persona: { select: { grado: true, apellido: true } } },
+      },
+      acuses: {
+        where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" },
+        select: { persona_id: true },
       },
     },
   })
@@ -89,21 +94,33 @@ export const GET = conSesion("POST_VUELO", async (request, context, session) => 
   }
 
   const esTripulante = esTripulanteDeEscala(escala, session.user.personaId)
-  const puedeVer = !!session.user.permisos?.POST_VUELO?.puede_ver || esTripulante
+  const esSupervisor = esSupervisorSemanaDeEscala(escala, session.user.personaId)
+
+  const puedeVer = !!session.user.permisos?.POST_VUELO?.puede_ver || esTripulante || esSupervisor
   if (!puedeVer) {
     return NextResponse.json({ error: "No tenés permiso para ver este post-vuelo" }, { status: 403 })
   }
 
   const postVuelo = await cargarPostVueloActivo(escalaId)
 
-  const puedeCrear = !!session.user.permisos?.POST_VUELO?.puede_crear || esTripulante
-  const puedeEditarPostVuelo = !!session.user.permisos?.POST_VUELO?.puede_editar || esTripulante
-  const puedeEditarTramos = (puedeCrear || puedeEditarPostVuelo) && ["PROGRAMADA", "CUMPLIDA"].includes(escala.estado)
+  // "Una sola vez": tripulante y Supervisor de Semana pueden CREAR el
+  // cierre (una vez, en el POST de abajo), pero no volver a editarlo —
+  // puedeEditarPostVuelo ya NO lleva el bypass de tripulante/supervisor,
+  // queda exclusivo del permiso de matriz.
+  const puedeCrear = !!session.user.permisos?.POST_VUELO?.puede_crear || esTripulante || esSupervisor
+  const puedeEditarPostVuelo = !!session.user.permisos?.POST_VUELO?.puede_editar
 
-  // Igual que Escalas, Eliminar depende únicamente del permiso de la
-  // matriz (POST_VUELO.puede_eliminar) — sin extenderlo a "o
-  // tripulante", a diferencia de crear/editar (borrar es una acción
-  // más sensible que corregir).
+  // Tramos: libres de editar mientras no exista el cierre (están
+  // "completando" antes de la carga única); una vez creado el
+  // post-vuelo, corregir un tramo es lo mismo que editar, así que pasa
+  // a depender solo de matriz.
+  const puedeEditarTramos = postVuelo
+    ? puedeEditarPostVuelo
+    : puedeCrear && escala.estado === "PROGRAMADA"
+
+  // Eliminar sigue dependiendo únicamente del permiso de la matriz —
+  // sin bypass de tripulante/supervisor, es una acción más sensible
+  // que corregir.
   const puedeEliminarPostVuelo = !!session.user.permisos?.POST_VUELO?.puede_eliminar
 
   const calculo = calcularHorasDesdeTramosReales(escala.itinerarios)
@@ -137,8 +154,9 @@ export const POST = conSesion("POST_VUELO", async (request, context, session) =>
   }
 
   const esTripulante = esTripulanteDeEscala(escala, session.user.personaId)
+  const esSupervisor = esSupervisorSemanaDeEscala(escala, session.user.personaId)
   const tienePermisoAmplio = !!session.user.permisos?.POST_VUELO?.puede_crear
-  if (!tienePermisoAmplio && !esTripulante) {
+  if (!tienePermisoAmplio && !esTripulante && !esSupervisor) {
     return NextResponse.json({ error: "No tenés permiso para cargar este post-vuelo" }, { status: 403 })
   }
 
@@ -213,9 +231,12 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
     return NextResponse.json({ error: "Esta escala todavía no tiene post-vuelo cargado" }, { status: 404 })
   }
 
-  const esTripulante = esTripulanteDeEscala(escala, session.user.personaId)
-  const tienePermisoAmplio = !!session.user.permisos?.POST_VUELO?.puede_editar
-  if (!tienePermisoAmplio && !esTripulante) {
+  // Editar un post-vuelo ya cargado es EXCLUSIVO de la matriz de
+  // permisos — tripulante y Supervisor de Semana ya usaron su única
+  // carga al crearlo. Para corregir algo hace falta alguien con
+  // POST_VUELO.puede_editar (Cmdte. Esc. Aéreo/Material o superior).
+  const puedeEditarPostVuelo = !!session.user.permisos?.POST_VUELO?.puede_editar
+  if (!puedeEditarPostVuelo) {
     return NextResponse.json({ error: "No tenés permiso para editar este post-vuelo" }, { status: 403 })
   }
 

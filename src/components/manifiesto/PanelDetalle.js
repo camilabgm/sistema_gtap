@@ -4,17 +4,21 @@
 // sin re-cargar nada) + secciones editables de Pasajeros y Carga.
 
 import { useState } from "react"
+import { Pencil, Trash2, AlertTriangle } from "lucide-react"
 import { Badge, formatearFechaCorta, formatearHoraCorta } from "./ListaEscalas"
 import { construirCadenaRuta } from "@/lib/manifiesto"
 import { exportarManifiestoPDF } from "@/lib/exportarManifiestoPDF"
 import FormularioPasajero from "./FormularioPasajero"
 import FormularioCarga from "./FormularioCarga"
+import AccionIcono from "@/components/shared/AccionIcono"
+import SeparadorSeccion from "@/components/shared/SeparadorSeccion"
 
 export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
   const [agregandoPasajero, setAgregandoPasajero] = useState(false)
   const [editandoPasajeroId, setEditandoPasajeroId] = useState(null)
   const [agregandoCarga, setAgregandoCarga] = useState(false)
   const [editandoCargaId, setEditandoCargaId] = useState(null)
+  const [cerrando, setCerrando] = useState(false)
 
   const ruta = construirCadenaRuta(detalle.itinerarios)
 
@@ -40,6 +44,28 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
     onCambio()
   }
 
+  async function cerrarManifiesto() {
+    if (
+      !confirm(
+        "¿Cerrar el manifiesto de esta escala? Después de cerrarlo no vas a poder agregar ni editar pasajeros o carga — para corregir algo va a hacer falta un usuario de nivel superior."
+      )
+    ) {
+      return
+    }
+    setCerrando(true)
+    try {
+      const res = await fetch(`/api/manifiesto/${detalle.id}/cerrar`, { method: "PUT" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || "No se pudo cerrar el manifiesto")
+        return
+      }
+      onCambio()
+    } finally {
+      setCerrando(false)
+    }
+  }
+
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto rounded-lg border border-gray-200 bg-white p-5">
       {/* Encabezado: ruta, estado, fecha, horas */}
@@ -48,6 +74,12 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>{formatearFechaCorta(detalle.fecha)}</span>
             <Badge estado={detalle.estado} />
+            {detalle.manifiesto_cerrado && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                Manifiesto cerrado
+              </span>
+            )}
           </div>
           <div className="mt-1 text-xl font-semibold text-gray-900">
             {detalle.origen ?? "—"} → {detalle.destino ?? "—"}
@@ -145,6 +177,9 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
         </button>
       </div>
 
+      {/* A partir de acá: lo que el usuario tiene que completar */}
+      <SeparadorSeccion texto="Manifiesto de esta escala" />
+
       {/* Manifiesto de pasajeros */}
       <div className="border-b border-gray-100 pb-4">
         <div className="mb-2 flex items-center justify-between">
@@ -152,12 +187,24 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
             Manifiesto · {detalle.pasajeros.length} persona{detalle.pasajeros.length === 1 ? "" : "s"}
           </div>
           {puedeGestionar && !agregandoPasajero && (
-            <button
-              onClick={() => setAgregandoPasajero(true)}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              + Agregar persona
-            </button>
+            <div className="flex gap-2">
+              {!detalle.manifiesto_cerrado && (
+                <button
+                  onClick={cerrarManifiesto}
+                  disabled={cerrando}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  {cerrando ? "Cerrando…" : "Cerrar manifiesto"}
+                </button>
+              )}
+              <button
+                onClick={() => setAgregandoPasajero(true)}
+                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                + Agregar persona
+              </button>
+            </div>
           )}
         </div>
 
@@ -199,13 +246,19 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
                   <span className="ml-2 text-gray-500">{p.nro_documento} · {p.nacionalidad}</span>
                 </div>
                 {puedeGestionar && (
-                  <div className="flex gap-2 text-xs">
-                    <button onClick={() => setEditandoPasajeroId(p.id)} className="text-blue-600 hover:underline">
-                      Editar
-                    </button>
-                    <button onClick={() => borrarPasajero(p.id)} className="text-red-600 hover:underline">
-                      Borrar
-                    </button>
+                  <div className="flex gap-1">
+                    <AccionIcono
+                      icono={Pencil}
+                      etiqueta="Editar pasajero"
+                      onClick={() => setEditandoPasajeroId(p.id)}
+                      color="primario"
+                    />
+                    <AccionIcono
+                      icono={Trash2}
+                      etiqueta="Borrar pasajero"
+                      onClick={() => borrarPasajero(p.id)}
+                      color="peligro"
+                    />
                   </div>
                 )}
               </li>
@@ -267,13 +320,19 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
                   {c.peso && <span className="ml-2 text-gray-500">{c.peso} kg</span>}
                 </div>
                 {puedeGestionar && (
-                  <div className="flex gap-2 text-xs">
-                    <button onClick={() => setEditandoCargaId(c.id)} className="text-blue-600 hover:underline">
-                      Editar
-                    </button>
-                    <button onClick={() => borrarCarga(c.id)} className="text-red-600 hover:underline">
-                      Borrar
-                    </button>
+                  <div className="flex gap-1">
+                    <AccionIcono
+                      icono={Pencil}
+                      etiqueta="Editar carga"
+                      onClick={() => setEditandoCargaId(c.id)}
+                      color="primario"
+                    />
+                    <AccionIcono
+                      icono={Trash2}
+                      etiqueta="Borrar carga"
+                      onClick={() => borrarCarga(c.id)}
+                      color="peligro"
+                    />
                   </div>
                 )}
               </li>

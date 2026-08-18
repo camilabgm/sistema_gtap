@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
-import ColaPostVuelo from "@/components/postVuelo/ColaPostVuelo"
+import PostVueloScreen from "@/components/postVuelo/PostVueloScreen"
 
 // Sin gate por permiso de módulo — cualquier usuario logueado puede
 // tener escalas pendientes de reportar como tripulante, tenga o no el
@@ -17,5 +17,5 @@ export default async function PostVueloPage() {
     )
   }
 
-  return <ColaPostVuelo />
+  return <PostVueloScreen />
 }

@@ -2,10 +2,10 @@
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { conPermiso } from "@/lib/api-helpers"
+import { conSesion } from "@/lib/api-helpers"
 import { validarPasajero, usuarioPuedeGestionarManifiesto } from "@/lib/manifiesto"
 
-export const POST = conPermiso("MANIFIESTO", "puede_crear", async (request, context, session) => {
+export const POST = conSesion("MANIFIESTO", async (request, context, session) => {
   const { escalaId } = await context.params
   const id = parseInt(escalaId, 10)
   if (!Number.isInteger(id) || id <= 0) {
@@ -16,6 +16,7 @@ export const POST = conPermiso("MANIFIESTO", "puede_crear", async (request, cont
     where: { id, deleted_at: null },
     select: {
       id: true,
+      manifiesto_cerrado: true,
       tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
       acuses: { where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" }, select: { persona_id: true } },
     },

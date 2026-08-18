@@ -388,6 +388,14 @@ model Escala {
   observacion_aborto     String?
   es_borrador            Boolean         @default(true)
 
+  // Manifiesto: candado de "una sola carga" para tripulación y
+  // Supervisor de Semana. Una vez true, usuarioPuedeGestionarManifiesto()
+  // en src/lib/manifiesto.js bloquea a todos menos a los roles de
+  // matriz (Comandante, Jefe de Operaciones, Cmdte. Esc. Aéreo).
+  manifiesto_cerrado     Boolean   @default(false)
+  manifiesto_cerrado_por Int?
+  manifiesto_cerrado_en  DateTime?
+
   autorizada         Boolean         @default(false)
   autorizada_por     Int?
   rol_autoriza       RolAutorizador?
@@ -404,7 +412,6 @@ model Escala {
   tipo_mision     TipoMision? @relation(fields: [tipo_mision_id], references: [id])
   subtipo_elegido String?
 
-  // Relaciones hijas (este módulo)
   itinerarios    EscalaItinerario[]
   tripulacion    EscalaTripulacion[]
   solicitudes    Solicitud[]

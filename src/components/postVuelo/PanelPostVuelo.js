@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { formatearFechaHoraCompacta } from "@/lib/escalas"
 import { fechaUTCAInputParaguay } from "@/lib/fechaHora"
+import SeparadorSeccion from "@/components/shared/SeparadorSeccion"
 
 const ETIQUETAS_NOVEDAD = {
   SIN_NOVEDAD: "Sin novedad",
@@ -25,7 +26,7 @@ function formatearMinutos(min) {
   return `${h}h ${m}min`
 }
 
-export default function PanelPostVuelo({ escala, onCerrar, onActualizada }) {
+export default function PanelPostVuelo({ escala, onActualizada }) {
   const e = escala
   const primerTramo = e.itinerarios?.[0]
   const ultimoTramo = e.itinerarios?.[e.itinerarios.length - 1]
@@ -181,6 +182,8 @@ export default function PanelPostVuelo({ escala, onCerrar, onActualizada }) {
     }
   }
 
+  const completado = pvData ? !!pvData.postVuelo : !!e.tiene_post_vuelo
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5">
       {/* Encabezado — a cuál escala pertenece este panel */}
@@ -188,19 +191,23 @@ export default function PanelPostVuelo({ escala, onCerrar, onActualizada }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span>{formatearFechaHoraCompacta(e.hora_despegue_estimada)}</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              Por reportar
-            </span>
+            {completado ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 font-medium text-green-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Completada
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Por reportar
+              </span>
+            )}
           </div>
           <div className="mt-1 text-lg font-semibold text-gray-900">
             {e.aeronave?.matricula || "Sin aeronave"} · {ruta}
           </div>
           {e.nro_orden && <div className="text-xs text-gray-400">Orden #{e.nro_orden}</div>}
         </div>
-        <button onClick={onCerrar} className="shrink-0 text-xs text-gray-400 hover:text-gray-600">
-          ✕ cerrar
-        </button>
       </div>
 
       {/* Datos de la escala */}
@@ -221,6 +228,11 @@ export default function PanelPostVuelo({ escala, onCerrar, onActualizada }) {
               : "Sin tripulación cargada"}
           </div>
         </div>
+      </div>
+
+      {/* A partir de acá: lo que el usuario tiene que completar */}
+      <div className="pt-4">
+        <SeparadorSeccion texto="Tu reporte de post-vuelo" />
       </div>
 
       {pvCargando ? (
@@ -336,7 +348,7 @@ export default function PanelPostVuelo({ escala, onCerrar, onActualizada }) {
           {!pvData.postVuelo && !pvEditandoCierre && pvData.tramosCompletos && pvData.puedeCargar && (
             <button
               onClick={() => setPvEditandoCierre(true)}
-              className="rounded-md border border-teal-200 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-50"
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
             >
               Completar cierre del post-vuelo
             </button>

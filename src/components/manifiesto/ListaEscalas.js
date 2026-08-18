@@ -1,5 +1,7 @@
 // Panel izquierdo: buscador + lista de escalas con estado, ruta,
-// aeronave y cantidad de pasajeros cargados.
+// aeronave y cantidad de pasajeros cargados. Resalta en ámbar las
+// escalas donde el usuario logueado todavía tiene el manifiesto
+// pendiente de completar (te_corresponde, calculado en el servidor).
 
 const ESTADOS = {
   PROGRAMADA:    { label: "Programada", dot: "bg-blue-500",   texto: "text-blue-700",   fondo: "bg-blue-50" },
@@ -53,20 +55,26 @@ export default function ListaEscalas({ escalas, cargando, busqueda, onBuscar, es
 
         {!cargando && escalas.map((e) => {
           const seleccionada = e.id === escalaSeleccionadaId
+          const resaltar = e.te_corresponde && !seleccionada
           return (
             <button
               key={e.id}
               onClick={() => onSeleccionar(e.id)}
               className={`block w-full border-b border-gray-100 p-3 text-left transition-colors ${
-                seleccionada ? "bg-blue-50" : "hover:bg-gray-50"
+                seleccionada ? "bg-blue-50" : resaltar ? "bg-amber-50 hover:bg-amber-100" : "hover:bg-gray-50"
               }`}
             >
               <div className="flex items-center justify-between text-xs text-gray-500">
                 <span>{formatearFechaCorta(e.fecha)} · {formatearHoraCorta(e.hora_despegue_estimada)}</span>
                 <Badge estado={e.estado} />
               </div>
-              <div className="mt-1 font-medium text-gray-900">
-                {e.origen ?? "—"} → {e.destino ?? "—"}
+              <div className="mt-1 flex items-center gap-2 font-medium text-gray-900">
+                <span>{e.origen ?? "—"} → {e.destino ?? "—"}</span>
+                {e.te_corresponde && (
+                  <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                    Te toca
+                  </span>
+                )}
               </div>
               <div className="mt-0.5 text-xs text-gray-400">
                   Escala #{e.id}{e.nro_orden ? ` · Orden #${e.nro_orden}` : ""}

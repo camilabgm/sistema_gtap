@@ -3,7 +3,7 @@
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { conPermiso } from "@/lib/api-helpers"
+import { conSesion } from "@/lib/api-helpers"
 import { validarPasajero, usuarioPuedeGestionarManifiesto } from "@/lib/manifiesto"
 
 async function buscarPasajeroConEscala(id) {
@@ -15,6 +15,7 @@ async function buscarPasajeroConEscala(id) {
       escala: {
         select: {
           id: true,
+          manifiesto_cerrado: true,
           tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
           acuses: { where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" }, select: { persona_id: true } },
         },
@@ -23,7 +24,7 @@ async function buscarPasajeroConEscala(id) {
   })
 }
 
-export const PUT = conPermiso("MANIFIESTO", "puede_editar", async (request, context, session) => {
+export const PUT = conSesion("MANIFIESTO", async (request, context, session) => {
   const { id } = await context.params
   const pasajeroId = parseInt(id, 10)
   if (!Number.isInteger(pasajeroId) || pasajeroId <= 0) {
@@ -59,7 +60,7 @@ export const PUT = conPermiso("MANIFIESTO", "puede_editar", async (request, cont
   }
 })
 
-export const DELETE = conPermiso("MANIFIESTO", "puede_eliminar", async (request, context, session) => {
+export const DELETE = conSesion("MANIFIESTO", async (request, context, session) => {
   const { id } = await context.params
   const pasajeroId = parseInt(id, 10)
   if (!Number.isInteger(pasajeroId) || pasajeroId <= 0) {

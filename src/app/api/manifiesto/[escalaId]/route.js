@@ -1,6 +1,7 @@
 // GET /api/manifiesto/<escalaId> → detalle completo para el panel
 // derecho: aeronave, ruta, horas (estimadas o reales según estado),
-// combustible, tripulación, pasajeros, cargas y ocupación.
+// combustible, tripulación, pasajeros, cargas, ocupación y estado del
+// candado de manifiesto (cerrado o no).
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -21,10 +22,11 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
       fecha: true,
       estado: true,
       solicitante: true,
-      nro_orden: true,  
-      observaciones: true,
+      nro_orden: true,
       hora_despegue_estimada: true,
       hora_arribo_estimada: true,
+      manifiesto_cerrado: true,
+      manifiesto_cerrado_en: true,
       aeronave: {
         select: { id: true, matricula: true, tipo: true, capacidad_pasajeros: true, tipo_combustible: true },
       },
@@ -50,8 +52,9 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
           persona: { select: { nombre: true, apellido: true, grado: true } },
         },
       },
-      // Necesario para que el cliente calcule si esta persona puede
-      // gestionar el manifiesto de esta escala (usuarioPuedeGestionarManifiesto).
+      // Se devuelve al frontend porque usuarioPuedeGestionarManifiesto()
+      // se llama también del lado del cliente (ManifiestoScreen.js), y
+      // necesita esta lista para calcular puedeGestionar ahí.
       acuses: {
         where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" },
         select: { persona_id: true },
@@ -89,8 +92,6 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
     estado: escala.estado,
     solicitante: escala.solicitante,
     nro_orden: escala.nro_orden,
-    observaciones: escala.observaciones,
-    itinerarios: escala.itinerarios,
     origen: escala.itinerarios[0]?.origen ?? null,
     destino: escala.itinerarios[escala.itinerarios.length - 1]?.destino ?? null,
     hora_salida: horas.salida,
@@ -100,6 +101,8 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
     tipo_mision: escala.tipo_mision,
     tripulacion: escala.tripulacion,
     acuses: escala.acuses,
+    manifiesto_cerrado: escala.manifiesto_cerrado,
+    manifiesto_cerrado_en: escala.manifiesto_cerrado_en,
     pasajeros: escala.pasajeros,
     cargas: escala.cargas,
     capacidad,

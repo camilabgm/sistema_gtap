@@ -20,7 +20,6 @@ function conAutorizacion(modulo, chequeo, handler) {
   return async function (request, context) {
     try {
       const session = await getServerSession(authOptions)
-       console.log("DEBUG sesión recibida:", session)
       if (!session) {
         return NextResponse.json({ error: "No autorizado" }, { status: 401 })
         

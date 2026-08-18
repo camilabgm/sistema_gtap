@@ -23,6 +23,17 @@ export function esTripulanteDeEscala(escala, personaId) {
   return (escala.tripulacion || []).some((t) => t.persona_id === personaId)
 }
 
+// ¿Esta persona fue Supervisor de Semana de esta escala? Se basa en el
+// acuse de recibo con rol SUPERVISOR_SEMANA, que se genera solo al
+// autorizar la escala para quien tenga ese rol esa semana. Igual que
+// esTripulanteDeEscala, deja pasar aunque no tenga el permiso general
+// de matriz — con el mismo alcance de "una sola vez" que la tripulación
+// (ver puedeEditarPostVuelo en el route.js).
+export function esSupervisorSemanaDeEscala(escala, personaId) {
+  if (!personaId) return false
+  return (escala.acuses || []).some((a) => a.persona_id === personaId)
+}
+
 // Calcula horas de vuelo y en tierra a partir de las horas REALES de
 // cada tramo — nunca de lo estimado. "completo" indica si TODOS los
 // tramos ya tienen sus dos horas reales cargadas (condición para poder
@@ -68,4 +79,18 @@ export function calcularDefaultsPostVuelo(escala) {
     destino_real: destinoReal,
     aterrizajes: itinerarios.length,
   }
+}
+
+// Variante para el resaltado de "te toca a vos" en la lista de
+// escalas — mismo criterio que teCorrespondeCompletarManifiesto en
+// lib/manifiesto.js. Si la escala ya tiene post-vuelo cargado, a nadie
+// le "corresponde" nada puntual ahí (ya se reportó).
+export function teCorrespondeReportarPostVuelo(session, escala, tienePostVuelo) {
+  if (!session?.user || tienePostVuelo) return false
+
+  const personaId = session.user.personaId
+  if (!personaId) return false
+
+  if (esTripulanteDeEscala(escala, personaId)) return true
+  return esSupervisorSemanaDeEscala(escala, personaId)
 }

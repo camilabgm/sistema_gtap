@@ -8,9 +8,11 @@
 import { esTripulanteDeEscala } from "@/lib/postVuelo"
 
 // Roles con acceso a Crear/Editar/Eliminar Manifiesto en CUALQUIER
-// escala (según la matriz de permisos). El resto de los roles con bit
-// de permiso (Piloto, Copiloto, Técnico de Vuelo, Supervisor de Semana)
-// solo pueden operar sobre las escalas donde ellos mismos participan.
+// escala, SIN el candado de "una sola vez" (según la matriz de
+// permisos). El resto de los roles con bit de permiso (Piloto,
+// Copiloto, Técnico de Vuelo, Supervisor de Semana) solo pueden operar
+// sobre las escalas donde ellos mismos participan, y una sola vez por
+// escala — ver el candado manifiesto_cerrado más abajo.
 export const ROLES_GLOBAL_MANIFIESTO = [
   "Comandante",
   "Jefe de Operaciones",
@@ -19,22 +21,40 @@ export const ROLES_GLOBAL_MANIFIESTO = [
 
 // ¿Esta persona puede crear/editar/eliminar el manifiesto de ESTA
 // escala puntual? Se usa DESPUÉS de que conPermiso ya confirmó el bit
-// general de MANIFIESTO en la matriz — esta función solo agrega el
-// filtro de "es su propia escala" para los roles de tripulación.
+// general de MANIFIESTO en la matriz.
 //
-// escala necesita venir con: tripulacion (persona_id) y acuses
-// (persona_id, rol=SUPERVISOR_SEMANA) ya cargados.
+// escala necesita venir con: tripulacion (persona_id), acuses
+// (persona_id, rol=SUPERVISOR_SEMANA) y manifiesto_cerrado ya cargados.
 export function usuarioPuedeGestionarManifiesto(session, escala) {
   if (!session?.user) return false
 
   const rol = session.user.rol
   if (ROLES_GLOBAL_MANIFIESTO.includes(rol)) return true
 
+  // "Una sola vez": una vez cerrado, tripulación y Supervisor de Semana
+  // pierden acceso — para corregir algo hace falta un rol de matriz.
+  if (escala.manifiesto_cerrado) return false
+
   const personaId = session.user.personaId
   if (!personaId) return false
 
   if (esTripulanteDeEscala(escala, personaId)) return true
 
+  return (escala.acuses || []).some((a) => a.persona_id === personaId)
+}
+
+// Variante para el resaltado de "te toca a vos" en la lista de
+// escalas. A diferencia de la de arriba, NO incluye a los roles de
+// matriz (a ellos no les corresponde puntualmente ninguna escala en
+// particular, tocan todas por igual) — solo marca a quien realmente
+// tiene una carga pendiente de hacer.
+export function teCorrespondeCompletarManifiesto(session, escala) {
+  if (!session?.user || escala.manifiesto_cerrado) return false
+
+  const personaId = session.user.personaId
+  if (!personaId) return false
+
+  if (esTripulanteDeEscala(escala, personaId)) return true
   return (escala.acuses || []).some((a) => a.persona_id === personaId)
 }
 

@@ -1,9 +1,12 @@
 // GET /api/manifiesto → lista de escalas para el panel izquierdo:
-// fecha, estado, ruta, aeronave y cantidad de pasajeros cargados.
+// fecha, estado, ruta, aeronave, cantidad de pasajeros cargados, y si
+// el manifiesto ya está cerrado + si le corresponde completarlo a
+// quien está pidiendo la lista (para el resaltado en pantalla).
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
+import { teCorrespondeCompletarManifiesto } from "@/lib/manifiesto"
 
 export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context, session) => {
   const { searchParams } = new URL(request.url)
@@ -31,12 +34,15 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
       fecha: true,
       estado: true,
       hora_despegue_estimada: true,
+      manifiesto_cerrado: true,
       aeronave: { select: { matricula: true, tipo: true } },
       itinerarios: {
         where: { deleted_at: null },
         orderBy: { orden: "asc" },
         select: { orden: true, origen: true, destino: true },
       },
+      tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
+      acuses: { where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" }, select: { persona_id: true } },
       _count: { select: { pasajeros: { where: { deleted_at: null } } } },
     },
   })
@@ -54,6 +60,8 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
       destino: ultimo?.destino ?? null,
       aeronave_matricula: e.aeronave?.matricula ?? null,
       cantidad_pasajeros: e._count.pasajeros,
+      manifiesto_cerrado: e.manifiesto_cerrado,
+      te_corresponde: teCorrespondeCompletarManifiesto(session, e),
     }
   })
 
