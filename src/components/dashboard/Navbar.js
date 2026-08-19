@@ -10,6 +10,7 @@ import {
   ScrollText, Menu, LogOut, KeyRound, PlaneLanding,
 } from "lucide-react"
 import { ROLES_ADMIN } from "@/lib/autorizacion"
+import { yaPasoLaHora } from "@/lib/escalas"
 
 const modulosAntes = [
   { nombre: "Inicio",            ruta: "/dashboard",                Icono: Home  },
@@ -142,14 +143,25 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
     if (!esCargoDeCascada) return
     fetch("/api/escalas/pendientes-autorizar", { credentials: "include" })
       .then((r) => r.json())
-      .then((data) => setPendientesParaMi(data?.podesActuar ? data.escalas.length : 0))
+      .then((data) => {
+        if (!data?.podesActuar) { setPendientesParaMi(0); return }
+        // Solo cuenta las que se pueden autorizar de verdad ahora
+        // mismo — una escala vencida necesita que alguien la edite y
+        // reprograme primero, no tiene sentido que "pese" en el badge
+        // como si fuera algo accionable de inmediato.
+        const accionables = (data.escalas || []).filter((e) => !yaPasoLaHora(e.hora_despegue_estimada))
+        setPendientesParaMi(accionables.length)
+      })
       .catch(() => {})
   }, [pathname, esCargoDeCascada])
 
   useEffect(() => {
-    fetch("/api/post-vuelo/pendientes", { credentials: "include" })
+    fetch("/api/post-vuelo", { credentials: "include" })
       .then((r) => r.json())
-      .then((data) => setPostVueloParaMi(Array.isArray(data) ? data.length : 0))
+      .then((data) => {
+        const cantidad = Array.isArray(data) ? data.filter((e) => e.te_corresponde).length : 0
+        setPostVueloParaMi(cantidad)
+      })
       .catch(() => {})
   }, [pathname])
 

@@ -249,6 +249,26 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
           {/* Tramos — hora real */}
           <div>
             <div className="mb-2 text-xs uppercase text-gray-400">Tramos — hora real</div>
+
+            {/* Aviso de "una sola vez" vs "estás corrigiendo algo
+                cerrado" — distingue según exista o no un post-vuelo:
+                sin post-vuelo todavía, esto es la carga única de
+                tripulante/supervisor; con post-vuelo ya creado, solo
+                matriz llega hasta acá (puedeEditarTramos ya lo filtra
+                en el backend), y está corrigiendo un cierre existente. */}
+            {pvData.puedeEditarTramos && (
+              pvData.postVuelo ? (
+                <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Este post-vuelo ya está cerrado — lo que guardes acá va a sobrescribir los valores ya cargados.
+                </div>
+              ) : (
+                <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Podés cargar la hora real de los tramos y cerrar el post-vuelo una sola vez — revisá bien los
+                  datos antes de guardar, después no vas a poder editarlos vos mismo.
+                </div>
+              )
+            )}
+
             <div className="space-y-2">
               {pvData.escala.itinerarios.map((t) => (
                 <div key={t.id} className="rounded-md border border-gray-100 bg-gray-50 p-3">
@@ -350,7 +370,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
               onClick={() => setPvEditandoCierre(true)}
               className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
             >
-              Completar cierre del post-vuelo
+              Completar cierre del post-vuelo (una sola vez)
             </button>
           )}
 
@@ -361,6 +381,11 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
           {/* Cierre — formulario */}
           {pvEditandoCierre && (
             <div className="space-y-3 border-t border-gray-100 pt-4">
+              {pvData.postVuelo && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Estás editando un post-vuelo ya cerrado — al guardar, los valores actuales se van a sobrescribir.
+                </div>
+              )}
               <div>
                 <label className="mb-0.5 block text-[11px] text-gray-500">Destino real</label>
                 <input

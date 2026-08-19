@@ -39,7 +39,7 @@ export function calcularVentana(itinerarios) {
 // Filtro común: "vuelos que ocupan de verdad" un tripulante o aeronave.
 // Excluye:
 //   - borradores (nunca se publicaron)
-//   - ABORTADA y RECHAZADA (nunca ocurrieron de verdad)
+//   - ABORTADA  (nunca ocurrió de verdad)
 //   - una escala NUNCA autorizada, cuya hora YA PASÓ — no representa
 //     ningún compromiso operativo real (mismo criterio que
 //     puedeEditarAhora en lib/escalas.js: el tiempo pasado solo importa
@@ -53,7 +53,7 @@ export function condicionSolape(ventana, escalaIdActual) {
   const ahora = new Date()
   return {
     es_borrador: false,
-    estado: { notIn: ["ABORTADA", "RECHAZADA"] },
+    estado: { notIn: ["ABORTADA"] },
     deleted_at: null,
     id: { not: escalaIdActual },
     hora_despegue_estimada: { lt: ventana.fin },

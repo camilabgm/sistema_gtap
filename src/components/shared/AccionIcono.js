@@ -30,9 +30,6 @@ export default function AccionIcono({ icono: Icono, etiqueta, onClick, href, col
   useLayoutEffect(() => {
     if (!mostrarTooltip || !botonRef.current) return
     const rect = botonRef.current.getBoundingClientRect()
-    // Anclado por el borde derecho del ícono, no centrado — así el
-    // texto siempre crece hacia la izquierda y nunca se sale de la
-    // pantalla por la derecha, sea cual sea la posición del ícono.
     setPosicion({
       top: rect.top - 6,
       right: window.innerWidth - rect.right,
@@ -40,6 +37,7 @@ export default function AccionIcono({ icono: Icono, etiqueta, onClick, href, col
   }, [mostrarTooltip])
 
   const clases = `relative inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:opacity-40 disabled:pointer-events-none ${COLORES[color]}`
+  const clasesDeshabilitado = "relative inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-300 cursor-not-allowed"
 
   const eventos = {
     onMouseEnter: () => setMostrarTooltip(true),
@@ -49,7 +47,7 @@ export default function AccionIcono({ icono: Icono, etiqueta, onClick, href, col
   }
 
   const tooltip =
-    mostrarTooltip && !disabled && posicion && typeof document !== "undefined"
+    mostrarTooltip && posicion && typeof document !== "undefined"
       ? createPortal(
           <span
             style={{ position: "fixed", top: posicion.top, right: posicion.right, transform: "translateY(-100%)" }}
@@ -61,7 +59,18 @@ export default function AccionIcono({ icono: Icono, etiqueta, onClick, href, col
         )
       : null
 
+  // Los <a> no tienen atributo "disabled" — a diferencia del <button>,
+  // hay que directamente NO renderizarlo como link cuando está
+  // deshabilitado, o el navegador lo sigue dejando clickeable.
   if (href) {
+    if (disabled) {
+      return (
+        <span ref={botonRef} className={clasesDeshabilitado} aria-label={etiqueta} {...eventos}>
+          <Icono className="h-4 w-4" />
+          {tooltip}
+        </span>
+      )
+    }
     return (
       <a href={href} ref={botonRef} className={clases} aria-label={etiqueta} {...eventos}>
         <Icono className="h-4 w-4" />

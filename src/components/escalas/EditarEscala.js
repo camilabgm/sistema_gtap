@@ -379,15 +379,6 @@ export default function EditarEscala({ escalaId }) {
         </div>
       )}
 
-      {escala.estado === "RECHAZADA" && (
-        <div className="bg-red-50 border border-red-200 rounded-md px-4 py-3 text-sm">
-          <p className="font-medium text-red-800">Esta escala fue rechazada anteriormente</p>
-          <p className="text-red-700 mt-0.5">Motivo: {escala.motivo_rechazo || "—"}</p>
-          <p className="text-red-500 text-xs mt-1">
-            Este historial se pierde una vez que guardes la edición — la escala vuelve a estado Programada.
-          </p>
-        </div>
-      )}
 
       <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Solicitud</h2>

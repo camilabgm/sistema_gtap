@@ -7,15 +7,22 @@
 // escala seleccionada por su cuenta.
 
 import { useState, useEffect, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import ListaEscalasPostVuelo from "./ListaEscalasPostVuelo"
 import PanelPostVuelo from "./PanelPostVuelo"
 
 export default function PostVueloScreen() {
+  const searchParams = useSearchParams()
+  const idDesdeUrl = (() => {
+  const n = parseInt(searchParams.get("escala"), 10)
+    return Number.isInteger(n) && n > 0 ? n : null
+  })()
+
   const [escalas, setEscalas] = useState([])
   const [cargandoLista, setCargandoLista] = useState(true)
   const [errorLista, setErrorLista] = useState(null)
   const [busqueda, setBusqueda] = useState("")
-  const [escalaSeleccionadaId, setEscalaSeleccionadaId] = useState(null)
+  const [escalaSeleccionadaId, setEscalaSeleccionadaId] = useState(idDesdeUrl)
 
   const cargarLista = useCallback(async (q) => {
     setCargandoLista(true)

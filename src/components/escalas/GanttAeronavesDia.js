@@ -14,7 +14,6 @@ const COLORES_ESTADO = {
   SIN_REGISTRAR: "#8b5cf6",
   CUMPLIDA:      "#22c55e",
   ABORTADA:      "#ef4444",
-  RECHAZADA:     "#6b7280",
 }
 
 function porcentaje(minutos) {

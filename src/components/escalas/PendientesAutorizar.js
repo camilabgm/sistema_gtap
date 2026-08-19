@@ -48,6 +48,22 @@ function textoMotivoEscalamiento(motivo) {
     : null
 }
 
+// Ocultar una vencida es una preferencia personal, por navegador — no
+// se borra nada del lado del servidor, la escala sigue esperando que
+// alguien la edite. Guardado en localStorage para no meter una tabla
+// nueva por algo tan liviano.
+const CLAVE_OCULTAS = "gtap_vencidas_ocultas"
+
+function leerOcultasGuardadas() {
+  if (typeof window === "undefined") return []
+  try {
+    const guardadas = JSON.parse(window.localStorage.getItem(CLAVE_OCULTAS) || "[]")
+    return Array.isArray(guardadas) ? guardadas : []
+  } catch {
+    return []
+  }
+}
+
 export default function PendientesAutorizar() {
   const [tab, setTab] = useState("PENDIENTES") // "PENDIENTES" | "AUTORIZADAS"
 
@@ -67,11 +83,13 @@ export default function PendientesAutorizar() {
   const [errorDerivar, setErrorDerivar] = useState(null)
 
   const [accionando, setAccionando] = useState(null)
-  const [rechazandoId, setRechazandoId] = useState(null)
-  const [motivoRechazo, setMotivoRechazo] = useState("")
   const [errorAccion, setErrorAccion] = useState(null)
 
+  const [ocultas, setOcultas] = useState([])
+  const [mostrarOcultas, setMostrarOcultas] = useState(false)
+
   useEffect(() => {
+    setOcultas(leerOcultasGuardadas())
     cargarPendientes()
     cargarDerivacion()
   }, [])
@@ -183,21 +201,32 @@ export default function PendientesAutorizar() {
     if (ok) await cargarPendientes()
   }
 
-  async function handleConfirmarRechazo(escalaId) {
-    if (!motivoRechazo.trim()) {
-      setErrorAccion("El motivo del rechazo es obligatorio")
-      return
-    }
-    setErrorAccion(null)
-    setAccionando(escalaId)
-    const ok = await ejecutarAccion(`/api/escalas/${escalaId}/rechazar`, { motivo_rechazo: motivoRechazo.trim() })
-    setAccionando(null)
-    if (ok) {
-      setRechazandoId(null)
-      setMotivoRechazo("")
-      await cargarPendientes()
-    }
+  function ocultarVencida(escalaId) {
+    setOcultas((prev) => {
+      const actualizado = [...new Set([...prev, escalaId])]
+      window.localStorage.setItem(CLAVE_OCULTAS, JSON.stringify(actualizado))
+      return actualizado
+    })
   }
+
+  function limpiarOcultas() {
+    setOcultas([])
+    window.localStorage.removeItem(CLAVE_OCULTAS)
+  }
+
+  const todasLasEscalas = pendientes?.escalas ?? []
+  const vencidas = todasLasEscalas.filter((e) => yaPasoLaHora(e.hora_despegue_estimada))
+  const accionablesCount = todasLasEscalas.length - vencidas.length
+  const vencidasOcultasCount = vencidas.filter((e) => ocultas.includes(e.id)).length
+
+  // Lo que realmente se dibuja: siempre las accionables, y las
+  // vencidas solo si no están ocultas (o si el usuario pidió
+  // mostrarlas todas con el link de abajo).
+  const escalasAMostrar = todasLasEscalas.filter((e) => {
+    const vencida = yaPasoLaHora(e.hora_despegue_estimada)
+    if (!vencida) return true
+    return mostrarOcultas || !ocultas.includes(e.id)
+  })
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -326,18 +355,24 @@ export default function PendientesAutorizar() {
                   : "bg-gray-50 border-gray-200"
               }`}
             >
-              {pendientes.escalas.length === 0 ? (
+              {todasLasEscalas.length === 0 ? (
                 <p className="text-sm text-gray-600">No hay ninguna escala esperando autorización.</p>
               ) : pendientes.podesActuar ? (
                 <div>
                   <p className="text-sm font-medium text-blue-800">
-                    Tenés {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} para autorizar
+                    Tenés {accionablesCount} escala{accionablesCount !== 1 && "s"} para autorizar
                     {pendientes.autorizanteActivo &&
                       ` (como ${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}.
                   </p>
                   {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
                     <p className="text-xs text-blue-700 mt-1">
                       {textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}
+                    </p>
+                  )}
+                  {vencidas.length > 0 && (
+                    <p className="text-xs text-rose-700 mt-1">
+                      Además hay {vencidas.length} vencida{vencidas.length !== 1 && "s"} que ya pasó su hora — hace
+                      falta editarlas para reprogramarlas antes de poder autorizarlas.
                     </p>
                   )}
                 </div>
@@ -350,7 +385,7 @@ export default function PendientesAutorizar() {
                     </span>
                     {pendientes.autorizanteActivo &&
                       ` (${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}.
-                    {" "}Hay {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} esperando.
+                    {" "}Hay {accionablesCount} escala{accionablesCount !== 1 && "s"} esperando.
                   </p>
                   {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
                     <p className="text-xs text-gray-500 mt-1">
@@ -359,6 +394,23 @@ export default function PendientesAutorizar() {
                   )}
                 </div>
               )}
+
+              {vencidasOcultasCount > 0 && !mostrarOcultas && (
+                <button
+                  onClick={() => setMostrarOcultas(true)}
+                  className="mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
+                >
+                  Mostrar {vencidasOcultasCount} vencida{vencidasOcultasCount !== 1 && "s"} oculta{vencidasOcultasCount !== 1 && "s"}
+                </button>
+              )}
+              {mostrarOcultas && (
+                <button
+                  onClick={() => { setMostrarOcultas(false); limpiarOcultas() }}
+                  className="mt-2 text-xs text-gray-500 hover:text-gray-700 underline block"
+                >
+                  Volver a ocultarlas
+                </button>
+              )}
             </div>
 
             {errorAccion && (
@@ -366,7 +418,7 @@ export default function PendientesAutorizar() {
             )}
 
             <div className="space-y-2">
-              {pendientes.escalas.map((e) => {
+              {escalasAMostrar.map((e) => {
                 const tripulacionTexto = (e.tripulacion || [])
                   .map((t) => `${t.persona.grado} ${t.persona.apellido}`)
                   .join(", ") || "Sin tripulación"
@@ -407,53 +459,26 @@ export default function PendientesAutorizar() {
                         )}
                       </div>
 
-                      {pendientes.podesActuar && (
-                        <div className="flex gap-2 shrink-0">
-                          {!vencida && (
-                            <button
-                              onClick={() => handleAutorizar(e.id)}
-                              disabled={accionando === e.id}
-                              className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-                            >
-                              {accionando === e.id ? "..." : "Autorizar"}
-                            </button>
-                          )}
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        {pendientes.podesActuar && !vencida && (
                           <button
-                            onClick={() => { setRechazandoId(rechazandoId === e.id ? null : e.id); setMotivoRechazo("") }}
-                            className="border border-red-200 text-red-600 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-red-50 transition-colors"
-                          >
-                            Rechazar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {rechazandoId === e.id && (
-                      <div className="mt-3 pt-3 border-t border-gray-100">
-                        <textarea
-                          value={motivoRechazo}
-                          onChange={(ev) => setMotivoRechazo(ev.target.value)}
-                          placeholder="Motivo del rechazo (obligatorio)"
-                          rows={2}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                        />
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={() => handleConfirmarRechazo(e.id)}
+                            onClick={() => handleAutorizar(e.id)}
                             disabled={accionando === e.id}
-                            className="bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                            className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                           >
-                            {accionando === e.id ? "..." : "Confirmar rechazo"}
+                            {accionando === e.id ? "..." : "Autorizar"}
                           </button>
+                        )}
+                        {vencida && !ocultas.includes(e.id) && (
                           <button
-                            onClick={() => setRechazandoId(null)}
-                            className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                            onClick={() => ocultarVencida(e.id)}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline"
                           >
-                            Cancelar
+                            Ocultar
                           </button>
-                        </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}
@@ -464,7 +489,7 @@ export default function PendientesAutorizar() {
         <p className="text-sm text-gray-400">Cargando historial...</p>
       ) : !autorizadas || autorizadas.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
-          Todavía no hay escalas autorizadas ni rechazadas.
+          Todavía no hay escalas autorizadas.
         </div>
       ) : (
         <div className="space-y-2">
@@ -475,25 +500,12 @@ export default function PendientesAutorizar() {
                   {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
                   {e.nro_orden && ` · Orden #${e.nro_orden}`}
                 </p>
-                {e.autorizada ? (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Autorizada por {e.autorizada_por_nombre} ({etiquetaAutorizante(e.rol_autoriza, e.orden_autorizante)}) el {formatearFechaHora(e.fecha_autorizacion)}
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Rechazada por {e.rechazada_por_nombre} el {formatearFechaHora(e.fecha_rechazo)}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">Motivo: {e.motivo_rechazo}</p>
-                  </>
-                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Autorizada por {e.autorizada_por_nombre} ({etiquetaAutorizante(e.rol_autoriza, e.orden_autorizante)}) el {formatearFechaHora(e.fecha_autorizacion)}
+                </p>
               </div>
-              <span
-                className={`px-2 py-1 text-xs rounded-full font-medium shrink-0 ${
-                  e.autorizada ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                }`}
-              >
-                {e.autorizada ? "Autorizada" : "Rechazada"}
+              <span className="px-2 py-1 text-xs rounded-full font-medium shrink-0 bg-green-100 text-green-700">
+                Autorizada
               </span>
             </div>
           ))}

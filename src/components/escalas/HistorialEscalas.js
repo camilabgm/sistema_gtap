@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect, Fragment } from "react"
-import Link from "next/link"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
+import { Eye, Pencil, Trash2, Users, ClipboardCheck } from "lucide-react"
 import {
   estadoDetallado,
   ESTADO_DETALLADO_CLASES,
@@ -14,6 +14,8 @@ import {
 } from "@/lib/escalas"
 import { formatearFechaSoloDia } from "@/lib/fechaSoloDia"
 import PanelDetalleEscala from "./PanelDetalleEscala"
+import AbortarEscalaAccion from "./AbortarEscalaAccion"
+import AccionIcono from "@/components/shared/AccionIcono"
 
 const ESTADOS_FILTRABLES = [
   { clave: "PENDIENTE", texto: "Programada · Pendiente" },
@@ -23,13 +25,35 @@ const ESTADOS_FILTRABLES = [
   { clave: "SIN_REGISTRAR", texto: "Sin registrar" },
   { clave: "CUMPLIDA", texto: "Cumplida" },
   { clave: "ABORTADA", texto: "Abortada" },
-  { clave: "RECHAZADA", texto: "Rechazada" },
   { clave: "BORRADOR", texto: "Borrador" },
 ]
+
+// Agrupa el detalle fino de estadoDetallado() en los 4 baldes que
+// muestra la barra de contadores. "Programada" es el balde por
+// default — cubre Borrador, Pendiente, Vencida sin autorizar,
+// Programada·Autorizada y Sin registrar, o sea todo lo que todavía
+// no terminó (ni voló, ni se completó, ni se abortó).
+function contarPorBalde(escalas) {
+  const contadores = { PROGRAMADA: 0, EN_DESARROLLO: 0, CUMPLIDA: 0, ABORTADA: 0 }
+  for (const e of escalas) {
+    const clave = estadoDetallado(e).clave
+    if (clave === "EN_DESARROLLO") contadores.EN_DESARROLLO++
+    else if (clave === "CUMPLIDA") contadores.CUMPLIDA++
+    else if (clave === "ABORTADA") contadores.ABORTADA++
+    else contadores.PROGRAMADA++
+  }
+  return contadores
+}
 
 function textoTripulacion(tripulacion) {
   if (!tripulacion || tripulacion.length === 0) return "—"
   return tripulacion.map((t) => `${t.persona.grado} ${t.persona.apellido}`).join(", ")
+}
+
+function textoRuta(itinerarios) {
+  const primero = itinerarios?.[0]
+  const ultimo = itinerarios?.[itinerarios.length - 1]
+  return primero && ultimo ? `${primero.origen} → ${ultimo.destino}` : "—"
 }
 
 export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
@@ -103,6 +127,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
     busqueda.trim() || filtroEstados.length > 0 || filtroAeronave || filtroFechaDesde || filtroFechaHasta
 
   const aeronaveOptions = [...new Set(escalas.map((e) => e.aeronave?.matricula).filter(Boolean))].sort()
+  const contadores = contarPorBalde(escalas)
 
   const filtradas = escalas
     .filter((e) => {
@@ -139,13 +164,17 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
     doc.setTextColor(120)
     doc.text(`Generado: ${new Date().toLocaleString("es-PY")}`, 14, 21)
 
+    // El PDF sigue completo (para el reporte impreso), aunque la tabla
+    // en pantalla se recortó a lo esencial — acá sí interesa tener
+    // Tripulación y Tipo de misión visibles sin tener que abrir nada.
     autoTable(doc, {
       startY: 26,
-      head: [["Solicitante", "Fecha del vuelo", "Aeronave", "Salida", "N. Orden", "Tripulación", "Tipo de misión", "Estado"]],
+      head: [["Solicitante", "Fecha del vuelo", "Aeronave", "Ruta", "Salida", "N. Orden", "Tripulación", "Tipo de misión", "Estado"]],
       body: filtradas.map((e) => [
         e.solicitante || "—",
         formatearFechaSoloDia(e.fecha),
         e.aeronave?.matricula || "—",
+        textoRuta(e.itinerarios),
         formatearFechaHoraCompacta(e.hora_despegue_estimada),
         e.nro_orden || "—",
         textoTripulacion(e.tripulacion),
@@ -161,7 +190,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-4">
 
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -177,6 +206,23 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
         >
           ⬇ Descargar PDF
         </button>
+      </div>
+
+      {/* Contadores generales — sobre el total, sin importar filtros */}
+      <div className="flex flex-wrap items-center gap-4 mb-4 text-sm">
+        <span className="flex items-center gap-1.5 text-gray-600">
+          <span className="h-2 w-2 rounded-full bg-blue-500" /> Programada : {contadores.PROGRAMADA}
+        </span>
+        <span className="flex items-center gap-1.5 text-gray-600">
+          <span className="h-2 w-2 rounded-full bg-orange-500" /> En vuelo : {contadores.EN_DESARROLLO}
+        </span>
+        <span className="flex items-center gap-1.5 text-gray-600">
+          <span className="h-2 w-2 rounded-full bg-green-500" /> Completada : {contadores.CUMPLIDA}
+        </span>
+        <span className="flex items-center gap-1.5 text-gray-600">
+          <span className="h-2 w-2 rounded-full bg-red-500" /> Abortada : {contadores.ABORTADA}
+        </span>
+        <span className="text-gray-400">· Total {escalas.length}</span>
       </div>
 
       <input
@@ -291,17 +337,21 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+         <table className="w-full table-fixed divide-y divide-gray-200">
+            <colgroup>
+              <col className="w-[22%]" />
+              <col className="w-[22%]" />
+              <col className="w-[14%]" />
+              <col className="w-[16%]" />
+              <col className="w-[26%]" />
+            </colgroup>
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitante</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aeronave</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vuelo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salida</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N. Orden</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tripulación</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de misión</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -311,19 +361,22 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                 const motivo = motivoNoEditable(e)
                 const expandida = filaExpandidaId === e.id
                 const tooltipEstado = TOOLTIP_ESTADO_DETALLADO[estado.clave]
+                const abortada = e.estado === "ABORTADA"
 
                 return (
                   <Fragment key={e.id}>
                     <tr className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-sm">
-                        <p className="text-gray-900 font-medium">{e.solicitante || "—"}</p>
-                        <p className="text-xs text-gray-400">{formatearFechaSoloDia(e.fecha)}</p>
+                      <td className="px-4 py-3 text-sm truncate">
+                        <p className="text-gray-900 font-medium truncate">{e.solicitante || "—"}</p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {formatearFechaSoloDia(e.fecha)}{e.nro_orden ? ` · Orden #${e.nro_orden}` : ""}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{e.aeronave?.matricula || "—"}</td>
+                      <td className="px-4 py-3 text-sm truncate">
+                        <p className="text-gray-900 font-medium truncate">{e.aeronave?.matricula || "Sin aeronave"}</p>
+                        <p className="text-xs text-gray-500 truncate">{textoRuta(e.itinerarios)}</p>
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatearFechaHoraCompacta(e.hora_despegue_estimada)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{e.nro_orden || "—"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{textoTripulacion(e.tripulacion)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{e.tipo_mision?.codigo || "—"}</td>
                       <td className="px-4 py-3 text-sm">
                         <span
                           title={tooltipEstado}
@@ -335,48 +388,66 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
-                            className="px-3 py-1 rounded-full border border-gray-300 text-gray-600 text-xs font-medium hover:bg-gray-50 transition-colors"
-                          >
-                            {expandida ? "Ocultar" : "Ver"}
-                          </button>
-                          {puedeEditar && (
-                            editable ? (
-                              <Link
-                                href={`/dashboard/escalas/${e.id}/editar`}
-                                className="px-3 py-1 rounded-full border border-blue-200 text-blue-600 text-xs font-medium hover:bg-blue-50 transition-colors"
-                              >
-                                {e.es_borrador ? "Completar" : "Editar"}
-                              </Link>
-                            ) : (
-                              <span
-                                title={motivo}
-                                className="px-3 py-1 rounded-full border border-gray-200 text-gray-300 text-xs font-medium cursor-not-allowed"
-                              >
-                                Editar
-                              </span>
-                            )
-                          )}
-                          {/* Eliminar ahora depende únicamente del permiso
-                              ESCALAS.puede_eliminar — sin importar el
-                              estado de la escala. */}
-                          {puedeEliminar && (
-                            <button
-                              onClick={() => handleEliminar(e)}
-                              disabled={eliminandoId === e.id}
-                              className="px-3 py-1 rounded-full border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
-                            >
-                              {eliminandoId === e.id ? "..." : "Eliminar"}
-                            </button>
-                          )}
+                        <div className="flex items-center justify-end gap-3">
+                          <div className="flex items-center gap-0.5">
+                            <AccionIcono
+                              icono={Eye}
+                              etiqueta={expandida ? "Ocultar" : "Ver"}
+                              onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
+                            />
+
+                            {puedeEditar && (
+                              editable ? (
+                                <AccionIcono
+                                  icono={Pencil}
+                                  etiqueta={e.es_borrador ? "Completar" : "Editar"}
+                                  href={`/dashboard/escalas/${e.id}/editar`}
+                                  color="primario"
+                                />
+                              ) : (
+                                <AccionIcono icono={Pencil} etiqueta={motivo || "No editable"} disabled />
+                              )
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-0.5 border-l border-gray-100 pl-3">
+                            <AccionIcono
+                              icono={Users}
+                              etiqueta={abortada ? "No disponible: la escala fue abortada" : "Manifiesto"}
+                              href={abortada ? undefined : `/dashboard/manifiesto?escala=${e.id}`}
+                              disabled={abortada}
+                            />
+
+                            <AccionIcono
+                              icono={ClipboardCheck}
+                              etiqueta={abortada ? "No disponible: la escala fue abortada" : "Post-vuelo"}
+                              href={abortada ? undefined : `/dashboard/post-vuelo?escala=${e.id}`}
+                              disabled={abortada}
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-0.5 border-l border-gray-100 pl-3">
+                            {puedeEditar && <AbortarEscalaAccion escala={e} onAbortada={cargarEscalas} />}
+
+                            {/* Eliminar depende únicamente del permiso
+                                ESCALAS.puede_eliminar — sin importar el
+                                estado de la escala. */}
+                            {puedeEliminar && (
+                              <AccionIcono
+                                icono={Trash2}
+                                etiqueta="Eliminar"
+                                onClick={() => handleEliminar(e)}
+                                disabled={eliminandoId === e.id}
+                                color="peligro"
+                              />
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
                     {expandida && (
                       <tr>
-                        <td colSpan={8} className="px-4 pb-4 bg-gray-50">
+                        <td colSpan={5} className="px-4 pb-4 bg-gray-50">
                           <PanelDetalleEscala
                             escala={e}
                             puedeEditar={puedeEditar}

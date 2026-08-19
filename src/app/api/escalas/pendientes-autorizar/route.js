@@ -36,7 +36,7 @@ export const GET = conCascada("ESCALAS", async (request, context, session) => {
     where: {
       es_borrador: false,
       autorizada: false,
-      estado: { notIn: ["ABORTADA", "RECHAZADA"] },
+      estado: { notIn: ["ABORTADA"] },
       deleted_at: null,
     },
     orderBy: [{ fecha: "asc" }, { hora_despegue_estimada: "asc" }],

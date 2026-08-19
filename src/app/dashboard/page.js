@@ -84,7 +84,7 @@ async function obtenerEstadisticas(sesion) {
         where: {
           es_borrador: false,
           autorizada: false,
-          estado: { notIn: ["ABORTADA", "RECHAZADA"] },
+          estado: { notIn: ["ABORTADA"] },
           deleted_at: null,
         },
       })

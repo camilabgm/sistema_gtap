@@ -14,7 +14,6 @@ export const ETIQUETAS_ESTADO = {
   SIN_REGISTRAR: "Sin registrar",
   CUMPLIDA: "Cumplida",
   ABORTADA: "Abortada",
-  RECHAZADA: "Rechazada",
 }
 
 export const ETIQUETAS_MOTIVO_ABORTO = {
@@ -35,7 +34,6 @@ export const ESTADO_DETALLADO_CLASES = {
   SIN_REGISTRAR:            "bg-purple-100 text-purple-700",
   CUMPLIDA:                 "bg-green-100 text-green-700",
   ABORTADA:                 "bg-red-100 text-red-700",
-  RECHAZADA:                "bg-gray-200 text-gray-600",
 }
 
 export const TOOLTIP_ESTADO_DETALLADO = {
@@ -79,7 +77,7 @@ export function estaPendienteDeAutorizacion(escala) {
   return !escala.autorizada && escala.estado === "PROGRAMADA"
 }
 
-export const ESTADOS_EDITABLES_PUBLICADA = ["PROGRAMADA", "RECHAZADA"]
+export const ESTADOS_EDITABLES_PUBLICADA = ["PROGRAMADA"]
 
 export function yaPasoLaHora(horaEstimada) {
   if (!horaEstimada) return false
@@ -160,7 +158,6 @@ export function formatearRangoVuelo(horaDespegueIso, horaArriboIso) {
 
 export function estadoDetallado(escala) {
   if (escala.es_borrador) return { clave: "BORRADOR", texto: "Borrador" }
-  if (escala.estado === "RECHAZADA") return { clave: "RECHAZADA", texto: "Rechazada" }
   if (escala.estado === "ABORTADA")  return { clave: "ABORTADA",  texto: "Abortada" }
   if (escala.estado === "CUMPLIDA")  return { clave: "CUMPLIDA",  texto: "Cumplida" }
 

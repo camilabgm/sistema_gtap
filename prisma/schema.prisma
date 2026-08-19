@@ -73,7 +73,6 @@ enum EstadoEscala {
   EN_DESARROLLO
   CUMPLIDA
   ABORTADA
-  RECHAZADA
 }
 
 enum MotivoAbortada {
@@ -401,10 +400,6 @@ model Escala {
   rol_autoriza       RolAutorizador?
   fecha_autorizacion DateTime?
   orden_autorizante  Int?
-
-  rechazada_por  Int?
-  motivo_rechazo String?
-  fecha_rechazo  DateTime?
 
   aeronave_id     Int?
   aeronave        Aeronave?   @relation(fields: [aeronave_id], references: [id])

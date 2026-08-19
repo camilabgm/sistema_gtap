@@ -70,8 +70,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
       )
     }
 
-    const veniaDeRechazada = escala.estado === "RECHAZADA"
-
     const solicitudActual = await prisma.solicitud.findFirst({
       where: { escala_id: escalaId, deleted_at: null },
       orderBy: { fecha_recepcion: "asc" },
@@ -242,20 +240,13 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
         editado_por: session.user.id,
         // Reset de autorización — el corazón de la re-autorización. Se
         // suma orden_autorizante al mismo reset: si no, quedaría el
-        // valor de la autorización/rechazo anterior pegado a una escala
-        // que todavía nadie volvió a resolver.
+        // valor de la autorización anterior pegado a una escala que
+        // todavía nadie volvió a resolver.
         autorizada: false,
         autorizada_por: null,
         rol_autoriza: null,
         orden_autorizante: null,
         fecha_autorizacion: null,
-      }
-
-      if (veniaDeRechazada) {
-        dataEscala.estado = "PROGRAMADA"
-        dataEscala.rechazada_por = null
-        dataEscala.motivo_rechazo = null
-        dataEscala.fecha_rechazo = null
       }
 
       if (solicitanteRes.tocado) dataEscala.solicitante = solicitanteRes.valor

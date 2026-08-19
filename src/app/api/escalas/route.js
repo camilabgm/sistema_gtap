@@ -58,7 +58,6 @@ export const GET = conPermiso("ESCALAS", "puede_ver", async (request, context, s
       autorizada: true,
       motivo_abortada: true,
       observacion_aborto: true,
-      motivo_rechazo: true,
       updated_at: true,
       aeronave: { select: { matricula: true } },
       tipo_mision: { select: { codigo: true, nombre: true } },

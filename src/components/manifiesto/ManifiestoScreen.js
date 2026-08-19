@@ -6,16 +6,28 @@
 // los hijos por props — los hijos no hacen fetch por su cuenta.
 
 import { useState, useEffect, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import { usuarioPuedeGestionarManifiesto } from "@/lib/manifiesto"
 import ListaEscalas from "./ListaEscalas"
 import PanelDetalle from "./PanelDetalle"
 
 export default function ManifiestoScreen({ session }) {
+    // Si se entró con ?escala=<id> (ej. desde el ícono de Gestión de
+    // Escalas), esa es la escala seleccionada de arranque — si no hay
+    // parámetro o es inválido, se cae al comportamiento de siempre
+    // (seleccionar la primera de la lista una vez que cargue).
+  const searchParams = useSearchParams()
+  const idDesdeUrl = (() => {
+    const n = parseInt(searchParams.get("escala"), 10)
+    return Number.isInteger(n) && n > 0 ? n : null
+  })()
+
   const [escalas, setEscalas] = useState([])
   const [cargandoLista, setCargandoLista] = useState(true)
   const [busqueda, setBusqueda] = useState("")
 
-  const [escalaSeleccionadaId, setEscalaSeleccionadaId] = useState(null)
+  
+  const [escalaSeleccionadaId, setEscalaSeleccionadaId] = useState(idDesdeUrl)
   const [detalle, setDetalle] = useState(null)
   const [cargandoDetalle, setCargandoDetalle] = useState(false)
   const [errorDetalle, setErrorDetalle] = useState(null)

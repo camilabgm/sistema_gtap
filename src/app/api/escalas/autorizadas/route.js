@@ -10,7 +10,7 @@ export const GET = conCascada("ESCALAS", async (request, context, session) => {
   const escalas = await prisma.escala.findMany({
     where: {
       deleted_at: null,
-      OR: [{ autorizada: true }, { estado: "RECHAZADA" }],
+      autorizada: true,
     },
     orderBy: [{ updated_at: "desc" }],
     select: {
@@ -25,17 +25,12 @@ export const GET = conCascada("ESCALAS", async (request, context, session) => {
       rol_autoriza: true,
       orden_autorizante: true,
       fecha_autorizacion: true,
-      rechazada_por: true,
-      motivo_rechazo: true,
-      fecha_rechazo: true,
       aeronave: { select: { matricula: true } },
       tipo_mision: { select: { codigo: true } },
     },
   })
 
-  const idsUsuarios = [
-    ...new Set(escalas.flatMap((e) => [e.autorizada_por, e.rechazada_por]).filter(Boolean)),
-  ]
+  const idsUsuarios = [...new Set(escalas.map((e) => e.autorizada_por).filter(Boolean))]
   const usuarios = await prisma.usuario.findMany({
     where: { id: { in: idsUsuarios } },
     select: { id: true, persona: { select: { grado: true, apellido: true } } },
@@ -47,7 +42,6 @@ export const GET = conCascada("ESCALAS", async (request, context, session) => {
   const resultado = escalas.map((e) => ({
     ...e,
     autorizada_por_nombre: e.autorizada_por ? nombrePorUsuarioId[e.autorizada_por] || "—" : null,
-    rechazada_por_nombre: e.rechazada_por ? nombrePorUsuarioId[e.rechazada_por] || "—" : null,
   }))
 
   return NextResponse.json(resultado)

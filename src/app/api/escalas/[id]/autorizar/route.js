@@ -40,7 +40,7 @@ export const PUT = conSesion("ESCALAS", async (request, context, session) => {
   if (escala.autorizada) {
     return NextResponse.json({ error: "La escala ya está autorizada" }, { status: 409 })
   }
-  if (["ABORTADA", "RECHAZADA"].includes(escala.estado)) {
+  if (escala.estado === "ABORTADA") {
     return NextResponse.json({ error: "La escala ya no está disponible para autorizar" }, { status: 409 })
   }
   if (yaPasoLaHora(escala.hora_despegue_estimada)) {

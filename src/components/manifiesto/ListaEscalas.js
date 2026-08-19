@@ -8,7 +8,6 @@ const ESTADOS = {
   EN_DESARROLLO: { label: "En vuelo",   dot: "bg-amber-500",  texto: "text-amber-700",  fondo: "bg-amber-50" },
   CUMPLIDA:      { label: "Completada", dot: "bg-green-500",  texto: "text-green-700",  fondo: "bg-green-50" },
   ABORTADA:      { label: "Abortada",   dot: "bg-red-500",    texto: "text-red-700",    fondo: "bg-red-50" },
-  RECHAZADA:     { label: "Rechazada",  dot: "bg-gray-400",   texto: "text-gray-600",   fondo: "bg-gray-50" },
 }
 
 function Badge({ estado }) {
