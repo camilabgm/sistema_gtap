@@ -32,6 +32,19 @@ export const GET = conCascada("ESCALAS", async (request, context, session) => {
 
   const podesActuar = !!autorizantePersonaId && autorizantePersonaId === session.user.personaId
 
+  // "¿Puede esta persona ASUMIR la autorización del bloqueado actual?"
+  // Solo tiene sentido preguntarlo si: hay alguien real bloqueando el
+  // paso (autorizantePersonaId existe) y esa persona NO es quien está
+  // mirando la pantalla. Se simula "¿y si esa persona no contara?" sin
+  // tocar la base — si el resultado de esa simulación coincide con
+  // quien pregunta, significa que es el siguiente legítimo en la
+  // cascada y puede asumir.
+  let puedeAsumir = false
+  if (!podesActuar && autorizantePersonaId) {
+    const simulacion = await calcularAutorizanteActivo(autorizantePersonaId)
+    puedeAsumir = !!simulacion.autorizantePersonaId && simulacion.autorizantePersonaId === session.user.personaId
+  }
+
   const escalas = await prisma.escala.findMany({
     where: {
       es_borrador: false,
@@ -64,5 +77,5 @@ export const GET = conCascada("ESCALAS", async (request, context, session) => {
     },
   })
 
-  return NextResponse.json({ autorizanteActivo, podesActuar, escalas })
+  return NextResponse.json({ autorizanteActivo, podesActuar, puedeAsumir, escalas })
 })

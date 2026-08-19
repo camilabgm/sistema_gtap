@@ -31,7 +31,11 @@
 //      / parte diario / derivación)
 //
 // Se usa al publicar una escala, y para calcular quién puede
-// autorizar/rechazar en cualquier momento posterior.
+// autorizar/rechazar en cualquier momento posterior. También se usa en
+// modo SIMULACIÓN (con personaIdExcluida) para responder "¿quién sería
+// el autorizante si esta persona puntual no contara?" — sin escribir
+// nada en la base. Lo usa /api/autorizadores/asumir para decidir si
+// alguien puede tomar la autorización del actual autorizante activo.
 
 import prisma from "@/lib/prisma"
 import { estaDisponibleAhora } from "@/lib/disponibilidad"
@@ -40,8 +44,8 @@ import { rolCoincideConCargo } from "@/lib/autorizacion"
 // Orden de la cascada de autorización. Es un fallback: si titular y
 // adjunto de un cargo no sirven, se pasa al siguiente cargo.
 export const CASCADA_AUTORIZACION = [
-  "JEFE_OPERACIONES",
   "COMANDANTE",
+  "JEFE_OPERACIONES",
   "CMDTE_ESC_AEREO",
   "CMDTE_ESC_MANTENIMIENTO",
   "JEFE_PERSONAL",
@@ -50,6 +54,11 @@ export const CASCADA_AUTORIZACION = [
 // Evalúa UNA posición puntual (titular o adjunto) de un cargo. Es el
 // bloque que se reutiliza dos veces por cargo, para no duplicar la
 // lógica entre titular y adjunto.
+//
+// personaIdExcluida: si esta posición corresponde a esa persona, se
+// trata como "no disponible" sin consultar la base — es la simulación
+// de "¿y si esta persona no contara?", usada por calcularAutorizanteActivo
+// en modo dry-run.
 //
 // Devuelve uno de estos tres resultados:
 //   { resultado: "AUTORIZA", personaId }
@@ -60,7 +69,7 @@ export const CASCADA_AUTORIZACION = [
 //       PARTE_DIARIO o DERIVACION_MANUAL).
 //   { resultado: "SIN_ASIGNAR", personaId: null }
 //     → no hay nadie cargado en esta posición para este cargo.
-async function evaluarPosicion(rol, orden) {
+async function evaluarPosicion(rol, orden, personaIdExcluida = null) {
   const cargo = await prisma.cargoAutorizacion.findFirst({
     where: { rol_autorizador: rol, orden, activo: true, deleted_at: null },
     select: {
@@ -99,6 +108,13 @@ async function evaluarPosicion(rol, orden) {
     return { resultado: "SALTAR", motivo: "ROL_DESACTUALIZADO", personaId }
   }
 
+  // Simulación de exclusión — se corta ANTES de tocar la base para el
+  // chequeo real de disponibilidad. No representa una derivación
+  // real, solo el "¿y si...?" del dry-run.
+  if (personaIdExcluida && personaId === personaIdExcluida) {
+    return { resultado: "SALTAR", motivo: "DERIVACION_MANUAL", personaId }
+  }
+
   // Chequeo 3: ¿está disponible ahora mismo?
   const disponibilidad = await estaDisponibleAhora(personaId)
   if (disponibilidad.disponible) {
@@ -116,16 +132,22 @@ async function evaluarPosicion(rol, orden) {
 // última fila alcanza para saber quién autoriza ahora, por qué, y si
 // esa posición es titular (orden 1) o adjunto (orden 2) del cargo.
 //
+// personaIdExcluida (opcional): modo simulación — ver evaluarPosicion.
+// Cuando se pasa, el resultado NUNCA se persiste (no se llama desde
+// ningún lugar que escriba EscalaAutorizacion con esto activo) — es
+// puro cálculo para responder "¿quién sería el autorizante activo si
+// esta persona no contara ahora mismo?".
+//
 // Devuelve { autorizanteRol, autorizantePersonaId, autorizanteOrden, pasos }.
 // Si nadie en toda la cascada sirve, autorizantePersonaId es null.
-export async function calcularAutorizanteActivo() {
+export async function calcularAutorizanteActivo(personaIdExcluida = null) {
   const pasos = []
   let motivoDeEsteRol = "INICIAL"
 
   for (const rol of CASCADA_AUTORIZACION) {
     // Primero el titular (orden 1), después el adjunto (orden 2)
     for (const orden of [1, 2]) {
-      const evaluacion = await evaluarPosicion(rol, orden)
+      const evaluacion = await evaluarPosicion(rol, orden, personaIdExcluida)
 
       pasos.push({
         rol_autorizador: rol,

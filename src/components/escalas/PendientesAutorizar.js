@@ -48,22 +48,6 @@ function textoMotivoEscalamiento(motivo) {
     : null
 }
 
-// Ocultar una vencida es una preferencia personal, por navegador — no
-// se borra nada del lado del servidor, la escala sigue esperando que
-// alguien la edite. Guardado en localStorage para no meter una tabla
-// nueva por algo tan liviano.
-const CLAVE_OCULTAS = "gtap_vencidas_ocultas"
-
-function leerOcultasGuardadas() {
-  if (typeof window === "undefined") return []
-  try {
-    const guardadas = JSON.parse(window.localStorage.getItem(CLAVE_OCULTAS) || "[]")
-    return Array.isArray(guardadas) ? guardadas : []
-  } catch {
-    return []
-  }
-}
-
 export default function PendientesAutorizar() {
   const [tab, setTab] = useState("PENDIENTES") // "PENDIENTES" | "AUTORIZADAS"
 
@@ -85,11 +69,10 @@ export default function PendientesAutorizar() {
   const [accionando, setAccionando] = useState(null)
   const [errorAccion, setErrorAccion] = useState(null)
 
-  const [ocultas, setOcultas] = useState([])
-  const [mostrarOcultas, setMostrarOcultas] = useState(false)
+  const [asumiendo, setAsumiendo] = useState(false)
+  const [errorAsumir, setErrorAsumir] = useState(null)
 
   useEffect(() => {
-    setOcultas(leerOcultasGuardadas())
     cargarPendientes()
     cargarDerivacion()
   }, [])
@@ -201,32 +184,26 @@ export default function PendientesAutorizar() {
     if (ok) await cargarPendientes()
   }
 
-  function ocultarVencida(escalaId) {
-    setOcultas((prev) => {
-      const actualizado = [...new Set([...prev, escalaId])]
-      window.localStorage.setItem(CLAVE_OCULTAS, JSON.stringify(actualizado))
-      return actualizado
-    })
+  async function handleAsumir() {
+    const nombreBloqueado = pendientes?.autorizanteActivo?.nombre || "el autorizante activo"
+    const confirmar = window.confirm(
+      `Vas a asumir la autorización en lugar de ${nombreBloqueado}. Esto queda registrado como una derivación a su nombre. ¿Confirmás?`
+    )
+    if (!confirmar) return
+
+    setErrorAsumir(null)
+    setAsumiendo(true)
+    try {
+      const res = await fetch("/api/autorizadores/asumir", { method: "PUT", credentials: "include" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Error al asumir la autorización")
+      await cargarPendientes()
+    } catch (err) {
+      setErrorAsumir(err.message)
+    } finally {
+      setAsumiendo(false)
+    }
   }
-
-  function limpiarOcultas() {
-    setOcultas([])
-    window.localStorage.removeItem(CLAVE_OCULTAS)
-  }
-
-  const todasLasEscalas = pendientes?.escalas ?? []
-  const vencidas = todasLasEscalas.filter((e) => yaPasoLaHora(e.hora_despegue_estimada))
-  const accionablesCount = todasLasEscalas.length - vencidas.length
-  const vencidasOcultasCount = vencidas.filter((e) => ocultas.includes(e.id)).length
-
-  // Lo que realmente se dibuja: siempre las accionables, y las
-  // vencidas solo si no están ocultas (o si el usuario pidió
-  // mostrarlas todas con el link de abajo).
-  const escalasAMostrar = todasLasEscalas.filter((e) => {
-    const vencida = yaPasoLaHora(e.hora_despegue_estimada)
-    if (!vencida) return true
-    return mostrarOcultas || !ocultas.includes(e.id)
-  })
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -355,24 +332,18 @@ export default function PendientesAutorizar() {
                   : "bg-gray-50 border-gray-200"
               }`}
             >
-              {todasLasEscalas.length === 0 ? (
+              {pendientes.escalas.length === 0 ? (
                 <p className="text-sm text-gray-600">No hay ninguna escala esperando autorización.</p>
               ) : pendientes.podesActuar ? (
                 <div>
                   <p className="text-sm font-medium text-blue-800">
-                    Tenés {accionablesCount} escala{accionablesCount !== 1 && "s"} para autorizar
+                    Tenés {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} para autorizar
                     {pendientes.autorizanteActivo &&
                       ` (como ${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}.
                   </p>
                   {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
                     <p className="text-xs text-blue-700 mt-1">
                       {textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}
-                    </p>
-                  )}
-                  {vencidas.length > 0 && (
-                    <p className="text-xs text-rose-700 mt-1">
-                      Además hay {vencidas.length} vencida{vencidas.length !== 1 && "s"} que ya pasó su hora — hace
-                      falta editarlas para reprogramarlas antes de poder autorizarlas.
                     </p>
                   )}
                 </div>
@@ -385,31 +356,34 @@ export default function PendientesAutorizar() {
                     </span>
                     {pendientes.autorizanteActivo &&
                       ` (${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}.
-                    {" "}Hay {accionablesCount} escala{accionablesCount !== 1 && "s"} esperando.
+                    {" "}Hay {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} esperando.
                   </p>
                   {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
                     <p className="text-xs text-gray-500 mt-1">
                       {textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}
                     </p>
                   )}
+                  {pendientes.puedeAsumir && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      {errorAsumir && (
+                        <div className="mb-2 p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-xs">
+                          {errorAsumir}
+                        </div>
+                      )}
+                      <button
+                        onClick={handleAsumir}
+                        disabled={asumiendo}
+                        className="bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-4 py-2 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      >
+                        {asumiendo ? "Asumiendo..." : "Asumir autorización"}
+                      </button>
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        Sos el siguiente en la cascada. Si {pendientes.autorizanteActivo?.nombre} no puede actuar
+                        ahora, podés tomar su lugar — queda registrado como una derivación a su nombre.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {vencidasOcultasCount > 0 && !mostrarOcultas && (
-                <button
-                  onClick={() => setMostrarOcultas(true)}
-                  className="mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
-                >
-                  Mostrar {vencidasOcultasCount} vencida{vencidasOcultasCount !== 1 && "s"} oculta{vencidasOcultasCount !== 1 && "s"}
-                </button>
-              )}
-              {mostrarOcultas && (
-                <button
-                  onClick={() => { setMostrarOcultas(false); limpiarOcultas() }}
-                  className="mt-2 text-xs text-gray-500 hover:text-gray-700 underline block"
-                >
-                  Volver a ocultarlas
-                </button>
               )}
             </div>
 
@@ -418,7 +392,7 @@ export default function PendientesAutorizar() {
             )}
 
             <div className="space-y-2">
-              {escalasAMostrar.map((e) => {
+              {pendientes.escalas.map((e) => {
                 const tripulacionTexto = (e.tripulacion || [])
                   .map((t) => `${t.persona.grado} ${t.persona.apellido}`)
                   .join(", ") || "Sin tripulación"
@@ -459,8 +433,8 @@ export default function PendientesAutorizar() {
                         )}
                       </div>
 
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        {pendientes.podesActuar && !vencida && (
+                      {pendientes.podesActuar && !vencida && (
+                        <div className="flex gap-2 shrink-0">
                           <button
                             onClick={() => handleAutorizar(e.id)}
                             disabled={accionando === e.id}
@@ -468,16 +442,8 @@ export default function PendientesAutorizar() {
                           >
                             {accionando === e.id ? "..." : "Autorizar"}
                           </button>
-                        )}
-                        {vencida && !ocultas.includes(e.id) && (
-                          <button
-                            onClick={() => ocultarVencida(e.id)}
-                            className="text-xs text-gray-400 hover:text-gray-600 underline"
-                          >
-                            Ocultar
-                          </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )

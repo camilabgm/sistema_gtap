@@ -8,8 +8,8 @@
 import { useState, useEffect } from "react"
 
 const CASCADA_ORDEN = [
-  "JEFE_OPERACIONES",
   "COMANDANTE",
+  "JEFE_OPERACIONES",
   "CMDTE_ESC_AEREO",
   "CMDTE_ESC_MANTENIMIENTO",
   "JEFE_PERSONAL",
