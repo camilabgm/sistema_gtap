@@ -4,6 +4,7 @@
 // pendiente de completar (te_corresponde, calculado en el servidor).
 
 const ESTADOS = {
+  BORRADOR:      { label: "Borrador",   dot: "bg-slate-400",  texto: "text-slate-600",  fondo: "bg-slate-100" },
   PROGRAMADA:    { label: "Programada", dot: "bg-blue-500",   texto: "text-blue-700",   fondo: "bg-blue-50" },
   EN_DESARROLLO: { label: "En vuelo",   dot: "bg-amber-500",  texto: "text-amber-700",  fondo: "bg-amber-50" },
   CUMPLIDA:      { label: "Completada", dot: "bg-green-500",  texto: "text-green-700",  fondo: "bg-green-50" },

@@ -267,10 +267,6 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
                       activo={pathname === "/dashboard/escalas"} badge={acusesParaMi} colapsado={colapsado} />
                   </li>
                   <li>
-                    <SubItemEscalas nombre="Nueva escala" ruta="/dashboard/escalas/nueva" Icono={PlusCircle}
-                      activo={pathname === "/dashboard/escalas/nueva"} colapsado={colapsado} />
-                  </li>
-                  <li>
                     <SubItemEscalas nombre="Gestión" ruta="/dashboard/escalas/historial" Icono={ClipboardList}
                       activo={pathname === "/dashboard/escalas/historial"} colapsado={colapsado} />
                   </li>

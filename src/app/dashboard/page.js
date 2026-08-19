@@ -85,6 +85,7 @@ async function obtenerEstadisticas(sesion) {
           es_borrador: false,
           autorizada: false,
           estado: { notIn: ["ABORTADA"] },
+          hora_despegue_estimada: { gt: new Date() },
           deleted_at: null,
         },
       })
@@ -228,7 +229,7 @@ export default async function DashboardPage() {
               { nombre: "Personas",          activo: true  },
               { nombre: "Escalas",           activo: true  },
               { nombre: "Post-Vuelo",        activo: true  },
-              { nombre: "Manifiesto",        activo: false },
+              { nombre: "Manifiesto",        activo: true },
               { nombre: "Informes",          activo: false },
               { nombre: "SICEM",             activo: false },
             ].map((modulo) => (

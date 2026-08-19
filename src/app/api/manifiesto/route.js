@@ -15,7 +15,6 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
   const escalas = await prisma.escala.findMany({
     where: {
       deleted_at: null,
-      es_borrador: false,
       ...(busqueda
         ? {
             OR: [

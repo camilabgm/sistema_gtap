@@ -93,6 +93,11 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
   }
 
   async function guardarTramo(tramoId) {
+    const mensaje = pvData?.postVuelo
+        ? "Este post-vuelo ya está cerrado. ¿Confirmás que querés guardar este tramo? Los valores ya cargados se van a sobrescribir."
+        : "¿Confirmás que querés guardar este tramo con estos valores?"
+      if (!window.confirm(mensaje)) return
+      
     setPvError(null)
     setTramoGuardando(tramoId)
     try {
