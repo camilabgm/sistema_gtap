@@ -2,7 +2,9 @@
 // src/components/tipos-misiones/TiposMisionesTable.js
 
 import { useState } from "react"
+import { Plus, Search, Pencil, Trash2 } from "lucide-react"
 import TiposMisionesForm from "./TiposMisionesForm"
+import AccionIcono from "@/components/shared/AccionIcono"
 
 const ETIQUETAS_CLASIFICACION = {
   OPERACIONAL: { label: "Operacional", color: "bg-blue-100 text-blue-700" },
@@ -63,39 +65,42 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4">
 
-      {/* Encabezado */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tipos de Misión</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Catálogo operacional según OG COMFAER 2026
-          </p>
+      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Tipos de Misión</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Catálogo operacional según OG COMFAER 2026
+            </p>
+          </div>
+          {permisos?.puede_crear && (
+            <button
+              onClick={handleNuevo}
+              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo tipo
+            </button>
+          )}
         </div>
-        {permisos?.puede_crear && (
-          <button
-            onClick={handleNuevo}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            + Nuevo tipo
-          </button>
-        )}
-      </div>
 
-      {/* Filtros */}
-      <div className="flex gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Buscar por código o nombre..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="flex-1 border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar por código o nombre"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-full h-10 pl-9 pr-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
         <select
           value={filtroClasificacion}
           onChange={(e) => setFiltroClasificacion(e.target.value)}
-          className="border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="h-9 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="TODAS">Todas las clasificaciones</option>
           <option value="OPERACIONAL">Operacional</option>
@@ -104,8 +109,7 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
         </select>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -150,24 +154,19 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
                         : <span className="text-gray-300 text-xs">—</span>
                       }
                     </td>
-                    <td className="px-6 py-4 text-sm text-right">
-                      <div className="flex justify-end gap-2">
+                    <td className="px-6 py-4 text-sm">
+                      <div className="flex justify-end items-center gap-0.5">
                         {permisos?.puede_editar && (
-                          <button
-                            onClick={() => handleEditar(tipo)}
-                            className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
-                          >
-                            Editar
-                          </button>
+                          <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(tipo)} color="primario" />
                         )}
                         {permisos?.puede_eliminar && (
-                          <button
+                          <AccionIcono
+                            icono={Trash2}
+                            etiqueta="Desactivar"
                             onClick={() => handleEliminar(tipo.id)}
                             disabled={eliminando === tipo.id}
-                            className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                          >
-                            {eliminando === tipo.id ? "..." : "Desactivar"}
-                          </button>
+                            color="peligro"
+                          />
                         )}
                         {!permisos?.puede_editar && !permisos?.puede_eliminar && (
                           <span className="text-xs text-gray-300">Sin acciones</span>

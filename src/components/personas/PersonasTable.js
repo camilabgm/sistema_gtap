@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { Plus, Search, Pencil, ShieldCheck, KeyRound, Lock, UserX, UserCheck, Trash2, RotateCcw } from "lucide-react"
 import PersonasForm from "./PersonasForm"
 import UsuarioModal from "./UsuarioModal"
 import PermisosUsuarioModal from "./PermisosUsuarioModal"
 import HabilitacionesModal from "./HabilitacionesModal"
+import AccionIcono from "@/components/shared/AccionIcono"
 
 const ETIQUETAS_ESCUADRON = {
   ESCUADRON_OPERACIONES_AEREAS: "Esc. Operaciones",
@@ -208,63 +210,74 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Personas</h1>
-          <p className="text-sm text-gray-500 mt-1">Personal de la FAP registrado en el sistema</p>
+    <div className="p-4">
+
+      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Personas</h1>
+            <p className="text-sm text-gray-500 mt-1">Personal de la FAP registrado en el sistema</p>
+          </div>
+          {permisos?.puede_crear && (
+            <button onClick={handleNuevo}
+              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0">
+              <Plus className="h-4 w-4" />
+              Nueva persona
+            </button>
+          )}
         </div>
-        {permisos?.puede_crear && (
-          <button onClick={handleNuevo}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
-            + Nueva persona
-          </button>
-        )}
+
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input type="text"
+            placeholder="Buscar por nombre, apellido o documento"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-full h-10 pl-9 pr-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={filtroEspecialidad}
+            onChange={(e) => setFiltroEspecialidad(e.target.value)}
+            className="h-9 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="TODAS">Todas las especialidades</option>
+            <option value="PILOTO">Piloto</option>
+            <option value="COPILOTO">Copiloto</option>
+            <option value="TECNICO_DE_VUELO">Téc. de vuelo</option>
+            <option value="MECANICO">Mecánico</option>
+            <option value="ADMINISTRATIVO">Administrativo</option>
+            <option value="OTRO">Otro</option>
+          </select>
+          <select value={filtroEscuadron}
+            onChange={(e) => setFiltroEscuadron(e.target.value)}
+            className="h-9 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="TODOS">Todos los escuadrones</option>
+            <option value="ESCUADRON_OPERACIONES_AEREAS">Esc. Operaciones</option>
+            <option value="ESCUADRON_MANTENIMIENTO">Esc. Mantenimiento</option>
+            <option value="ESCUADRON_BASE">Esc. Base</option>
+            <option value="PLANA_MAYOR">Plana Mayor</option>
+          </select>
+
+          {puedeVerInactivas && (
+            <>
+              <div className="w-px h-7 bg-gray-200" />
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={mostrarInactivas}
+                  onChange={toggleMostrarInactivas}
+                  disabled={cargandoLista}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Mostrar inactivas
+                {cargandoLista && <span className="text-xs text-gray-400">Cargando...</span>}
+              </label>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-4 mb-3">
-        <input type="text"
-          placeholder="Buscar por nombre, apellido o documento..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="flex-1 border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <select value={filtroEspecialidad}
-          onChange={(e) => setFiltroEspecialidad(e.target.value)}
-          className="border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="TODAS">Todas las especialidades</option>
-          <option value="PILOTO">Piloto</option>
-          <option value="COPILOTO">Copiloto</option>
-          <option value="TECNICO_DE_VUELO">Téc. de vuelo</option>
-          <option value="MECANICO">Mecánico</option>
-          <option value="ADMINISTRATIVO">Administrativo</option>
-          <option value="OTRO">Otro</option>
-        </select>
-        <select value={filtroEscuadron}
-          onChange={(e) => setFiltroEscuadron(e.target.value)}
-          className="border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="TODOS">Todos los escuadrones</option>
-          <option value="ESCUADRON_OPERACIONES_AEREAS">Esc. Operaciones</option>
-          <option value="ESCUADRON_MANTENIMIENTO">Esc. Mantenimiento</option>
-          <option value="ESCUADRON_BASE">Esc. Base</option>
-          <option value="PLANA_MAYOR">Plana Mayor</option>
-        </select>
-      </div>
-
-      {puedeVerInactivas && (
-        <label className="flex items-center gap-2 mb-4 text-sm text-gray-600 cursor-pointer w-fit">
-          <input
-            type="checkbox"
-            checked={mostrarInactivas}
-            onChange={toggleMostrarInactivas}
-            disabled={cargandoLista}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          Mostrar personas inactivas
-          {cargandoLista && <span className="text-xs text-gray-400">Cargando...</span>}
-        </label>
-      )}
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -309,63 +322,61 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
                   <td className="px-6 py-4 text-sm">{badgeMedica(persona)}</td>
                   <td className="px-6 py-4 text-sm">{badgeOperacional(persona.nivel_operacional_habilitado)}</td>
                   <td className="px-6 py-4 text-sm">{badgeAcceso(persona)}</td>
-                  <td className="px-6 py-4 text-sm text-right">
-                    <div className="flex justify-end gap-2 flex-wrap">
+                  <td className="px-6 py-4 text-sm">
+                    <div className="flex justify-end items-center gap-0.5">
                       {persona.activo === false ? (
                         permisos?.puede_editar && (
-                          <button onClick={() => handleReactivarPersona(persona)}
+                          <AccionIcono
+                            icono={RotateCcw}
+                            etiqueta="Reactivar"
+                            onClick={() => handleReactivarPersona(persona)}
                             disabled={eliminando === persona.id}
-                            className="px-3 py-1 text-xs text-green-700 border border-green-200 rounded hover:bg-green-50 transition-colors disabled:opacity-50">
-                            {eliminando === persona.id ? "..." : "Reactivar"}
-                          </button>
+                            color="primario"
+                          />
                         )
                       ) : (
                         <>
                           {permisos?.puede_editar && (
-                            <button onClick={() => handleEditar(persona)}
-                              className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors">
-                              Editar
-                            </button>
+                            <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(persona)} color="primario" />
                           )}
                           {permisos?.puede_editar && (
-                            <button onClick={() => handleAbrirHabilitaciones(persona)}
-                              className="px-3 py-1 text-xs text-teal-600 border border-teal-200 rounded hover:bg-teal-50 transition-colors">
-                              Habilitaciones
-                            </button>
+                            <AccionIcono icono={ShieldCheck} etiqueta="Habilitaciones" onClick={() => handleAbrirHabilitaciones(persona)} />
                           )}
                           {permisos?.puede_editar && (
-                            <button onClick={() => handleAbrirUsuario(persona)}
-                              className="px-3 py-1 text-xs text-purple-600 border border-purple-200 rounded hover:bg-purple-50 transition-colors">
-                              {persona.usuario ? "Acceso" : "Dar acceso"}
-                            </button>
+                            <AccionIcono
+                              icono={KeyRound}
+                              etiqueta={persona.usuario ? "Acceso" : "Dar acceso"}
+                              onClick={() => handleAbrirUsuario(persona)}
+                            />
                           )}
                           {esAdministrador && persona.usuario && (
-                            <button onClick={() => handleAbrirPermisos(persona)}
-                              className="px-3 py-1 text-xs text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-50 transition-colors">
-                              Permisos
-                            </button>
+                            <AccionIcono icono={Lock} etiqueta="Permisos" onClick={() => handleAbrirPermisos(persona)} />
                           )}
                           {permisos?.puede_editar && persona.usuario && (
                             persona.usuario.activo ? (
-                              <button onClick={() => handleDesactivarUsuario(persona)}
+                              <AccionIcono
+                                icono={UserX}
+                                etiqueta="Quitar acceso"
+                                onClick={() => handleDesactivarUsuario(persona)}
                                 disabled={eliminando === persona.id}
-                                className="px-3 py-1 text-xs text-amber-600 border border-amber-200 rounded hover:bg-amber-50 transition-colors disabled:opacity-50">
-                                {eliminando === persona.id ? "..." : "Quitar acceso"}
-                              </button>
+                              />
                             ) : (
-                              <button onClick={() => handleReactivarUsuario(persona)}
+                              <AccionIcono
+                                icono={UserCheck}
+                                etiqueta="Restaurar acceso"
+                                onClick={() => handleReactivarUsuario(persona)}
                                 disabled={eliminando === persona.id}
-                                className="px-3 py-1 text-xs text-green-700 border border-green-200 rounded hover:bg-green-50 transition-colors disabled:opacity-50">
-                                {eliminando === persona.id ? "..." : "Restaurar acceso"}
-                              </button>
+                              />
                             )
                           )}
                           {permisos?.puede_eliminar && (
-                            <button onClick={() => handleDesactivar(persona.id)}
+                            <AccionIcono
+                              icono={Trash2}
+                              etiqueta="Desactivar"
+                              onClick={() => handleDesactivar(persona.id)}
                               disabled={eliminando === persona.id}
-                              className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50">
-                              {eliminando === persona.id ? "..." : "Desactivar"}
-                            </button>
+                              color="peligro"
+                            />
                           )}
                           {!permisos?.puede_editar && !permisos?.puede_eliminar && (
                             <span className="text-xs text-gray-300">Sin acciones</span>

@@ -2,7 +2,9 @@
 // src/components/aeronaves/AeronavesTable.js
 
 import { useState } from "react"
+import { Plus, Search, Pencil, Trash2 } from "lucide-react"
 import AeronavesForm from "./AeronavesForm"
+import AccionIcono from "@/components/shared/AccionIcono"
 
 const MOTIVOS = {
   ACCIDENTADA:      "Accidentada",
@@ -78,52 +80,59 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4">
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Aeronaves</h1>
-          <p className="text-sm text-gray-500 mt-1">Gestión de aeronaves del GTAP</p>
+      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Aeronaves</h1>
+            <p className="text-sm text-gray-500 mt-1">Gestión de aeronaves del GTAP</p>
+          </div>
+          {permisos?.puede_crear && (
+            <button
+              onClick={handleNuevo}
+              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva aeronave
+            </button>
+          )}
         </div>
-        {permisos?.puede_crear && (
-          <button
-            onClick={handleNuevo}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar por matrícula o tipo"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-full h-10 pl-9 pr-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <select
+            value={filtroCategoria}
+            onChange={(e) => setFiltroCategoria(e.target.value)}
+            className="h-9 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            + Nueva aeronave
-          </button>
-        )}
+            <option value="TODAS">Todas las categorías</option>
+            <option value="PROPIA">Propias</option>
+            <option value="INCAUTADA">Incautadas</option>
+          </select>
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="h-9 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="TODOS">Todos los estados</option>
+            <option value="DISPONIBLE">Disponibles</option>
+            <option value="NO_DISPONIBLE">No disponibles</option>
+          </select>
+        </div>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Buscar por matrícula o tipo..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="flex-1 border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <select
-          value={filtroCategoria}
-          onChange={(e) => setFiltroCategoria(e.target.value)}
-          className="border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="TODAS">Todas las categorías</option>
-          <option value="PROPIA">Propias</option>
-          <option value="INCAUTADA">Incautadas</option>
-        </select>
-        <select
-          value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value)}
-          className="border border-gray-300 rounded-md px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="TODOS">Todos los estados</option>
-          <option value="DISPONIBLE">Disponibles</option>
-          <option value="NO_DISPONIBLE">No disponibles</option>
-        </select>
-      </div>
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -166,24 +175,19 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {aeronave.capacidad_pasajeros}
                   </td>
-                  <td className="px-6 py-4 text-sm text-right">
-                    <div className="flex justify-end gap-2">
+                  <td className="px-6 py-4 text-sm">
+                    <div className="flex justify-end items-center gap-0.5">
                       {permisos?.puede_editar && (
-                        <button
-                          onClick={() => handleEditar(aeronave)}
-                          className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
-                        >
-                          Editar
-                        </button>
+                        <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(aeronave)} color="primario" />
                       )}
                       {permisos?.puede_eliminar && (
-                        <button
+                        <AccionIcono
+                          icono={Trash2}
+                          etiqueta="Desactivar"
                           onClick={() => handleEliminar(aeronave.id)}
                           disabled={eliminando === aeronave.id}
-                          className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                        >
-                          {eliminando === aeronave.id ? "..." : "Desactivar"}
-                        </button>
+                          color="peligro"
+                        />
                       )}
                       {!permisos?.puede_editar && !permisos?.puede_eliminar && (
                         <span className="text-xs text-gray-300">Sin acciones</span>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import GanttAeronavesDia from "./GanttAeronavesDia"
 import PanelDetalleEscala from "./PanelDetalleEscala"
 import {
@@ -108,41 +109,44 @@ export default function AgendaEscalas({ puedeCrear }) {
     offsetSemanas === 0 ? "Semana actual" : offsetSemanas < 0 ? "Semana pasada" : "Próxima semana"
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 max-w-4xl mx-auto">
 
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
-          <p className="text-sm text-gray-500 mt-1">Qué vuela, cuándo — solo escalas ya publicadas y con horario cargado</p>
+      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
+            <p className="text-sm text-gray-500 mt-1">Qué vuela, cuándo — solo escalas ya publicadas y con horario cargado</p>
+          </div>
+          {puedeCrear && (
+            <Link
+              href="/dashboard/escalas/nueva"
+              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva escala
+            </Link>
+          )}
         </div>
-        {puedeCrear && (
-          <Link
-            href="/dashboard/escalas/nueva"
-            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            + Nueva escala
-          </Link>
-        )}
-      </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-500">Vuelos del día seleccionado</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{escalasDelDia.length}</p>
+         <div className="flex items-center justify-center gap-8 pb-4 mb-4 border-b border-gray-100">
+          <div>
+            <p className="text-xs text-gray-500">Vuelos del día seleccionado</p>
+            <p className="text-2xl font-bold text-gray-900 mt-0.5">{escalasDelDia.length}</p>
+          </div>
+          <div className="w-px h-9 bg-gray-200" />
+          <div>
+            <p className="text-xs text-gray-500">Vuelos en esta semana</p>
+            <p className="text-2xl font-bold text-gray-900 mt-0.5">{escalasSemanaReal.length}</p>
+          </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-500">Vuelos en esta semana</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{escalasSemanaReal.length}</p>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => setOffsetSemanas((o) => o - 1)}
-            className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="h-9 flex items-center gap-1 px-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            ← Semana anterior
+            <ChevronLeft className="h-4 w-4" />
+            Semana anterior
           </button>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{etiquetaSemana}</span>
@@ -157,50 +161,51 @@ export default function AgendaEscalas({ puedeCrear }) {
           </div>
           <button
             onClick={() => setOffsetSemanas((o) => o + 1)}
-            className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="h-9 flex items-center gap-1 px-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            Semana siguiente →
+            Semana siguiente
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-      </div>
 
-      <div className="flex gap-2 mb-6">
-        {diasSemana.map((d) => {
-          const iso = formatearISO(d)
-          const esSeleccionado = iso === fechaSeleccionada
-          const esHoy = iso === hoyISO
-          const cantidad = escalasQueVuelanEse(iso).length
+        <div className="flex gap-2">
+          {diasSemana.map((d) => {
+            const iso = formatearISO(d)
+            const esSeleccionado = iso === fechaSeleccionada
+            const esHoy = iso === hoyISO
+            const cantidad = escalasQueVuelanEse(iso).length
 
-          return (
-            <button
-              key={iso}
-              onClick={() => { setFechaSeleccionada(iso); setFilaExpandidaId(null) }}
-              className={`flex-1 text-center py-2 px-1 rounded-md border transition-colors ${
-                esSeleccionado
-                  ? "bg-blue-600 border-blue-600 text-white"
-                  : "bg-white border-gray-200 hover:bg-gray-50 text-gray-700"
-              }`}
-            >
-              <p className={`text-xs ${esSeleccionado ? "text-blue-100" : "text-gray-400"}`}>
-                {NOMBRES_DIA[d.getDay()]}
-              </p>
-              <p className="text-sm font-medium mt-0.5">
-                {d.getDate()}
-                {esHoy && !esSeleccionado && <span className="ml-0.5 text-blue-600">•</span>}
-              </p>
-              {cantidad > 0 && (
-                <div className="flex justify-center gap-0.5 mt-1">
-                  {Array.from({ length: Math.min(cantidad, 3) }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-1 h-1 rounded-full ${esSeleccionado ? "bg-white" : "bg-blue-500"}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </button>
-          )
-        })}
+            return (
+              <button
+                key={iso}
+                onClick={() => { setFechaSeleccionada(iso); setFilaExpandidaId(null) }}
+                className={`flex-1 text-center py-2 px-1 rounded-md border transition-colors ${
+                  esSeleccionado
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "bg-white border-gray-200 hover:bg-gray-50 text-gray-700"
+                }`}
+              >
+                <p className={`text-xs ${esSeleccionado ? "text-blue-100" : "text-gray-400"}`}>
+                  {NOMBRES_DIA[d.getDay()]}
+                </p>
+                <p className="text-sm font-medium mt-0.5">
+                  {d.getDate()}
+                  {esHoy && !esSeleccionado && <span className="ml-0.5 text-blue-600">•</span>}
+                </p>
+                {cantidad > 0 && (
+                  <div className="flex justify-center gap-0.5 mt-1">
+                    {Array.from({ length: Math.min(cantidad, 3) }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-1 h-1 rounded-full ${esSeleccionado ? "bg-white" : "bg-blue-500"}`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <div className="flex items-center justify-between mb-3">
@@ -271,7 +276,7 @@ export default function AgendaEscalas({ puedeCrear }) {
                 <div key={e.id}>
                   <button
                     onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
-                    className="w-full flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center gap-4 bg-white border border-gray-200 rounded-lg px-4 py-3 text-left hover:bg-gray-50 hover:border-gray-300 transition-colors"
                   >
                     <div className="text-center min-w-[92px]">
                       <p className="text-sm font-bold text-gray-900">

@@ -6,6 +6,7 @@ import { useTick } from "@/lib/useTick"
 import { ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO_ABORTO, calcularEstadoVisual, estaPendienteDeAutorizacion, formatearHora, formatearRangoVuelo } from "@/lib/escalas"
 import { puedeCargarPostVuelo } from "@/lib/postVuelo"
 import { formatearFechaHora } from "@/lib/fechaHora"
+import SeparadorSeccion from "@/components/shared/SeparadorSeccion"
 
 const ETIQUETAS_NOVEDAD = {
   SIN_NOVEDAD: "Sin novedad",
@@ -189,7 +190,7 @@ export default function PanelDetalleEscala({ escala, puedeEditar, mostrarPostVue
 
       {relevantePostVuelo && (
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
-          <p className="text-xs text-gray-400">Post-Vuelo</p>
+          <SeparadorSeccion texto="Post-Vuelo" />
 
           {pvCargando ? (
             <p className="text-xs text-gray-400">Cargando post-vuelo...</p>

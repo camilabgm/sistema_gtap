@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Pause, Play } from "lucide-react"
 import { yaPasoLaHora } from "@/lib/escalas"
 import { formatearFechaHora as formatearFechaHoraBase } from "@/lib/fechaHora"
 
@@ -206,110 +207,152 @@ export default function PendientesAutorizar() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 max-w-4xl mx-auto">
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Autorización de Escalas</h1>
+      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Autorización de Escalas</h1>
 
-      {/* Derivar / Ya volví — acción general, no por escala */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-        {cargandoDerivacion ? (
-          <p className="text-sm text-gray-400">Cargando estado de derivación...</p>
-        ) : derivacion ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Derivaste tu autorización desde las {formatearFechaHora(derivacion.desde)}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Motivo: {ETIQUETAS_MOTIVO_DERIVACION[derivacion.motivo] || derivacion.motivo}
-                {derivacion.motivo_detalle && ` — ${derivacion.motivo_detalle}`}
-              </p>
-            </div>
-            <button
-              onClick={handleYaVolvi}
-              disabled={enviandoDerivar}
-              className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-            >
-              {enviandoDerivar ? "..." : "Ya volví"}
-            </button>
-          </div>
-        ) : mostrarFormDerivar ? (
-          <div className="space-y-3">
-            {errorDerivar && (
-              <div className="p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">{errorDerivar}</div>
-            )}
-            <div className="flex gap-2">
-              <select
-                value={motivoDerivar}
-                onChange={(e) => setMotivoDerivar(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        {/* Derivar / Ya volví — acción general, no por escala */}
+        <div className="pb-4 border-b border-gray-100">
+          {cargandoDerivacion ? (
+            <p className="text-sm text-gray-400">Cargando estado de derivación...</p>
+          ) : derivacion ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Derivaste tu autorización desde las {formatearFechaHora(derivacion.desde)}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Motivo: {ETIQUETAS_MOTIVO_DERIVACION[derivacion.motivo] || derivacion.motivo}
+                  {derivacion.motivo_detalle && ` — ${derivacion.motivo_detalle}`}
+                </p>
+              </div>
+              <button
+                onClick={handleYaVolvi}
+                disabled={enviandoDerivar}
+                className="flex items-center gap-1.5 bg-green-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 h-9 shrink-0"
               >
-                {Object.entries(ETIQUETAS_MOTIVO_DERIVACION).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-              {motivoDerivar === "OTRO" && (
-                <input
-                  type="text"
-                  value={detalleDerivar}
-                  onChange={(e) => setDetalleDerivar(e.target.value)}
-                  placeholder="Detalle del motivo"
-                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <Play className="h-3.5 w-3.5" />
+                {enviandoDerivar ? "..." : "Ya volví"}
+              </button>
+            </div>
+          ) : mostrarFormDerivar ? (
+            <div className="space-y-3">
+              {errorDerivar && (
+                <div className="p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">{errorDerivar}</div>
+              )}
+              <div className="flex gap-2">
+                <select
+                  value={motivoDerivar}
+                  onChange={(e) => setMotivoDerivar(e.target.value)}
+                  className="h-9 border border-gray-300 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {Object.entries(ETIQUETAS_MOTIVO_DERIVACION).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+                {motivoDerivar === "OTRO" && (
+                  <input
+                    type="text"
+                    value={detalleDerivar}
+                    onChange={(e) => setDetalleDerivar(e.target.value)}
+                    placeholder="Detalle del motivo"
+                    className="flex-1 h-9 border border-gray-300 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDerivar}
+                  disabled={enviandoDerivar}
+                  className="h-9 px-4 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {enviandoDerivar ? "Guardando..." : "Confirmar derivación"}
+                </button>
+                <button
+                  onClick={() => { setMostrarFormDerivar(false); setErrorDerivar(null) }}
+                  className="h-9 px-4 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">¿No podés autorizar hoy?</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Vas a derivar tu autorización al siguiente cargo hasta que vuelvas.
+                </p>
+              </div>
+              <button
+                onClick={() => setMostrarFormDerivar(true)}
+                className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-3.5 rounded-md hover:bg-amber-100 transition-colors h-9 shrink-0"
+              >
+                <Pause className="h-3.5 w-3.5" />
+                Derivar autorización
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* "Quién autoriza ahora" — mismo bloque de info general de la
+            pantalla, separado por línea fina, no dentro del panel de
+            la lista de abajo. */}
+        {!cargandoPendientes && pendientes && pendientes.escalas.length > 0 && (
+          <div className="pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                {pendientes.podesActuar ? (
+                  <>
+                    <p className="text-sm font-semibold text-gray-900">
+                      Tenés {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} para autorizar
+                      {pendientes.autorizanteActivo &&
+                        ` (como ${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}
+                    </p>
+                    {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-gray-900">
+                      Le corresponde autorizar a {pendientes.autorizanteActivo?.nombre || "nadie disponible en este momento"}
+                      {pendientes.autorizanteActivo &&
+                        ` (${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Hay {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} esperando.
+                      {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) &&
+                        ` ${textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}`}
+                    </p>
+                  </>
+                )}
+              </div>
+              {pendientes.puedeAsumir && (
+                <button
+                  onClick={handleAsumir}
+                  disabled={asumiendo}
+                  className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-3.5 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50 h-9 shrink-0"
+                >
+                  <Pause className="h-3.5 w-3.5" />
+                  {asumiendo ? "Asumiendo..." : "Asumir autorización"}
+                </button>
               )}
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleDerivar}
-                disabled={enviandoDerivar}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                {enviandoDerivar ? "Guardando..." : "Confirmar derivación"}
-              </button>
-              <button
-                onClick={() => { setMostrarFormDerivar(false); setErrorDerivar(null) }}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">¿No podés autorizar hoy?</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Vas a derivar tu autorización al siguiente cargo hasta que vuelvas.
+            {pendientes.puedeAsumir && (
+              <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
+                Sos el siguiente en la cascada. Si {pendientes.autorizanteActivo?.nombre} no puede actuar ahora,
+                podés tomar su lugar — queda registrado como una derivación a su nombre.
               </p>
-            </div>
-            <button
-              onClick={() => setMostrarFormDerivar(true)}
-              className="bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-4 py-2 rounded-md hover:bg-amber-100 transition-colors flex items-center gap-2 shrink-0"
-            >
-              <span>⏸</span> Derivar autorización
-            </button>
+            )}
+            {errorAsumir && (
+              <div className="mt-2 p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-xs">{errorAsumir}</div>
+            )}
           </div>
         )}
-      </div>
-
-      {/* Tabs */}
-      <div className="flex bg-gray-100 rounded-md p-0.5 w-fit mb-4">
-        <button
-          onClick={() => setTab("PENDIENTES")}
-          className={`px-4 py-1.5 text-sm font-medium rounded transition-colors ${
-            tab === "PENDIENTES" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-          }`}
-        >
-          Pendientes
-        </button>
-        <button
-          onClick={() => setTab("AUTORIZADAS")}
-          className={`px-4 py-1.5 text-sm font-medium rounded transition-colors ${
-            tab === "AUTORIZADAS" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-          }`}
-        >
-          Autorizadas
-        </button>
       </div>
 
       {avisoRecalculo && (
@@ -318,165 +361,129 @@ export default function PendientesAutorizar() {
         </div>
       )}
 
-      {tab === "PENDIENTES" ? (
-        cargandoPendientes ? (
-          <p className="text-sm text-gray-400">Cargando pendientes...</p>
-        ) : !pendientes ? (
-          <p className="text-sm text-red-600">Error al cargar.</p>
-        ) : (
-          <>
-            <div
-              className={`rounded-lg border p-4 mb-4 ${
-                pendientes.podesActuar
-                  ? "bg-blue-50 border-blue-200"
-                  : "bg-gray-50 border-gray-200"
-              }`}
-            >
-              {pendientes.escalas.length === 0 ? (
-                <p className="text-sm text-gray-600">No hay ninguna escala esperando autorización.</p>
-              ) : pendientes.podesActuar ? (
-                <div>
-                  <p className="text-sm font-medium text-blue-800">
-                    Tenés {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} para autorizar
-                    {pendientes.autorizanteActivo &&
-                      ` (como ${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}.
-                  </p>
-                  {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
-                    <p className="text-xs text-blue-700 mt-1">
-                      {textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Le corresponde autorizar a{" "}
-                    <span className="font-medium">
-                      {pendientes.autorizanteActivo?.nombre || "nadie disponible en este momento"}
-                    </span>
-                    {pendientes.autorizanteActivo &&
-                      ` (${etiquetaAutorizante(pendientes.autorizanteActivo.rol_autorizador, pendientes.autorizanteActivo.orden)})`}.
-                    {" "}Hay {pendientes.escalas.length} escala{pendientes.escalas.length !== 1 && "s"} esperando.
-                  </p>
-                  {textoMotivoEscalamiento(pendientes.autorizanteActivo?.motivo_escalamiento) && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {textoMotivoEscalamiento(pendientes.autorizanteActivo.motivo_escalamiento)}
-                    </p>
-                  )}
-                  {pendientes.puedeAsumir && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      {errorAsumir && (
-                        <div className="mb-2 p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-xs">
-                          {errorAsumir}
-                        </div>
-                      )}
-                      <button
-                        onClick={handleAsumir}
-                        disabled={asumiendo}
-                        className="bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-4 py-2 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50"
-                      >
-                        {asumiendo ? "Asumiendo..." : "Asumir autorización"}
-                      </button>
-                      <p className="text-xs text-gray-400 mt-1.5">
-                        Sos el siguiente en la cascada. Si {pendientes.autorizanteActivo?.nombre} no puede actuar
-                        ahora, podés tomar su lugar — queda registrado como una derivación a su nombre.
-                      </p>
-                    </div>
-                  )}
-                </div>
+      {/* Panel único con las tabs por dentro — el contenido (lista de
+          escalas) vive como filas dentro de este mismo borde. Mismo
+          patrón que la tabla de Gestión: encabezado gris, cuerpo
+          blanco. */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex bg-gray-50 border-b border-gray-200 p-1.5 gap-1">
+          <button
+            onClick={() => setTab("PENDIENTES")}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              tab === "PENDIENTES" ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Pendientes
+          </button>
+          <button
+            onClick={() => setTab("AUTORIZADAS")}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              tab === "AUTORIZADAS" ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Autorizadas
+          </button>
+        </div>
+
+        {tab === "PENDIENTES" ? (
+          cargandoPendientes ? (
+            <p className="p-4 text-sm text-gray-400">Cargando pendientes...</p>
+          ) : !pendientes ? (
+            <p className="p-4 text-sm text-red-600">Error al cargar.</p>
+          ) : (
+            <>
+              {errorAccion && (
+                <div className="m-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">{errorAccion}</div>
               )}
-            </div>
 
-            {errorAccion && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm mb-4">{errorAccion}</div>
-            )}
+              {pendientes.escalas.length === 0 ? (
+                <p className="p-4 text-sm text-gray-400">No hay ninguna escala esperando autorización.</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {pendientes.escalas.map((e) => {
+                    const tripulacionTexto = (e.tripulacion || [])
+                      .map((t) => `${t.persona.grado} ${t.persona.apellido}`)
+                      .join(", ") || "Sin tripulación"
+                    const fechaSolicitud = e.solicitudes?.[0]?.fecha_recepcion
+                    // Ya pasó la hora estimada de despegue y nunca se
+                    // autorizó — el endpoint de autorizar la rechaza
+                    // igual, así que no tiene sentido mostrar el botón
+                    // para esta fila puntual.
+                    const vencida = yaPasoLaHora(e.hora_despegue_estimada)
 
-            <div className="space-y-2">
-              {pendientes.escalas.map((e) => {
-                const tripulacionTexto = (e.tripulacion || [])
-                  .map((t) => `${t.persona.grado} ${t.persona.apellido}`)
-                  .join(", ") || "Sin tripulación"
-                const fechaSolicitud = e.solicitudes?.[0]?.fecha_recepcion
-                // Ya pasó la hora estimada de despegue y nunca se autorizó
-                // — el endpoint de autorizar la rechaza igual, así que no
-                // tiene sentido mostrar el botón para esta fila puntual.
-                const vencida = yaPasoLaHora(e.hora_despegue_estimada)
+                    return (
+                      <div key={e.id} className="p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-gray-900">
+                                {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
+                                {e.nro_orden && ` · Orden #${e.nro_orden}`}
+                              </p>
+                              {vencida && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-100 text-rose-700 shrink-0">
+                                  Vencida
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Vuelo: {formatearFechaHora(e.hora_despegue_estimada)} → {formatearFechaHora(e.hora_arribo_estimada)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">Tripulación: {tripulacionTexto}</p>
+                            {fechaSolicitud && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                Solicitud recibida: {formatearFechaHora(fechaSolicitud)}
+                              </p>
+                            )}
+                            {vencida && pendientes.podesActuar && (
+                              <p className="text-xs text-rose-600 mt-1">
+                                Ya pasó la hora — hay que editarla para reprogramarla antes de poder autorizarla.
+                              </p>
+                            )}
+                          </div>
 
-                return (
-                  <div key={e.id} className="bg-white border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900">
-                            {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
-                            {e.nro_orden && ` · Orden #${e.nro_orden}`}
-                          </p>
-                          {vencida && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-100 text-rose-700 shrink-0">
-                              Vencida
-                            </span>
+                          {pendientes.podesActuar && !vencida && (
+                            <button
+                              onClick={() => handleAutorizar(e.id)}
+                              disabled={accionando === e.id}
+                              className="h-9 px-3.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50 shrink-0"
+                            >
+                              {accionando === e.id ? "..." : "Autorizar"}
+                            </button>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Vuelo: {formatearFechaHora(e.hora_despegue_estimada)} → {formatearFechaHora(e.hora_arribo_estimada)}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">Tripulación: {tripulacionTexto}</p>
-                        {fechaSolicitud && (
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Solicitud recibida: {formatearFechaHora(fechaSolicitud)}
-                          </p>
-                        )}
-                        {vencida && pendientes.podesActuar && (
-                          <p className="text-xs text-rose-600 mt-1">
-                            Ya pasó la hora — hay que editarla para reprogramarla antes de poder autorizarla.
-                          </p>
-                        )}
                       </div>
-
-                      {pendientes.podesActuar && !vencida && (
-                        <div className="flex gap-2 shrink-0">
-                          <button
-                            onClick={() => handleAutorizar(e.id)}
-                            disabled={accionando === e.id}
-                            className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-                          >
-                            {accionando === e.id ? "..." : "Autorizar"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )
-      ) : cargandoAutorizadas ? (
-        <p className="text-sm text-gray-400">Cargando historial...</p>
-      ) : !autorizadas || autorizadas.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
-          Todavía no hay escalas autorizadas.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {autorizadas.map((e) => (
-            <div key={e.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
-                  {e.nro_orden && ` · Orden #${e.nro_orden}`}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Autorizada por {e.autorizada_por_nombre} ({etiquetaAutorizante(e.rol_autoriza, e.orden_autorizante)}) el {formatearFechaHora(e.fecha_autorizacion)}
-                </p>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )
+        ) : cargandoAutorizadas ? (
+          <p className="p-4 text-sm text-gray-400">Cargando historial...</p>
+        ) : !autorizadas || autorizadas.length === 0 ? (
+          <p className="p-4 text-sm text-gray-400">Todavía no hay escalas autorizadas.</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {autorizadas.map((e) => (
+              <div key={e.id} className="p-4 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
+                    {e.nro_orden && ` · Orden #${e.nro_orden}`}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Autorizada por {e.autorizada_por_nombre} ({etiquetaAutorizante(e.rol_autoriza, e.orden_autorizante)}) el {formatearFechaHora(e.fecha_autorizacion)}
+                  </p>
+                </div>
+                <span className="px-2 py-1 text-xs rounded-full font-medium shrink-0 bg-green-100 text-green-700">
+                  Autorizada
+                </span>
               </div>
-              <span className="px-2 py-1 text-xs rounded-full font-medium shrink-0 bg-green-100 text-green-700">
-                Autorizada
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

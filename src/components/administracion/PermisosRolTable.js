@@ -96,33 +96,35 @@ export default function PermisosRolTable({ roles }) {
 
       {/* Selector de roles */}
       <div className="w-56 shrink-0">
-        <p className="text-xs font-semibold uppercase text-gray-400 mb-2 px-1">
-          Roles
-        </p>
-        <ul className="space-y-1">
-          {roles.map((rol) => (
-            <li key={rol.id}>
-              <button
-                onClick={() => seleccionarRol(rol)}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                  rolSeleccionado.id === rol.id
-                    ? "bg-blue-600 text-white font-medium"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                {rol.nombre}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <p className="text-xs font-semibold uppercase text-gray-400 mb-2 px-1">
+            Roles
+          </p>
+          <ul className="space-y-1">
+            {roles.map((rol) => (
+              <li key={rol.id}>
+                <button
+                  onClick={() => seleccionarRol(rol)}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    rolSeleccionado.id === rol.id
+                      ? "bg-blue-600 text-white font-medium"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {rol.nombre}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
       {/* Tabla de permisos */}
       <div className="flex-1">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
 
           {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-gray-900">{rolSeleccionado.nombre}</h2>
               <p className="text-xs text-gray-400 mt-0.5">{rolSeleccionado.descripcion}</p>
@@ -130,7 +132,7 @@ export default function PermisosRolTable({ roles }) {
             <button
               onClick={guardar}
               disabled={guardando}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="h-9 px-4 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {guardando ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -152,11 +154,11 @@ export default function PermisosRolTable({ roles }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-6 py-3 font-medium text-gray-500 w-48">
+                  <th className="text-left px-6 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs w-48">
                     Módulo
                   </th>
                   {ACCIONES.map((a) => (
-                    <th key={a.key} className="text-center px-4 py-3 font-medium text-gray-500">
+                    <th key={a.key} className="text-center px-4 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs">
                       {a.label}
                     </th>
                   ))}

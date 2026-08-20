@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import { Search } from "lucide-react"
 import { formatearFechaHora } from "@/lib/fechaHora"
 
 const COLORES_RESULTADO = {
@@ -32,17 +33,25 @@ export default function TablaLogIntentos({ intentos }) {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Filtrar por resultado
-          </label>
+      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={busquedaUsuario}
+              onChange={(e) => setBusquedaUsuario(e.target.value)}
+              placeholder="Buscar por usuario"
+              className="w-full h-10 pl-9 pr-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
           <select
             value={filtroResultado}
             onChange={(e) => setFiltroResultado(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="h-9 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="TODOS">Todos</option>
+            <option value="TODOS">Todos los resultados</option>
             <option value="EXITOSO">Exitoso</option>
             <option value="CREDENCIALES_INVALIDAS">Credenciales inválidas</option>
             <option value="CUENTA_BLOQUEADA">Cuenta bloqueada</option>
@@ -50,45 +59,33 @@ export default function TablaLogIntentos({ intentos }) {
             <option value="CUENTA_INACTIVA">Cuenta inactiva</option>
           </select>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Buscar por usuario
-          </label>
-          <input
-            type="text"
-            value={busquedaUsuario}
-            onChange={(e) => setBusquedaUsuario(e.target.value)}
-            placeholder="Escribí un nombre de usuario..."
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
       </div>
 
       <p className="text-sm text-gray-500 mb-2">
         Mostrando {intentosFiltrados.length} de {intentos.length} registros
       </p>
 
-      <div className="overflow-x-auto bg-white rounded-lg shadow">
+      <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+          <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">
-                Fecha y Hora
+              <th className="text-left px-4 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs">
+                Fecha y hora
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">
+              <th className="text-left px-4 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs">
                 Usuario
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">
+              <th className="text-left px-4 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs">
                 Resultado
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">
+              <th className="text-left px-4 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs">
                 IP
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-100">
             {intentosFiltrados.map((intento) => (
-              <tr key={intento.id} className="hover:bg-gray-50">
+              <tr key={intento.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-600">
                   {formatearFechaHora(intento.created_at)}
                 </td>

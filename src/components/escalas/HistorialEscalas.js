@@ -3,7 +3,7 @@
 import { useState, useEffect, Fragment } from "react"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
-import { Eye, Pencil, Trash2, Users, ClipboardCheck } from "lucide-react"
+import { Eye, Pencil, Trash2, Users, ClipboardCheck, Search, Download, ChevronDown, X } from "lucide-react"
 import {
   estadoDetallado,
   ESTADO_DETALLADO_CLASES,
@@ -27,6 +27,16 @@ const ESTADOS_FILTRABLES = [
   { clave: "ABORTADA", texto: "Abortada" },
   { clave: "BORRADOR", texto: "Borrador" },
 ]
+
+// Colores de los puntos de la barra de contadores — mismos matices que
+// ya usa ESTADO_DETALLADO_CLASES, solo que acá se necesita el hex del
+// punto sólido, no la clase de fondo pastel.
+const COLOR_PUNTO_BALDE = {
+  PROGRAMADA: "#378ADD",
+  EN_DESARROLLO: "#EF9F27",
+  CUMPLIDA: "#639922",
+  ABORTADA: "#E24B4A",
+}
 
 // Agrupa el detalle fino de estadoDetallado() en los 4 baldes que
 // muestra la barra de contadores. "Programada" es el balde por
@@ -192,133 +202,143 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
   return (
     <div className="p-4">
 
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Escalas</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Todas las escalas del sistema — ver detalle, editar, eliminar o abortar según corresponda
-          </p>
-        </div>
-        <button
-          onClick={descargarPDF}
-          disabled={filtradas.length === 0}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          ⬇ Descargar PDF
-        </button>
-      </div>
-
-      {/* Contadores generales — sobre el total, sin importar filtros */}
-      <div className="flex flex-wrap items-center gap-4 mb-4 text-sm">
-        <span className="flex items-center gap-1.5 text-gray-600">
-          <span className="h-2 w-2 rounded-full bg-blue-500" /> Programada : {contadores.PROGRAMADA}
-        </span>
-        <span className="flex items-center gap-1.5 text-gray-600">
-          <span className="h-2 w-2 rounded-full bg-orange-500" /> En vuelo : {contadores.EN_DESARROLLO}
-        </span>
-        <span className="flex items-center gap-1.5 text-gray-600">
-          <span className="h-2 w-2 rounded-full bg-green-500" /> Completada : {contadores.CUMPLIDA}
-        </span>
-        <span className="flex items-center gap-1.5 text-gray-600">
-          <span className="h-2 w-2 rounded-full bg-red-500" /> Abortada : {contadores.ABORTADA}
-        </span>
-        <span className="text-gray-400">· Total {escalas.length}</span>
-      </div>
-
-      <input
-        type="text"
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar por solicitante, N. de orden o tipo de misión..."
-        className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-
-        <div className="relative">
+      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+        <div className="flex items-start justify-between mb-1">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Gestión de Escalas</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Todas las escalas del sistema — ver detalle, editar, eliminar o abortar según corresponda
+            </p>
+          </div>
           <button
-            onClick={() => setEstadoAbierto((v) => !v)}
-            className={`px-3 py-2 rounded-md border text-sm font-medium transition-colors ${
-              filtroEstados.length > 0
-                ? "bg-blue-50 border-blue-300 text-blue-700"
-                : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
-            }`}
+            onClick={descargarPDF}
+            disabled={filtradas.length === 0}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 h-9 shrink-0"
           >
-            Estado {filtroEstados.length > 0 && `(${filtroEstados.length})`} ▾
+            <Download className="h-4 w-4" />
+            Descargar PDF
           </button>
-          {estadoAbierto && (
-            <div className="absolute z-10 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg p-2">
-              {ESTADOS_FILTRABLES.map((op) => (
-                <label key={op.clave} className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-50 rounded cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={filtroEstados.includes(op.clave)}
-                    onChange={() => toggleEstadoFiltro(op.clave)}
-                    className="rounded border-gray-300"
-                  />
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${ESTADO_DETALLADO_CLASES[op.clave] || "bg-gray-100 text-gray-600"}`}
-                  >
-                    {op.texto}
-                  </span>
-                </label>
-              ))}
-              <div className="border-t border-gray-100 mt-1 pt-1 flex justify-between px-2">
-                <button
-                  onClick={() => setFiltroEstados([])}
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                >
-                  Limpiar
-                </button>
-                <button
-                  onClick={() => setEstadoAbierto(false)}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Cerrar
-                </button>
-              </div>
+        </div>
+
+        {/* Contadores generales — sobre el total, sin importar filtros */}
+        <div className="flex flex-wrap items-center gap-4 mt-4 pb-4 border-b border-gray-100 text-sm">
+          {Object.entries({ PROGRAMADA: "Programada", EN_DESARROLLO: "En vuelo", CUMPLIDA: "Completada", ABORTADA: "Abortada" }).map(
+            ([clave, etiqueta]) => (
+              <span key={clave} className="flex items-center gap-1.5 text-gray-600">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_PUNTO_BALDE[clave] }} />
+                {etiqueta} · {contadores[clave]}
+              </span>
+            )
+          )}
+          <span className="text-gray-400">Total {escalas.length}</span>
+        </div>
+
+        {/* Buscador con ícono */}
+        <div className="relative mt-4 mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por solicitante, N. de orden o tipo de misión"
+            className="w-full h-10 pl-9 pr-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Filtros — agrupados, con separador y misma altura entre todos */}
+        <div className="flex flex-wrap items-center gap-4">
+
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setEstadoAbierto((v) => !v)}
+                className={`h-9 flex items-center gap-1.5 px-3 rounded-md border text-sm font-medium transition-colors ${
+                  filtroEstados.length > 0
+                    ? "bg-blue-50 border-blue-300 text-blue-700"
+                    : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Estado {filtroEstados.length > 0 && `(${filtroEstados.length})`}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              {estadoAbierto && (
+                <div className="absolute z-10 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg p-2">
+                  {ESTADOS_FILTRABLES.map((op) => (
+                    <label key={op.clave} className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-50 rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filtroEstados.includes(op.clave)}
+                        onChange={() => toggleEstadoFiltro(op.clave)}
+                        className="rounded border-gray-300"
+                      />
+                      <span
+                        className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${ESTADO_DETALLADO_CLASES[op.clave] || "bg-gray-100 text-gray-600"}`}
+                      >
+                        {op.texto}
+                      </span>
+                    </label>
+                  ))}
+                  <div className="border-t border-gray-100 mt-1 pt-1 flex justify-between px-2">
+                    <button
+                      onClick={() => setFiltroEstados([])}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Limpiar
+                    </button>
+                    <button
+                      onClick={() => setEstadoAbierto(false)}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+
+            <select
+              value={filtroAeronave}
+              onChange={(e) => setFiltroAeronave(e.target.value)}
+              className={`h-9 px-3 rounded-md border text-sm font-medium ${
+                filtroAeronave ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-white border-gray-300 text-gray-600"
+              }`}
+            >
+              <option value="">Aeronave — todas</option>
+              {aeronaveOptions.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="hidden sm:block w-px h-7 bg-gray-300" />
+
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Desde</span>
+            <input
+              type="date"
+              value={filtroFechaDesde}
+              onChange={(e) => setFiltroFechaDesde(e.target.value)}
+              className="h-9 px-2.5 rounded-md border border-gray-300 text-sm"
+            />
+            <span>Hasta</span>
+            <input
+              type="date"
+              value={filtroFechaHasta}
+              onChange={(e) => setFiltroFechaHasta(e.target.value)}
+              className="h-9 px-2.5 rounded-md border border-gray-300 text-sm"
+            />
+          </div>
+
+          {hayFiltrosActivos && (
+            <button
+              onClick={limpiarFiltros}
+              className="h-9 flex items-center gap-1.5 px-3 rounded-md border border-gray-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+              Limpiar filtros
+            </button>
           )}
         </div>
-
-        <select
-          value={filtroAeronave}
-          onChange={(e) => setFiltroAeronave(e.target.value)}
-          className={`px-3 py-2 rounded-md border text-sm font-medium ${
-            filtroAeronave ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-white border-gray-300 text-gray-600"
-          }`}
-        >
-          <option value="">Aeronave — todas</option>
-          {aeronaveOptions.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
-
-        <div className="flex items-center gap-1.5">
-          <label className="text-xs text-gray-500">Desde</label>
-          <input
-            type="date"
-            value={filtroFechaDesde}
-            onChange={(e) => setFiltroFechaDesde(e.target.value)}
-            className="px-2 py-1.5 rounded-md border border-gray-300 text-sm"
-          />
-          <label className="text-xs text-gray-500">Hasta</label>
-          <input
-            type="date"
-            value={filtroFechaHasta}
-            onChange={(e) => setFiltroFechaHasta(e.target.value)}
-            className="px-2 py-1.5 rounded-md border border-gray-300 text-sm"
-          />
-        </div>
-
-        {hayFiltrosActivos && (
-          <button
-            onClick={limpiarFiltros}
-            className="text-xs text-red-600 hover:text-red-700 font-medium ml-1"
-          >
-            ✕ Limpiar filtros
-          </button>
-        )}
       </div>
 
       {errorEliminar && (

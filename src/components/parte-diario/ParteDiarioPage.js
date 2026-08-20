@@ -2,6 +2,8 @@
 // src/components/parte-diario/ParteDiarioPage.js
 
 import { useState } from "react"
+import { Plus, X } from "lucide-react"
+import AccionIcono from "@/components/shared/AccionIcono"
 
 const ETIQUETAS_ESCUADRON = {
   ESCUADRON_OPERACIONES_AEREAS: "Esc. Operaciones",
@@ -66,38 +68,44 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 max-w-4xl mx-auto">
 
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Parte de Novedades</h1>
-          <p className="text-sm text-gray-500 mt-1 capitalize">{fechaHoy}</p>
+      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Parte de Novedades</h1>
+            <p className="text-sm text-gray-500 mt-1 capitalize">{fechaHoy}</p>
+          </div>
+          {permisos?.puede_crear && (
+            <button
+              onClick={() => { setPersonaId(""); setObservacion(""); setError(""); setModalAbierto(true) }}
+              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar novedad
+            </button>
+          )}
         </div>
-        {permisos?.puede_crear && (
-          <button
-            onClick={() => { setPersonaId(""); setObservacion(""); setError(""); setModalAbierto(true) }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
-            + Agregar novedad
-          </button>
-        )}
+
+        <div className="flex items-center justify-center gap-8 pb-1">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-gray-900">{personas.length}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Total personal</p>
+          </div>
+          <div className="w-px h-9 bg-gray-200" />
+          <div className="text-center">
+            <p className="text-2xl font-bold text-green-700">{personasDisponibles.length}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Disponibles hoy</p>
+          </div>
+          <div className="w-px h-9 bg-gray-200" />
+          <div className="text-center">
+            <p className="text-2xl font-bold text-red-700">{novedades.length}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Con novedad</p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{personas.length}</p>
-          <p className="text-xs text-gray-500 mt-1">Total personal</p>
-        </div>
-        <div className="bg-green-50 rounded-lg border border-green-200 p-4 text-center">
-          <p className="text-2xl font-bold text-green-700">{personasDisponibles.length}</p>
-          <p className="text-xs text-green-600 mt-1">Disponibles hoy</p>
-        </div>
-        <div className="bg-red-50 rounded-lg border border-red-200 p-4 text-center">
-          <p className="text-2xl font-bold text-red-700">{novedades.length}</p>
-          <p className="text-xs text-red-600 mt-1">Con novedad</p>
-        </div>
-      </div>
-
-      <div className="mb-8">
+      <div className="mb-4">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Novedades registradas hoy
         </h2>
@@ -122,11 +130,13 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
                     No disponible
                   </span>
                   {permisos?.puede_eliminar && (
-                    <button onClick={() => handleQuitarNovedad(nov.id)}
+                    <AccionIcono
+                      icono={X}
+                      etiqueta="Quitar novedad"
+                      onClick={() => handleQuitarNovedad(nov.id)}
                       disabled={quitando === nov.id}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50">
-                      {quitando === nov.id ? "..." : "Quitar"}
-                    </button>
+                      color="peligro"
+                    />
                   )}
                 </div>
               </div>
