@@ -4,6 +4,11 @@
 //
 // No depende de un permiso de módulo — depende de recalcular en vivo
 // quién es el autorizante activo y comparar contra quien llama.
+//
+// CORRECCIÓN sobre la versión anterior: la búsqueda de Supervisor de
+// Semana miraba Usuario.rol (el rol BASE). Con el rol secundario
+// rotativo, nadie tiene "Supervisor de Semana" como rol base — ahora
+// busca por rol_secundario_id, que es donde vive el turno activo.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -59,10 +64,25 @@ export const PUT = conSesion("ESCALAS", async (request, context, session) => {
     )
   }
 
-  const supervisoresDeSemana = await prisma.usuario.findMany({
-    where: { activo: true, deleted_at: null, rol: { nombre: "Supervisor de Semana" } },
-    select: { persona_id: true },
+  // Antes: rol: { nombre: "Supervisor de Semana" } — buscaba en el ROL
+  // BASE. Ahora busca en rol_secundario_id, que es el campo donde se
+  // activa el turno rotativo sin tocar el rol base de la persona
+  // (normalmente Técnico de Vuelo).
+  const rolSupervisorSemana = await prisma.rol.findUnique({
+    where: { nombre: "Supervisor de Semana" },
+    select: { id: true },
   })
+
+  const supervisoresDeSemana = rolSupervisorSemana
+    ? await prisma.usuario.findMany({
+        where: {
+          activo: true,
+          deleted_at: null,
+          rol_secundario_id: rolSupervisorSemana.id,
+        },
+        select: { persona_id: true },
+      })
+    : []
 
   const actualizada = await prisma.$transaction(async (tx) => {
     for (let i = 0; i < pasos.length; i++) {
