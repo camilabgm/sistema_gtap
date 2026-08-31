@@ -106,7 +106,7 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
     if (!confirm("¿Confirmás que esta escala no llevó pasajeros?")) return
     setConfirmandoSinPasajeros(true)
     try {
-      const res = await fetch(`/api/manifiesto/${detalle.id}/sin-pasajeros`, { method: "PUT" })
+      const res = await fetch(`/api/manifiesto/${detalle.id}/sin-pasajero`, { method: "PUT" })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         alert(data.error || "No se pudo confirmar")
