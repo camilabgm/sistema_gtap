@@ -1,61 +1,69 @@
 // src/lib/manifiesto.js
 //
 // Funciones puras de negocio para Manifiesto — sin dependencias de
-// React, mismo criterio que lib/postVuelo.js. Se importan tanto desde
-// route.js (servidor) como desde componentes (cliente), por eso no
-// pueden tener nada de Prisma ni de Next acá adentro.
+// React, mismo criterio que lib/postVuelo.js.
+//
+// REGLA DE ACCESO CONFIRMADA (matriz PERMISOS_GTAP_25_08.xlsx, fila de
+// observaciones): "En Manifiesto el Supervisor de Semana está
+// habilitado para cargar los datos. Una vez que le da cerrar
+// manifiesto o se cierra automáticamente ya no puede hacer ni el
+// check-in de los pasajeros/cargas".
+//
+// Los tripulantes (Piloto, Copiloto, Técnico de Vuelo) NO tocan el
+// Manifiesto en ningún caso — ni siquiera el Técnico de Vuelo cuando
+// está asignado a esa escala puntual. Solo lo carga quien esté de
+// turno como Supervisor de Semana, para TODAS las escalas — por eso
+// esta función ya no necesita mirar escala.tripulacion ni
+// escala.acuses en absoluto: el permiso depende únicamente de
+// session.user.esSupervisorSemana, calculado en auth.js a partir del
+// rol_secundario activo.
 
-import { esTripulanteDeEscala } from "@/lib/postVuelo"
+import { yaPasoLaHora } from "@/lib/escalas"
 
-// Roles con acceso a Crear/Editar/Eliminar Manifiesto en CUALQUIER
-// escala, SIN el candado de "una sola vez" (según la matriz de
-// permisos). El resto de los roles con bit de permiso (Piloto,
-// Copiloto, Técnico de Vuelo, Supervisor de Semana) solo pueden operar
-// sobre las escalas donde ellos mismos participan, y una sola vez por
-// escala — ver el candado manifiesto_cerrado más abajo.
 export const ROLES_GLOBAL_MANIFIESTO = [
   "Comandante",
   "Jefe de Operaciones",
   "Comandante del Escuadrón Aéreo",
 ]
 
-// ¿Esta persona puede crear/editar/eliminar el manifiesto de ESTA
-// escala puntual? Se usa DESPUÉS de que conPermiso ya confirmó el bit
-// general de MANIFIESTO en la matriz.
-//
-// escala necesita venir con: tripulacion (persona_id), acuses
-// (persona_id, rol=SUPERVISOR_SEMANA) y manifiesto_cerrado ya cargados.
+// El Manifiesto se cierra solo (sin que nadie apriete nada) en cuanto
+// pasa la hora estimada de despegue, o si la escala ya está
+// CUMPLIDA/ABORTADA — mismo criterio que yaPasoLaHora() en Post-Vuelo.
+// EN_VUELO nunca se guarda como valor real en la base (ver
+// calcularEstadoVisual en escalas.js), por eso el cierre automático se
+// calcula por hora, no por un cambio de estado guardado.
+// manifiesto_cerrado sigue existiendo aparte para el cierre MANUAL,
+// antes de que se cumpla cualquiera de esas condiciones.
+export function manifiestoEstaCerrado(escala) {
+  if (escala.manifiesto_cerrado) return true
+  if (escala.estado === "CUMPLIDA" || escala.estado === "ABORTADA") return true
+  return yaPasoLaHora(escala.hora_despegue_estimada)
+}
+
+// ¿Esta persona puede crear/editar/eliminar el Manifiesto de ESTA
+// escala puntual? Se usa DESPUÉS de que conSesion ya confirmó que hay
+// una sesión válida — acá vive el chequeo real, no en la matriz.
 export function usuarioPuedeGestionarManifiesto(session, escala) {
   if (!session?.user) return false
 
-  const rol = session.user.rol
-  if (ROLES_GLOBAL_MANIFIESTO.includes(rol)) return true
+  if (ROLES_GLOBAL_MANIFIESTO.includes(session.user.rol)) return true
 
-  // "Una sola vez": una vez cerrado, tripulación y Supervisor de Semana
-  // pierden acceso — para corregir algo hace falta un rol de matriz.
-  if (escala.manifiesto_cerrado) return false
+  if (manifiestoEstaCerrado(escala)) return false
 
-  const personaId = session.user.personaId
-  if (!personaId) return false
-
-  if (esTripulanteDeEscala(escala, personaId)) return true
-
-  return (escala.acuses || []).some((a) => a.persona_id === personaId)
+  // Supervisor de Semana: cubre CUALQUIER escala, no una en particular
+  // — es la única vía de tripulación que carga Manifiesto.
+  return !!session.user.esSupervisorSemana
 }
 
 // Variante para el resaltado de "te toca a vos" en la lista de
-// escalas. A diferencia de la de arriba, NO incluye a los roles de
-// matriz (a ellos no les corresponde puntualmente ninguna escala en
-// particular, tocan todas por igual) — solo marca a quien realmente
-// tiene una carga pendiente de hacer.
+// escalas. Con la regla confirmada, ya no es "tripulante de ESTA
+// escala" — es "sos el Supervisor de Semana activo, y este manifiesto
+// sigue abierto". Por eso se resalta en TODAS las escalas abiertas
+// mientras estés de turno, no en una asignación puntual.
 export function teCorrespondeCompletarManifiesto(session, escala) {
-  if (!session?.user || escala.manifiesto_cerrado) return false
-
-  const personaId = session.user.personaId
-  if (!personaId) return false
-
-  if (esTripulanteDeEscala(escala, personaId)) return true
-  return (escala.acuses || []).some((a) => a.persona_id === personaId)
+  if (!session?.user) return false
+  if (manifiestoEstaCerrado(escala)) return false
+  return !!session.user.esSupervisorSemana
 }
 
 // Hora de salida/llegada a mostrar: estimada si la escala sigue

@@ -14,7 +14,7 @@
 import { useState, useRef, useLayoutEffect } from "react"
 import { createPortal } from "react-dom"
 import { Ban } from "lucide-react"
-import { ETIQUETAS_MOTIVO_ABORTO, puedeAbortarAhora } from "@/lib/escalas"
+import { ETIQUETAS_MOTIVO_ABORTO, puedeAbortarAhora, motivoNoAbortable } from "@/lib/escalas"
 
 const MOTIVOS_ABORTO = Object.keys(ETIQUETAS_MOTIVO_ABORTO)
 
@@ -28,6 +28,10 @@ export default function AbortarEscalaAccion({ escala, onAbortada }) {
   const botonRef = useRef(null)
 
   const habilitado = puedeAbortarAhora(escala)
+  // Nombre distinto de "motivo" a propósito — ese ya lo usa el estado
+  // del motivo de aborto elegido en el desplegable, este es el motivo
+  // por el que el ÍCONO está deshabilitado, algo completamente distinto.
+  const motivoDeshabilitado = !habilitado ? motivoNoAbortable(escala) : null
 
   useLayoutEffect(() => {
     if (!abierto || !botonRef.current) return
@@ -73,7 +77,7 @@ export default function AbortarEscalaAccion({ escala, onAbortada }) {
         ref={botonRef}
         onClick={habilitado ? abrir : undefined}
         disabled={!habilitado}
-        title={habilitado ? "Abortar escala" : "No se puede abortar en este estado"}
+        title={habilitado ? "Abortar escala" : (motivoDeshabilitado || "No se puede abortar en este estado")}
         aria-label="Abortar escala"
         className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
           habilitado ? "text-red-500 hover:text-red-700 hover:bg-red-50" : "cursor-not-allowed text-gray-300"

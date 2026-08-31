@@ -5,22 +5,38 @@
 
 import { useState } from "react"
 import { Pencil, Trash2, AlertTriangle } from "lucide-react"
-import { Badge, formatearFechaCorta, formatearHoraCorta } from "./ListaEscalas"
-import { construirCadenaRuta } from "@/lib/manifiesto"
+import { formatearFechaCorta, formatearHoraCorta } from "./ListaEscalas"
+import { construirCadenaRuta, manifiestoEstaCerrado } from "@/lib/manifiesto"
+import { estadoDetallado, ESTADO_DETALLADO_CLASES } from "@/lib/escalas"
 import { exportarManifiestoPDF } from "@/lib/exportarManifiestoPDF"
 import FormularioPasajero from "./FormularioPasajero"
 import FormularioCarga from "./FormularioCarga"
 import AccionIcono from "@/components/shared/AccionIcono"
 import SeparadorSeccion from "@/components/shared/SeparadorSeccion"
+import PanelAuditoria from "@/components/shared/PanelAuditoria"
 
-export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
+export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, onCambio }) {
   const [agregandoPasajero, setAgregandoPasajero] = useState(false)
   const [editandoPasajeroId, setEditandoPasajeroId] = useState(null)
   const [agregandoCarga, setAgregandoCarga] = useState(false)
   const [editandoCargaId, setEditandoCargaId] = useState(null)
   const [cerrando, setCerrando] = useState(false)
+  const [eliminandoManifiesto, setEliminandoManifiesto] = useState(false)
+  const [confirmandoSinPasajeros, setConfirmandoSinPasajeros] = useState(false)
+  const [confirmandoSinCarga, setConfirmandoSinCarga] = useState(false)
 
   const ruta = construirCadenaRuta(detalle.itinerarios)
+  const estado = estadoDetallado(detalle)
+  const cerradoManualmente = detalle.manifiesto_cerrado
+  const cerradoAutomaticamente = !cerradoManualmente && manifiestoEstaCerrado(detalle)
+
+  const itemsAuditoria = [
+    { etiqueta: "Manifiesto creado por", nombre: detalle.manifiesto_creado_por_nombre, fecha: detalle.manifiesto_creado_en },
+    { etiqueta: "Manifiesto cerrado por", nombre: detalle.manifiesto_cerrado_por_nombre, fecha: detalle.manifiesto_cerrado_en },
+    ...(cerradoAutomaticamente
+      ? [{ etiqueta: "Manifiesto cerrado", nombre: "Automáticamente (venció la hora de despegue)", fecha: detalle.hora_despegue_estimada }]
+      : []),
+  ]
 
   async function borrarPasajero(id) {
     if (!confirm("¿Borrar este pasajero del manifiesto?")) return
@@ -66,18 +82,82 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
     }
   }
 
+  async function eliminarManifiestoCompleto() {
+    const confirmar = window.confirm(
+      `¿Eliminar TODO el manifiesto de esta escala? Se van a borrar los ${detalle.pasajeros.length} pasajero(s) y ${detalle.cargas.length} ítem(s) de carga ya cargados, y la escala queda como si el manifiesto nunca se hubiera tocado. Esta acción no se puede deshacer desde la interfaz.`
+    )
+    if (!confirmar) return
+
+    setEliminandoManifiesto(true)
+    try {
+      const res = await fetch(`/api/manifiesto/${detalle.id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || "No se pudo eliminar el manifiesto")
+        return
+      }
+      onCambio()
+    } finally {
+      setEliminandoManifiesto(false)
+    }
+  }
+
+  async function confirmarSinPasajeros() {
+    if (!confirm("¿Confirmás que esta escala no llevó pasajeros?")) return
+    setConfirmandoSinPasajeros(true)
+    try {
+      const res = await fetch(`/api/manifiesto/${detalle.id}/sin-pasajeros`, { method: "PUT" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || "No se pudo confirmar")
+        return
+      }
+      onCambio()
+    } finally {
+      setConfirmandoSinPasajeros(false)
+    }
+  }
+
+  async function confirmarSinCarga() {
+    if (!confirm("¿Confirmás que esta escala no llevó carga?")) return
+    setConfirmandoSinCarga(true)
+    try {
+      const res = await fetch(`/api/manifiesto/${detalle.id}/sin-carga`, { method: "PUT" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || "No se pudo confirmar")
+        return
+      }
+      onCambio()
+    } finally {
+      setConfirmandoSinCarga(false)
+    }
+  }
+
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto rounded-lg border border-gray-200 bg-white p-5">
-      {/* Encabezado: ruta, estado, fecha, horas */}
       <div className="flex items-start justify-between border-b border-gray-100 pb-4">
         <div>
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>{formatearFechaCorta(detalle.fecha)}</span>
-            <Badge estado={detalle.estado} />
-            {detalle.manifiesto_cerrado && (
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_DETALLADO_CLASES[estado.clave] || "bg-gray-100 text-gray-600"}`}
+            >
+              {estado.texto}
+            </span>
+            {cerradoManualmente && (
               <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
                 <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
                 Manifiesto cerrado
+              </span>
+            )}
+            {cerradoAutomaticamente && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
+                title="Se cerró solo porque ya pasó la hora de despegue estimada — nadie lo cerró a mano"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                Cerrado automáticamente
               </span>
             )}
           </div>
@@ -90,15 +170,19 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
           {ruta && <div className="text-xs text-gray-400">{ruta}</div>}
         </div>
         <div className="text-right">
-          <div className="text-2xl font-bold text-gray-900">{formatearHoraCorta(detalle.hora_salida)}</div>
-          <div className="text-xs text-gray-500">
-            salida · llegada {formatearHoraCorta(detalle.hora_llegada)}
-            {detalle.hora_es_real ? " (real)" : " (estimada)"}
+          <div className="flex items-baseline justify-end gap-1.5">
+            <span className="text-xs text-gray-400">Salida</span>
+            <span className="text-2xl font-bold text-gray-900">{formatearHoraCorta(detalle.hora_salida)}</span>
+          </div>
+          <div className="mt-0.5 flex items-baseline justify-end gap-1.5">
+            <span className="text-xs text-gray-400">
+              Llegada{detalle.hora_es_real ? " (real)" : " (estimada)"}
+            </span>
+            <span className="text-sm font-semibold text-gray-600">{formatearHoraCorta(detalle.hora_llegada)}</span>
           </div>
         </div>
       </div>
 
-      {/* Fila de datos: aeronave, tipo de misión, capacidad, ocupación */}
       <div className="grid grid-cols-2 gap-4 border-b border-gray-100 pb-4 sm:grid-cols-4">
         <div>
           <div className="text-xs uppercase text-gray-400">Aeronave</div>
@@ -130,7 +214,6 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
         </div>
       </div>
 
-      {/* Si ya voló: horas y combustible reales, calcado de la planilla en papel */}
       {detalle.estado === "CUMPLIDA" && (
         <div className="grid grid-cols-2 gap-4 border-b border-gray-100 pb-4 sm:grid-cols-3">
           <div>
@@ -151,7 +234,6 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
         </div>
       )}
 
-      {/* Tripulación — solo lectura, viene de Escalas */}
       <div className="border-b border-gray-100 pb-4">
         <div className="mb-2 text-xs uppercase text-gray-400">Tripulación</div>
         {detalle.tripulacion.length === 0 && <div className="text-sm text-gray-400">Sin tripulación asignada</div>}
@@ -167,7 +249,6 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
         </ul>
       </div>
 
-      {/* Botón exportar — visible siempre, reportes es ✓ para todos los roles */}
       <div className="flex justify-end">
         <button
           onClick={() => exportarManifiestoPDF(detalle)}
@@ -177,10 +258,8 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
         </button>
       </div>
 
-      {/* A partir de acá: lo que el usuario tiene que completar */}
       <SeparadorSeccion texto="Manifiesto de esta escala" />
 
-      {/* Manifiesto de pasajeros */}
       <div className="border-b border-gray-100 pb-4">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">
@@ -220,9 +299,24 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
         )}
 
         {detalle.pasajeros.length === 0 && !agregandoPasajero && (
-          <div className="rounded-md border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
-            Sin personas asignadas. Agregá tripulación o pasajeros a esta escala.
-          </div>
+          detalle.manifiesto_sin_pasajeros ? (
+            <div className="rounded-md border border-green-200 bg-green-50 p-4 text-center text-sm text-green-700">
+              ✓ Confirmado: esta escala no llevó pasajeros.
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
+              <p>No hubo asignación de pasajeros en esta escala.</p>
+              {puedeGestionar && (
+                <button
+                  onClick={confirmarSinPasajeros}
+                  disabled={confirmandoSinPasajeros}
+                  className="mt-2 text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+                >
+                  {confirmandoSinPasajeros ? "…" : "Confirmar sin pasajeros"}
+                </button>
+              )}
+            </div>
+          )
         )}
 
         <ul className="divide-y divide-gray-100">
@@ -267,7 +361,6 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
         </ul>
       </div>
 
-      {/* Carga */}
       <div>
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">
@@ -295,7 +388,24 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
         )}
 
         {detalle.cargas.length === 0 && !agregandoCarga && (
-          <div className="text-sm text-gray-400">Sin carga registrada.</div>
+          detalle.manifiesto_sin_carga ? (
+            <div className="rounded-md border border-green-200 bg-green-50 p-4 text-center text-sm text-green-700">
+              ✓ Confirmado: esta escala no llevó carga.
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
+              <p>No hubo asignación de carga en esta escala.</p>
+              {puedeGestionar && (
+                <button
+                  onClick={confirmarSinCarga}
+                  disabled={confirmandoSinCarga}
+                  className="mt-2 text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+                >
+                  {confirmandoSinCarga ? "…" : "Confirmar sin carga"}
+                </button>
+              )}
+            </div>
+          )
         )}
 
         <ul className="divide-y divide-gray-100">
@@ -340,6 +450,27 @@ export default function PanelDetalle({ detalle, puedeGestionar, onCambio }) {
           )}
         </ul>
       </div>
+
+      {/* Eliminar manifiesto completo — mismo lugar y mismo criterio
+          visual que "Eliminar post-vuelo" en PanelPostVuelo.js: al
+          final, después de la auditoría, separado de los botones de
+          arriba (que son de uso normal/frecuente; esto es excepcional
+          y solo para Comandante). */}
+      {puedeEliminar && (
+        <button
+          onClick={eliminarManifiestoCompleto}
+          disabled={eliminandoManifiesto}
+          className="self-start rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          {eliminandoManifiesto ? "Eliminando…" : "Eliminar manifiesto"}
+        </button>
+      )}
+
+      <SeparadorSeccion texto="Auditoría"/>
+
+      {/* Panel de auditoría — solo lectura, sin acciones */}
+      <PanelAuditoria items={itemsAuditoria} />
+
     </div>
   )
 }

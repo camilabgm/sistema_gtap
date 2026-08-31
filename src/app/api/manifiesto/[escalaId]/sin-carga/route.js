@@ -1,6 +1,9 @@
-// PUT /api/manifiesto/<escalaId>/cerrar → cierra el manifiesto de esta
-// escala. Se puede cerrar en 0 pasajeros y 0 cargas (ej. vuelo
-// puramente de carga, o vuelo sin pasajeros ni carga).
+// Destino: src/app/api/manifiesto/[escalaId]/sin-carga/route.js
+//
+// PUT — declara explícitamente "no hubo carga en esta escala". Mismo
+// mecanismo que sin-pasajeros, campo aparte porque son dos cosas
+// independientes: puede haber pasajeros sin carga, o carga sin
+// pasajeros.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -21,29 +24,33 @@ export const PUT = conSesion("MANIFIESTO", async (request, context, session) => 
       estado: true,
       hora_despegue_estimada: true,
       manifiesto_cerrado: true,
+      manifiesto_creado_por: true,
     },
   })
   if (!escala) {
     return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
   }
-
   if (!usuarioPuedeGestionarManifiesto(session, escala)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 })
   }
 
-  if (escala.manifiesto_cerrado) {
-    return NextResponse.json({ error: "Este manifiesto ya está cerrado" }, { status: 409 })
+  const hayCarga = await prisma.escalaCarga.count({
+    where: { escala_id: id, deleted_at: null },
+  })
+  if (hayCarga > 0) {
+    return NextResponse.json(
+      { error: "No se puede confirmar 'sin carga' — ya hay carga cargada en esta escala" },
+      { status: 409 }
+    )
   }
 
-  const actualizada = await prisma.escala.update({
-    where: { id },
-    data: {
-      manifiesto_cerrado: true,
-      manifiesto_cerrado_por: session.user.id,
-      manifiesto_cerrado_en: new Date(),
-      editado_por: session.user.id,
-    },
-  })
+  const data = { manifiesto_sin_carga: true, editado_por: session.user.id }
+  if (!escala.manifiesto_creado_por) {
+    data.manifiesto_creado_por = session.user.id
+    data.manifiesto_creado_en = new Date()
+  }
 
-  return NextResponse.json({ ok: true, manifiesto_cerrado_en: actualizada.manifiesto_cerrado_en })
+  await prisma.escala.update({ where: { id }, data })
+
+  return NextResponse.json({ ok: true })
 })

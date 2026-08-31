@@ -213,8 +213,14 @@ model Rol {
   editado_por   Int?
   eliminado_por Int?
 
-  usuarios     Usuario[]
-  permisos_rol PermisoRol[]
+  // Dos relaciones distintas hacia Usuario, por eso necesitan nombre:
+  // RolPrincipal = el rol de base de cada Usuario (Usuario.rol_id).
+  // RolSecundario = el turno rotativo activo (Usuario.rol_secundario_id),
+  // ej. Supervisor de Semana — no reemplaza al rol principal, se suma
+  // o no según Usuario.rol_secundario_combina.
+  usuarios            Usuario[]    @relation("RolPrincipal")
+  usuarios_secundario Usuario[]    @relation("RolSecundario")
+  permisos_rol        PermisoRol[]
 
   @@map("roles")
 }
@@ -229,6 +235,16 @@ model Usuario {
   bloqueado_hasta      DateTime?
   password_temporal    Boolean   @default(true)
 
+  // Rol secundario — turno rotativo (ej. Supervisor de Semana) que se
+  // activa/desactiva sin tocar el rol de base de la persona. Ver
+  // auth.js: si rol_secundario_combina es true, sus permisos se SUMAN
+  // a los del rol base; si es false, lo reemplazan mientras dure.
+  rol_secundario_id           Int?
+  rol_secundario              Rol?      @relation("RolSecundario", fields: [rol_secundario_id], references: [id])
+  rol_secundario_combina      Boolean   @default(true)
+  rol_secundario_asignado_por Int?
+  rol_secundario_desde        DateTime?
+
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -238,7 +254,7 @@ model Usuario {
 
   persona             Persona             @relation(fields: [persona_id], references: [id])
   persona_id          Int                 @unique
-  rol                 Rol                 @relation(fields: [rol_id], references: [id])
+  rol                 Rol                 @relation("RolPrincipal", fields: [rol_id], references: [id])
   rol_id              Int
   permisos_usuario    PermisoUsuario[]
   cargos_autorizacion CargoAutorizacion[]
@@ -387,13 +403,20 @@ model Escala {
   observacion_aborto     String?
   es_borrador            Boolean         @default(true)
 
-  // Manifiesto: candado de "una sola carga" para tripulación y
-  // Supervisor de Semana. Una vez true, usuarioPuedeGestionarManifiesto()
-  // en src/lib/manifiesto.js bloquea a todos menos a los roles de
-  // matriz (Comandante, Jefe de Operaciones, Cmdte. Esc. Aéreo).
+  // Manifiesto: candado de cierre. Se cierra a mano (usuario habilitado
+  // aprieta "cerrar"), o solo al pasar la hora estimada de despegue /
+  // CUMPLIDA / ABORTADA — ver manifiestoEstaCerrado() en manifiesto.js.
   manifiesto_cerrado     Boolean   @default(false)
   manifiesto_cerrado_por Int?
   manifiesto_cerrado_en  DateTime?
+
+  // Quién y cuándo creó el Manifiesto — hace falta guardarlo aparte
+  // porque en un vuelo "sin pasajeros y sin carga" no queda ninguna
+  // fila en EscalaPasajero/EscalaCarga de la cual inferirlo.
+  manifiesto_creado_por    Int?
+  manifiesto_creado_en     DateTime?
+  manifiesto_sin_pasajeros Boolean   @default(false)
+  manifiesto_sin_carga     Boolean   @default(false)
 
   autorizada         Boolean         @default(false)
   autorizada_por     Int?
@@ -594,6 +617,10 @@ model PostVuelo {
   destino_real          String
   combustible_consumido Decimal? @db.Decimal(8, 2)
   pasajeros             Int?
+  // Peso total de carga (kg) — sugerido a partir de lo que ya está en
+  // el Manifiesto de esta escala, pero editable: puede diferir (carga
+  // que no llegó a subir, por ejemplo).
+  carga_kg              Decimal? @db.Decimal(8, 2)
   aterrizajes           Int
 
   novedad         Novedad @default(SIN_NOVEDAD)

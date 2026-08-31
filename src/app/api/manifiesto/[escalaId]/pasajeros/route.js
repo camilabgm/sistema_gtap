@@ -16,9 +16,10 @@ export const POST = conSesion("MANIFIESTO", async (request, context, session) =>
     where: { id, deleted_at: null },
     select: {
       id: true,
+      estado: true,
+      hora_despegue_estimada: true,
       manifiesto_cerrado: true,
-      tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
-      acuses: { where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" }, select: { persona_id: true } },
+      manifiesto_creado_por: true,
     },
   })
   if (!escala) {
@@ -38,6 +39,20 @@ export const POST = conSesion("MANIFIESTO", async (request, context, session) =>
     const pasajero = await prisma.escalaPasajero.create({
       data: { escala_id: id, ...resultado.valor, creado_por: session.user.id },
     })
+
+    // Primera vez que se toca el manifiesto de esta escala — se marca
+    // quién y cuándo lo creó. Solo la primera vez: si ya estaba
+    // marcado, no se pisa (no cambia el "creador" original solo porque
+    // alguien más agregue un pasajero después).
+    // Si ya estaba marcado "sin pasajeros" y ahora cargan uno real,
+    // se corrige la contradicción de una sola vez, junto con el resto.
+    const dataEscala = { manifiesto_sin_pasajeros: false }
+    if (!escala.manifiesto_creado_por) {
+      dataEscala.manifiesto_creado_por = session.user.id
+      dataEscala.manifiesto_creado_en = new Date()
+    }
+    await prisma.escala.update({ where: { id }, data: dataEscala })
+
     return NextResponse.json(pasajero, { status: 201 })
   } catch (error) {
     if (error.code === "P2002") {

@@ -101,6 +101,29 @@ export function motivoNoEditable(escala) {
   }
   return null
 }
+// puedeAbortarAhora() ya decide el true/false, esta
+// función explica el motivo cuando da false, para que el ícono
+// deshabilitado no quede mudo (mismo patrón que ya tiene el lápiz de
+// Editar).
+
+export function motivoNoAbortable(escala) {
+  if (escala.es_borrador) {
+    return "No se puede abortar: todavía es un borrador, no está publicada"
+  }
+  if (escala.estado === "CUMPLIDA") {
+    return "No se puede abortar: la escala ya está cumplida"
+  }
+  if (escala.estado === "ABORTADA") {
+    return "Esta escala ya fue abortada"
+  }
+  if (escala.estado !== "PROGRAMADA") {
+    return `No se puede abortar: la escala está en estado ${ETIQUETAS_ESTADO[escala.estado] || escala.estado}`
+  }
+  if (escala.hora_despegue_estimada && new Date() >= new Date(escala.hora_despegue_estimada)) {
+    return "No se puede abortar: ya pasó la hora de despegue estimada"
+  }
+  return null
+}
 
 // NOTA: puedeEliminarse() se sacó de acá — Eliminar ahora depende
 // únicamente del permiso ESCALAS.puede_eliminar de la matriz, sin

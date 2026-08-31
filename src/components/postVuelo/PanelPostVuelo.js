@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from "react"
 import { formatearFechaHoraCompacta } from "@/lib/escalas"
 import { fechaUTCAInputParaguay } from "@/lib/fechaHora"
 import SeparadorSeccion from "@/components/shared/SeparadorSeccion"
+import PanelAuditoria from "@/components/shared/PanelAuditoria"
 
 const ETIQUETAS_NOVEDAD = {
   SIN_NOVEDAD: "Sin novedad",
@@ -39,12 +40,17 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
   const [pvGuardando, setPvGuardando] = useState(false)
   const [pvEliminando, setPvEliminando] = useState(false)
 
+  const [pvCombustibleInput, setPvCombustibleInput] = useState("")
+  const [pvGuardandoCombustible, setPvGuardandoCombustible] = useState(false)
+  const [pvErrorCombustible, setPvErrorCombustible] = useState(null)
+
   const [tramoValores, setTramoValores] = useState({})
   const [tramoGuardando, setTramoGuardando] = useState(null)
 
   const [pvDestino, setPvDestino] = useState("")
   const [pvCombustible, setPvCombustible] = useState("")
   const [pvPasajeros, setPvPasajeros] = useState("")
+  const [pvCargaKg, setPvCargaKg] = useState("")
   const [pvAterrizajes, setPvAterrizajes] = useState("")
   const [pvNovedad, setPvNovedad] = useState("SIN_NOVEDAD")
   const [pvDetalleNovedad, setPvDetalleNovedad] = useState("")
@@ -75,7 +81,11 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
         setPvDestino(base.destino_real ?? "")
         setPvAterrizajes(base.aterrizajes ?? "")
         setPvCombustible(data.postVuelo?.combustible_consumido ?? "")
-        setPvPasajeros(data.postVuelo?.pasajeros ?? "")
+        // Si ya existe post-vuelo, usa lo que ya se cargó. Si es la
+        // primera vez, sugiere lo que ya está en el Manifiesto de esta
+        // escala — sigue siendo editable, es solo un punto de partida.
+        setPvPasajeros(data.postVuelo?.pasajeros ?? data.defaults?.pasajeros_sugeridos ?? "")
+        setPvCargaKg(data.postVuelo?.carga_kg ?? data.defaults?.carga_kg_sugerida ?? "")
         setPvNovedad(data.postVuelo?.novedad ?? "SIN_NOVEDAD")
         setPvDetalleNovedad(data.postVuelo?.detalle_novedad ?? "")
         setPvObservaciones(data.postVuelo?.observaciones ?? "")
@@ -137,13 +147,16 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
     try {
       const body = {
         destino_real: pvDestino.trim(),
-        combustible_consumido: pvCombustible === "" ? null : Number(pvCombustible),
         pasajeros: pvPasajeros === "" ? null : Number(pvPasajeros),
+        carga_kg: pvCargaKg === "" ? null : Number(pvCargaKg),
         aterrizajes: Number(pvAterrizajes),
         novedad: pvNovedad,
         detalle_novedad: pvNovedad !== "SIN_NOVEDAD" ? pvDetalleNovedad.trim() : undefined,
         observaciones: pvObservaciones.trim() || undefined,
       }
+      // combustible_consumido NO se manda desde acá — se carga aparte,
+      // por Jefe de Combustible o Supervisor de Semana, una sola vez
+      // cada uno (ver el bloque de combustible más abajo en pantalla).
 
       const yaExiste = !!pvData?.postVuelo
       const res = await fetch(`/api/escalas/${e.id}/post-vuelo`, {
@@ -184,6 +197,36 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
       setPvError(err.message)
     } finally {
       setPvEliminando(false)
+    }
+  }
+
+  async function handleGuardarCombustible() {
+    setPvErrorCombustible(null)
+
+    const litros = Number(pvCombustibleInput)
+    if (pvCombustibleInput === "" || isNaN(litros) || litros < 0) {
+      setPvErrorCombustible("Ingresá un número válido")
+      return
+    }
+
+    setPvGuardandoCombustible(true)
+    try {
+      const res = await fetch(`/api/escalas/${e.id}/post-vuelo/combustible`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ combustible_consumido: litros }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Error al guardar el combustible")
+
+      setPvCombustibleInput("")
+      onActualizada?.()
+      cargarPostVuelo()
+    } catch (err) {
+      setPvErrorCombustible(err.message)
+    } finally {
+      setPvGuardandoCombustible(false)
     }
   }
 
@@ -255,12 +298,6 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
           <div>
             <div className="mb-2 text-xs uppercase text-gray-400">Tramos — hora real</div>
 
-            {/* Aviso de "una sola vez" vs "estás corrigiendo algo
-                cerrado" — distingue según exista o no un post-vuelo:
-                sin post-vuelo todavía, esto es la carga única de
-                tripulante/supervisor; con post-vuelo ya creado, solo
-                matriz llega hasta acá (puedeEditarTramos ya lo filtra
-                en el backend), y está corrigiendo un cierre existente. */}
             {pvData.puedeEditarTramos && (
               pvData.postVuelo ? (
                 <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -268,8 +305,8 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                 </div>
               ) : (
                 <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  Podés cargar la hora real de los tramos y cerrar el post-vuelo una sola vez — revisá bien los
-                  datos antes de guardar, después no vas a poder editarlos vos mismo.
+                  Podés cargar la hora real de los tramos las veces que haga falta hasta cerrar el post-vuelo —
+                  después del cierre, ya no vas a poder editarlos vos mismo.
                 </div>
               )
             )}
@@ -337,8 +374,11 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
               <p className="text-sm text-gray-700">Destino real: {pvData.postVuelo.destino_real}</p>
               <p className="text-sm text-gray-700">
                 Aterrizajes: {pvData.postVuelo.aterrizajes}
-                {pvData.postVuelo.combustible_consumido != null && ` · Combustible: ${pvData.postVuelo.combustible_consumido} L`}
+                {pvData.postVuelo.combustible_consumido != null
+                  ? ` · Combustible: ${pvData.postVuelo.combustible_consumido} L`
+                  : " · Combustible: pendiente de cargar"}
                 {pvData.postVuelo.pasajeros != null && ` · Pasajeros: ${pvData.postVuelo.pasajeros}`}
+                {pvData.postVuelo.carga_kg != null && ` · Carga: ${pvData.postVuelo.carga_kg} kg`}
               </p>
               {pvData.postVuelo.novedad !== "SIN_NOVEDAD" && (
                 <p className="text-sm text-red-600">
@@ -348,13 +388,49 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
               {pvData.postVuelo.observaciones && (
                 <p className="text-sm text-gray-500">Obs.: {pvData.postVuelo.observaciones}</p>
               )}
+
+              {/* Combustible — Jefe de Combustible o Supervisor de
+                  Semana lo cargan acá, una sola vez cada uno; matriz
+                  puede corregirlo siempre. Endpoint aparte del cierre
+                  general — ver PATCH .../post-vuelo/combustible. */}
+              {pvData.puedeEditarCombustible && (
+                <div className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2">
+                  <p className="mb-1.5 text-xs font-semibold text-teal-800">
+                    {pvData.postVuelo.combustible_consumido != null
+                      ? "Corregir combustible consumido (L)"
+                      : "Cargar combustible consumido (L)"}
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={pvCombustibleInput}
+                      onChange={(ev) => setPvCombustibleInput(ev.target.value)}
+                      placeholder={pvData.postVuelo.combustible_consumido != null ? `Actual: ${pvData.postVuelo.combustible_consumido}` : "Litros"}
+                      className="w-32 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                    <button
+                      onClick={handleGuardarCombustible}
+                      disabled={pvGuardandoCombustible}
+                      className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-800 disabled:opacity-50"
+                    >
+                      {pvGuardandoCombustible ? "…" : "Guardar"}
+                    </button>
+                  </div>
+                  {pvErrorCombustible && (
+                    <p className="mt-1 text-xs text-red-600">{pvErrorCombustible}</p>
+                  )}
+                </div>
+              )}
+
               <div className="mt-2 flex gap-2">
                 {pvData.puedeEditar && (
                   <button
                     onClick={() => setPvEditandoCierre(true)}
                     className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
                   >
-                    Editar cierre
+                    Editar datos del Post-Vuelo
                   </button>
                 )}
                 {pvData.puedeEliminarPostVuelo && (
@@ -367,6 +443,17 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                   </button>
                 )}
               </div>
+
+              {/* Auditoría — al final de todo, con su propio separador,
+                  mismo patrón que Manifiesto: sin borde extra, el
+                  separador azul ya alcanza solo. */}
+              <SeparadorSeccion texto="Auditoría" />
+              <PanelAuditoria
+                items={[
+                  { etiqueta: "Post-vuelo cargado por", nombre: pvData.postVuelo.creado_por_nombre, fecha: pvData.postVuelo.created_at },
+                  { etiqueta: "Post-vuelo editado por", nombre: pvData.postVuelo.editado_por_nombre, fecha: pvData.postVuelo.updated_at },
+                ]}
+              />
             </div>
           )}
 
@@ -413,18 +500,9 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                   />
                 </div>
                 <div>
-                  <label className="mb-0.5 block text-[11px] text-gray-500">Combustible (L)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={pvCombustible}
-                    onChange={(ev) => setPvCombustible(ev.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="mb-0.5 block text-[11px] text-gray-500">Pasajeros</label>
+                  <label className="mb-0.5 block text-[11px] text-gray-500">
+                    Pasajeros {!pvData.postVuelo && <span className="text-teal-600">(según Manifiesto)</span>}
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -433,7 +511,23 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                     className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                   />
                 </div>
+                <div>
+                  <label className="mb-0.5 block text-[11px] text-gray-500">
+                    Carga (kg) {!pvData.postVuelo && <span className="text-teal-600">(según Manifiesto)</span>}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={pvCargaKg}
+                    onChange={(ev) => setPvCargaKg(ev.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                  />
+                </div>
               </div>
+              {/* El campo de combustible ya NO va acá — lo cargan Jefe
+                  de Combustible o Supervisor de Semana, aparte, con su
+                  propio candado de una sola vez (ver bloque de abajo). */}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>

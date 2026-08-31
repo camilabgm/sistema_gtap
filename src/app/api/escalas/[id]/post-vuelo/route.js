@@ -1,4 +1,11 @@
 // Destino: src/app/api/escalas/[id]/post-vuelo/route.js
+//
+// CAMBIO: "matriz" ya no se chequea con el bit crudo
+// session.user.permisos.POST_VUELO.puede_editar/puede_crear — ese bit
+// también es true para Jefe de Combustible, así que le daba acceso
+// total sin querer (tramos, destino, novedades — no solo combustible).
+// Ahora se chequea contra ROLES_GLOBAL_POST_VUELO (lista fija de 4
+// roles), igual que ya se hace en Manifiesto.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -6,10 +13,11 @@ import { conSesion, conPermiso } from "@/lib/api-helpers"
 import {
   puedeCargarPostVuelo,
   esTripulanteDeEscala,
-  esSupervisorSemanaDeEscala,
   calcularDefaultsPostVuelo,
   calcularHorasDesdeTramosReales,
+  ROLES_GLOBAL_POST_VUELO,
 } from "@/lib/postVuelo"
+import { resolverNombresUsuarios } from "@/lib/auditoria"
 
 const NOVEDADES_VALIDAS = ["SIN_NOVEDAD", "INCIDENTE", "ACCIDENTE"]
 
@@ -42,10 +50,10 @@ async function cargarEscalaConDatos(escalaId) {
         where: { deleted_at: null },
         select: { persona_id: true, rol_en_vuelo: true, persona: { select: { grado: true, apellido: true } } },
       },
-      acuses: {
-        where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" },
-        select: { persona_id: true },
-      },
+      // Solo para sugerir pasajeros/carga_kg del post-vuelo a partir de
+      // lo ya cargado en Manifiesto — ver calcularDefaultsPostVuelo.
+      pasajeros: { where: { deleted_at: null }, select: { id: true } },
+      cargas: { where: { deleted_at: null }, select: { peso: true } },
     },
   })
 }
@@ -62,14 +70,14 @@ function validarCamposPostVuelo(body) {
   const aterrizajes = Number(body.aterrizajes)
   if (!Number.isInteger(aterrizajes) || aterrizajes < 0) return "Cantidad de aterrizajes inválida"
 
-  if (body.combustible_consumido !== undefined && body.combustible_consumido !== null) {
-    const combustible = Number(body.combustible_consumido)
-    if (isNaN(combustible) || combustible < 0) return "El combustible consumido no es válido"
-  }
-
   if (body.pasajeros !== undefined && body.pasajeros !== null) {
     const pasajeros = Number(body.pasajeros)
     if (!Number.isInteger(pasajeros) || pasajeros < 0) return "La cantidad de pasajeros no es válida"
+  }
+
+  if (body.carga_kg !== undefined && body.carga_kg !== null && body.carga_kg !== "") {
+    const cargaKg = Number(body.carga_kg)
+    if (isNaN(cargaKg) || cargaKg < 0) return "El peso de carga no es válido"
   }
 
   const novedad = body.novedad || "SIN_NOVEDAD"
@@ -94,44 +102,74 @@ export const GET = conSesion("POST_VUELO", async (request, context, session) => 
   }
 
   const esTripulante = esTripulanteDeEscala(escala, session.user.personaId)
-  const esSupervisor = esSupervisorSemanaDeEscala(escala, session.user.personaId)
+  const esSupervisor = !!session.user.esSupervisorSemana
+  const puedeMatriz = ROLES_GLOBAL_POST_VUELO.includes(session.user.rol)
 
-  const puedeVer = !!session.user.permisos?.POST_VUELO?.puede_ver || esTripulante || esSupervisor
+  // Ver: sí incluye a Supervisor de Semana — necesita poder ver el
+  // post-vuelo para saber si le falta cargar el combustible, aunque no
+  // participe del resto.
+  const puedeVer = !!session.user.permisos?.POST_VUELO?.puede_ver || esTripulante || esSupervisor || puedeMatriz
   if (!puedeVer) {
     return NextResponse.json({ error: "No tenés permiso para ver este post-vuelo" }, { status: 403 })
   }
 
   const postVuelo = await cargarPostVueloActivo(escalaId)
 
-  // "Una sola vez": tripulante y Supervisor de Semana pueden CREAR el
-  // cierre (una vez, en el POST de abajo), pero no volver a editarlo —
-  // puedeEditarPostVuelo ya NO lleva el bypass de tripulante/supervisor,
-  // queda exclusivo del permiso de matriz.
-  const puedeCrear = !!session.user.permisos?.POST_VUELO?.puede_crear || esTripulante || esSupervisor
-  const puedeEditarPostVuelo = !!session.user.permisos?.POST_VUELO?.puede_editar
+  // "Una sola vez": tripulante puede CREAR el cierre (una vez, en el
+  // POST de abajo), pero no volver a editarlo — puedeEditarPostVuelo
+  // queda exclusivo de los 4 roles globales.
+  //
+  // Supervisor de Semana YA NO entra en puedeCrear — según la
+  // observación de la matriz, no toca el Post-Vuelo en general, solo
+  // el campo de combustible (ver puedeEditarCombustible más abajo).
+  const puedeCrear = puedeMatriz || esTripulante
+  const puedeEditarPostVuelo = puedeMatriz
 
   // Tramos: libres de editar mientras no exista el cierre (están
   // "completando" antes de la carga única); una vez creado el
   // post-vuelo, corregir un tramo es lo mismo que editar, así que pasa
-  // a depender solo de matriz.
+  // a depender solo de los 4 roles globales — Jefe de Combustible ya
+  // no entra acá.
   const puedeEditarTramos = postVuelo
     ? puedeEditarPostVuelo
     : puedeCrear && escala.estado === "PROGRAMADA"
 
   // Eliminar sigue dependiendo únicamente del permiso de la matriz —
   // sin bypass de tripulante/supervisor, es una acción más sensible
-  // que corregir.
+  // que corregir. Este bit sí se deja tal cual: la matriz ya restringe
+  // Eliminar solo a Comandante, Jefe de Combustible no lo tiene.
   const puedeEliminarPostVuelo = !!session.user.permisos?.POST_VUELO?.puede_eliminar
+
+  // Mismo cálculo que el PATCH dedicado (post-vuelo/combustible/route.js)
+  // — se repite acá porque la pantalla necesita saber de antemano si
+  // mostrar el bloque para cargarlo, sin tener que intentarlo primero.
+  const faltaCombustible = postVuelo ? postVuelo.combustible_consumido === null : false
+  const puedeEditarCombustible =
+    !!postVuelo &&
+    (puedeMatriz || ((session.user.rol === "Jefe de Combustible" || esSupervisor) && faltaCombustible))
 
   const calculo = calcularHorasDesdeTramosReales(escala.itinerarios)
 
+  // Panel de auditoría — resuelve a nombre solo si hay post-vuelo
+  // cargado (si no existe todavía, no hay nada que resolver).
+  let postVueloConNombres = null
+  if (postVuelo) {
+    const nombres = await resolverNombresUsuarios([postVuelo.creado_por, postVuelo.editado_por])
+    postVueloConNombres = {
+      ...postVuelo,
+      creado_por_nombre: nombres[postVuelo.creado_por] ?? null,
+      editado_por_nombre: postVuelo.editado_por ? nombres[postVuelo.editado_por] ?? null : null,
+    }
+  }
+
   return NextResponse.json({
     escala,
-    postVuelo: postVuelo || null,
+    postVuelo: postVueloConNombres,
     puedeCargar: !postVuelo && puedeCrear && puedeCargarPostVuelo(escala),
     puedeEditar: !!postVuelo && puedeEditarPostVuelo,
     puedeEliminarPostVuelo,
     puedeEditarTramos,
+    puedeEditarCombustible,
     tramosCompletos: calculo.completo,
     horasCalculadas: {
       horas_vuelo_minutos: calculo.horas_vuelo_minutos,
@@ -154,9 +192,10 @@ export const POST = conSesion("POST_VUELO", async (request, context, session) =>
   }
 
   const esTripulante = esTripulanteDeEscala(escala, session.user.personaId)
-  const esSupervisor = esSupervisorSemanaDeEscala(escala, session.user.personaId)
-  const tienePermisoAmplio = !!session.user.permisos?.POST_VUELO?.puede_crear
-  if (!tienePermisoAmplio && !esTripulante && !esSupervisor) {
+  const puedeMatriz = ROLES_GLOBAL_POST_VUELO.includes(session.user.rol)
+  // Supervisor de Semana YA NO puede crear el post-vuelo — solo carga
+  // combustible después, por el PATCH aparte.
+  if (!puedeMatriz && !esTripulante) {
     return NextResponse.json({ error: "No tenés permiso para cargar este post-vuelo" }, { status: 403 })
   }
 
@@ -193,8 +232,12 @@ export const POST = conSesion("POST_VUELO", async (request, context, session) =>
         horas_tierra_minutos: calculo.horas_tierra_minutos,
         total_minutos: calculo.horas_vuelo_minutos + calculo.horas_tierra_minutos,
         destino_real: `${body.destino_real}`.trim(),
-        combustible_consumido: body.combustible_consumido ?? null,
+        // combustible_consumido NUNCA se acepta acá, aunque venga en el
+        // body — se completa después, exclusivamente por PATCH
+        // /api/escalas/[id]/post-vuelo/combustible.
+        combustible_consumido: null,
         pasajeros: body.pasajeros ?? null,
+        carga_kg: body.carga_kg !== undefined && body.carga_kg !== "" ? body.carga_kg : null,
         aterrizajes: Number(body.aterrizajes),
         novedad: body.novedad || "SIN_NOVEDAD",
         detalle_novedad: body.novedad && body.novedad !== "SIN_NOVEDAD" ? `${body.detalle_novedad}`.trim() : null,
@@ -231,11 +274,11 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
     return NextResponse.json({ error: "Esta escala todavía no tiene post-vuelo cargado" }, { status: 404 })
   }
 
-  // Editar un post-vuelo ya cargado es EXCLUSIVO de la matriz de
-  // permisos — tripulante y Supervisor de Semana ya usaron su única
-  // carga al crearlo. Para corregir algo hace falta alguien con
-  // POST_VUELO.puede_editar (Cmdte. Esc. Aéreo/Material o superior).
-  const puedeEditarPostVuelo = !!session.user.permisos?.POST_VUELO?.puede_editar
+  // Editar un post-vuelo ya cargado es EXCLUSIVO de los 4 roles
+  // globales — tripulante y Supervisor de Semana ya usaron su única
+  // carga al crearlo, y Jefe de Combustible tiene su propio PATCH
+  // aparte para el campo de combustible, no este endpoint general.
+  const puedeEditarPostVuelo = ROLES_GLOBAL_POST_VUELO.includes(session.user.rol)
   if (!puedeEditarPostVuelo) {
     return NextResponse.json({ error: "No tenés permiso para editar este post-vuelo" }, { status: 403 })
   }
@@ -261,8 +304,12 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
       horas_tierra_minutos: calculo.horas_tierra_minutos,
       total_minutos: calculo.horas_vuelo_minutos + calculo.horas_tierra_minutos,
       destino_real: `${body.destino_real}`.trim(),
-      combustible_consumido: body.combustible_consumido ?? null,
+      // Los 4 roles globales sí pueden tocar combustible desde acá
+      // también — a diferencia de Jefe de Combustible, que solo tiene
+      // el PATCH dedicado.
+      combustible_consumido: body.combustible_consumido ?? postVuelo.combustible_consumido,
       pasajeros: body.pasajeros ?? null,
+      carga_kg: body.carga_kg !== undefined && body.carga_kg !== "" ? body.carga_kg : null,
       aterrizajes: Number(body.aterrizajes),
       novedad: body.novedad || "SIN_NOVEDAD",
       detalle_novedad: body.novedad && body.novedad !== "SIN_NOVEDAD" ? `${body.detalle_novedad}`.trim() : null,

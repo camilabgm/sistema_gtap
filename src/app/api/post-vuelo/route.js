@@ -8,9 +8,11 @@
 // cerrarse, para que un usuario de matriz pueda entrar a corregir un
 // cierre viejo.
 //
-// Con permiso amplio (POST_VUELO.puede_ver) se ven todas; sin ese
-// permiso, solo las que tienen a la persona como tripulante o como
-// Supervisor de Semana (acuse) de esa escala puntual.
+// CAMBIO: post_vuelos ahora también trae combustible_consumido (antes
+// solo el id) — teCorrespondeReportarPostVuelo() lo necesita para
+// resaltar en ámbar las escalas donde a Jefe de Combustible le falta
+// completar ese campo puntual, aunque el resto del post-vuelo ya esté
+// cerrado.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -78,25 +80,21 @@ export const GET = conSesion("POST_VUELO", async (request, context, session) => 
           persona: { select: { grado: true, apellido: true } },
         },
       },
-      acuses: {
-        where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" },
-        select: { persona_id: true },
-      },
       post_vuelos: {
         where: { deleted_at: null },
-        select: { id: true },
+        select: { id: true, combustible_consumido: true },
         take: 1,
       },
     },
   })
 
   const resultado = escalas.map((e) => {
-    const tienePostVuelo = e.post_vuelos.length > 0
+    const postVuelo = e.post_vuelos[0] ?? null
     const { post_vuelos, ...resto } = e
     return {
       ...resto,
-      tiene_post_vuelo: tienePostVuelo,
-      te_corresponde: teCorrespondeReportarPostVuelo(session, e, tienePostVuelo),
+      tiene_post_vuelo: !!postVuelo,
+      te_corresponde: teCorrespondeReportarPostVuelo(session, e, postVuelo),
     }
   })
 

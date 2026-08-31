@@ -45,12 +45,17 @@ export const authOptions = {
       async authorize(credentials, req) {
         const ip = obtenerIP(req)
 
-        // 1. Buscar el usuario, con su rol y permisos
+        // 1. Buscar el usuario, con su rol (base Y secundario) y permisos.
+        // rol_secundario se agrega acá — nullable, solo trae algo si la
+        // persona tiene un turno rotativo activo (ej. Supervisor de Semana).
         const usuario = await prisma.usuario.findUnique({
           where: { username: credentials.username.trim() },
           include: {
             persona: true,
             rol: {
+              include: { permisos_rol: true },
+            },
+            rol_secundario: {
               include: { permisos_rol: true },
             },
             permisos_usuario: true,
@@ -149,6 +154,39 @@ export const authOptions = {
           }
         }
 
+        // 9b. Sumar los permisos del ROL SECUNDARIO, si tiene uno activo
+        // y eligió combinarlo con el rol base (rol_secundario_combina).
+        // Suma por OR bit a bit — nunca resta nada de lo que ya tenía el
+        // rol base, solo agrega lo que le falte.
+        if (usuario.rol_secundario && usuario.rol_secundario_combina) {
+          for (const permiso of usuario.rol_secundario.permisos_rol) {
+            const actual = permisos[permiso.modulo] || {
+              puede_ver: false, puede_crear: false, puede_editar: false,
+              puede_eliminar: false, puede_reportes: false,
+            }
+            permisos[permiso.modulo] = {
+              puede_ver:      actual.puede_ver      || permiso.puede_ver,
+              puede_crear:    actual.puede_crear    || permiso.puede_crear,
+              puede_editar:   actual.puede_editar   || permiso.puede_editar,
+              puede_eliminar: actual.puede_eliminar || permiso.puede_eliminar,
+              puede_reportes: actual.puede_reportes || permiso.puede_reportes,
+            }
+          }
+        }
+        // Si rol_secundario_combina es false, el rol secundario
+        // REEMPLAZA al base mientras está activo.
+        else if (usuario.rol_secundario && !usuario.rol_secundario_combina) {
+          for (const permiso of usuario.rol_secundario.permisos_rol) {
+            permisos[permiso.modulo] = {
+              puede_ver:      permiso.puede_ver,
+              puede_crear:    permiso.puede_crear,
+              puede_editar:   permiso.puede_editar,
+              puede_eliminar: permiso.puede_eliminar,
+              puede_reportes: permiso.puede_reportes,
+            }
+          }
+        }
+
         // 10. Aplicar overrides individuales del USUARIO
         for (const permiso of usuario.permisos_usuario) {
           permisos[permiso.modulo] = {
@@ -160,12 +198,26 @@ export const authOptions = {
           }
         }
 
-        // 11. ¿Tiene potestad de autorizar en la cascada? Se calcula acá,
+        // 11. Flag calculado una sola vez en el login, mismo patrón que
+        // esCargoDeCascada (nunca se recalcula durante la sesión).
+        // esSupervisorSemana viene del rol_secundario activo. Se usa en
+        // Manifiesto y Post-Vuelo para dar cobertura sobre CUALQUIER
+        // escala, no solo las propias — ver usuarioPuedeGestionarManifiesto()
+        // en lib/manifiesto.js y las funciones equivalentes de postVuelo.js.
+        //
+        // NOTA: acá NO va un flag "esTecnicoDeVuelo" — se evaluó, pero
+        // ninguna regla de negocio termina necesitándolo: Manifiesto
+        // depende solo de esSupervisorSemana, y el tripulante de
+        // Post-Vuelo se resuelve por escala (esTripulanteDeEscala), no
+        // por una bandera global de especialidad.
+        const esSupervisorSemana = !!usuario.rol_secundario && usuario.rol_secundario.nombre === "Supervisor de Semana"
+
+        // 12. ¿Tiene potestad de autorizar en la cascada? Se calcula acá,
         // una sola vez, para no volver a consultar CargoAutorizacion en
-        // cada request — mismo patrón que los permisos de arriba.
+        // cada request.
         const esCargoDeCascada = await usuarioTieneCargoDeCascada(usuario.id)
 
-        // 12. Retornar datos del usuario para la sesión
+        // 13. Retornar datos del usuario para la sesión
         return {
           id:                   usuario.id,
           username:             usuario.username,
@@ -175,6 +227,7 @@ export const authOptions = {
           personaId:            usuario.persona.id,
           sesion_invalidada_en: null,
           permisos,
+          esSupervisorSemana,
           esCargoDeCascada,
         }
       },
@@ -190,6 +243,7 @@ export const authOptions = {
         token.rol                  = user.rol
         token.personaId            = user.personaId
         token.permisos             = user.permisos
+        token.esSupervisorSemana   = user.esSupervisorSemana
         token.esCargoDeCascada     = user.esCargoDeCascada
         token.sesion_invalidada_en = user.sesion_invalidada_en
         token.iat                  = Math.floor(Date.now() / 1000)
@@ -204,6 +258,7 @@ export const authOptions = {
       session.user.rol                  = token.rol
       session.user.personaId            = token.personaId
       session.user.permisos             = token.permisos
+      session.user.esSupervisorSemana   = token.esSupervisorSemana
       session.user.esCargoDeCascada     = token.esCargoDeCascada
       session.user.sesion_invalidada_en = token.sesion_invalidada_en
       session.user.token_emitido_en     = token.iat

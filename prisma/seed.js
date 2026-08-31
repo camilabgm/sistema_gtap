@@ -28,10 +28,10 @@ async function main() {
   })
   console.log("✅ Roles obsoletos eliminados")
 
-  // ─── Paso 3: Crear / asegurar los 12 roles del Excel ─────────────────
+  // ─── Paso 3: Crear / asegurar los 13 roles del Excel ─────────────────
   const roles = [
     { nombre: "Comandante",                                descripcion: "Comandante del GTAP — acceso total" },
-    { nombre: "Jefe de Operaciones",                       descripcion: "Jefe del área de operaciones — acceso total" },
+    { nombre: "Jefe de Operaciones",                       descripcion: "Jefe del área de operaciones" },
     { nombre: "Comandante del Escuadrón Aéreo",            descripcion: "Comandante del Escuadrón Aéreo" },
     { nombre: "Jefe de Programación y Control",            descripcion: "Prog. y Control del Escuadrón Aéreo" },
     { nombre: "Comandante del Escuadrón de Mantenimiento", descripcion: "Comandante del Escuadrón de Mantenimiento" },
@@ -42,6 +42,7 @@ async function main() {
     { nombre: "Supervisor de Semana",                      descripcion: "Supervisor de Semana de la Línea de Vuelo" },
     { nombre: "Estadística",                               descripcion: "División de Estadística" },
     { nombre: "General (Personal sin rol específico)",     descripcion: "Personal del GTAP sin rol operativo específico" },
+    { nombre: "Jefe de Combustible",                       descripcion: "Jefe de Combustibles y Lubricantes" },
   ]
 
   for (const rol of roles) {
@@ -51,7 +52,7 @@ async function main() {
       create: rol,
     })
   }
-  console.log("✅ 12 roles asegurados")
+  console.log("✅ 13 roles asegurados")
 
   // ─── Paso 4: Vaciar permisos existentes para recargar limpios ─────────
   await prisma.permisoUsuario.deleteMany({})
@@ -60,7 +61,10 @@ async function main() {
 
   // ─── Paso 5: Cargar permisos según Resumen General PERMISOS_GTAP ─────
   // Formato por módulo: [ver, crear, editar, eliminar, reportes]  1=true 0=false
-  // Módulos del Excel — INSPECCION_PREVUELO queda sin permisos (diferida a Fase 2)
+  // Recalculado el 28/08/2026 leyendo el color de cada celda de la hoja
+  // "Resumen General" (verde=permitido, rojo=denegado) — no se usa
+  // ninguna aclaración verbal, solo lo que dice la planilla.
+  // INSPECCION_PREVUELO queda sin permisos (diferida a Fase 2).
 
   const matrizPermisos = {
     "Comandante": {
@@ -74,50 +78,50 @@ async function main() {
       TIPOS_MISIONES: [1,1,1,1,1],
     },
     "Jefe de Operaciones": {
-      ESCALAS:        [1,1,1,1,1],
-      POST_VUELO:     [1,1,1,1,1],
-      MANIFIESTO:     [1,1,1,1,1],
-      PERSONAS:       [1,1,1,1,1],
-      AERONAVES:      [1,1,1,1,1],
-      SICEM:          [1,1,1,1,1],
-      INFORMES:       [1,1,1,1,1],
-      TIPOS_MISIONES: [1,1,1,1,1],
+      ESCALAS:        [1,1,1,0,1],
+      POST_VUELO:     [1,1,1,0,1],
+      MANIFIESTO:     [1,1,1,0,1],
+      PERSONAS:       [1,1,1,0,1],
+      AERONAVES:      [1,1,1,0,1],
+      SICEM:          [1,1,1,0,1],
+      INFORMES:       [1,1,1,0,1],
+      TIPOS_MISIONES: [1,1,1,0,1],
     },
     "Comandante del Escuadrón Aéreo": {
-      ESCALAS:        [1,1,1,1,1],
-      POST_VUELO:     [1,1,1,1,1],
-      MANIFIESTO:     [1,1,1,1,1],
-      PERSONAS:       [1,1,1,1,1],
+      ESCALAS:        [1,1,1,0,1],
+      POST_VUELO:     [1,1,1,0,1],
+      MANIFIESTO:     [1,1,1,0,1],
+      PERSONAS:       [1,1,1,0,1],
       AERONAVES:      [1,0,0,0,1],
       SICEM:          [1,0,0,0,1],
-      INFORMES:       [1,1,1,1,1],
-      TIPOS_MISIONES: [1,1,1,1,1],
+      INFORMES:       [1,1,1,0,1],
+      TIPOS_MISIONES: [1,1,1,0,1],
     },
     "Jefe de Programación y Control": {
-      ESCALAS:        [1,1,1,1,1],
-      POST_VUELO:     [1,1,1,1,1],
+      ESCALAS:        [1,1,1,0,1],
+      POST_VUELO:     [1,1,1,0,1],
       MANIFIESTO:     [1,0,0,0,1],
       PERSONAS:       [1,0,0,0,1],
       AERONAVES:      [1,0,0,0,1],
       SICEM:          [1,0,0,0,0],
-      INFORMES:       [1,1,1,1,1],
-      TIPOS_MISIONES: [1,1,1,1,1],
+      INFORMES:       [1,1,1,0,1],
+      TIPOS_MISIONES: [1,1,1,0,1],
     },
     "Comandante del Escuadrón de Mantenimiento": {
-      ESCALAS:        [1,1,1,1,1],
+      ESCALAS:        [1,1,1,0,1],
       POST_VUELO:     [1,0,0,0,1],
       MANIFIESTO:     [1,0,0,0,1],
       PERSONAS:       [1,0,0,0,1],
-      AERONAVES:      [1,1,1,1,1],
-      SICEM:          [1,1,1,1,1],
+      AERONAVES:      [1,1,1,0,1],
+      SICEM:          [1,1,1,0,1],
       INFORMES:       [1,0,0,0,1],
       TIPOS_MISIONES: [1,0,0,0,1],
     },
     "Jefe de Personal": {
-      ESCALAS:        [1,1,1,1,1],
+      ESCALAS:        [1,1,1,0,1],
       POST_VUELO:     [1,0,0,0,1],
       MANIFIESTO:     [1,0,0,0,1],
-      PERSONAS:       [1,1,1,1,1],
+      PERSONAS:       [1,1,1,0,1],
       AERONAVES:      [1,0,0,0,1],
       SICEM:          [1,0,0,0,0],
       INFORMES:       [1,0,0,0,1],
@@ -126,7 +130,7 @@ async function main() {
     "Piloto": {
       ESCALAS:        [1,0,0,0,1],
       POST_VUELO:     [1,0,0,0,1],
-      MANIFIESTO:     [1,1,1,1,1],
+      MANIFIESTO:     [1,0,0,0,1],
       PERSONAS:       [1,0,0,0,1],
       AERONAVES:      [1,0,0,0,1],
       SICEM:          [1,0,0,0,0],
@@ -136,7 +140,7 @@ async function main() {
     "Copiloto": {
       ESCALAS:        [1,0,0,0,1],
       POST_VUELO:     [1,0,0,0,1],
-      MANIFIESTO:     [1,1,1,1,1],
+      MANIFIESTO:     [1,0,0,0,1],
       PERSONAS:       [1,0,0,0,1],
       AERONAVES:      [1,0,0,0,1],
       SICEM:          [1,0,0,0,0],
@@ -146,7 +150,7 @@ async function main() {
     "Técnico de Vuelo": {
       ESCALAS:        [1,0,0,0,1],
       POST_VUELO:     [1,0,0,0,1],
-      MANIFIESTO:     [1,1,1,1,1],
+      MANIFIESTO:     [1,0,0,0,1],
       PERSONAS:       [1,0,0,0,1],
       AERONAVES:      [1,0,0,0,1],
       SICEM:          [1,0,0,0,0],
@@ -156,7 +160,7 @@ async function main() {
     "Supervisor de Semana": {
       ESCALAS:        [1,0,0,0,1],
       POST_VUELO:     [1,0,0,0,1],
-      MANIFIESTO:     [1,1,1,1,1],
+      MANIFIESTO:     [1,0,0,0,1],
       PERSONAS:       [1,0,0,0,1],
       AERONAVES:      [1,0,0,0,1],
       SICEM:          [1,0,0,0,1],
@@ -174,6 +178,16 @@ async function main() {
       TIPOS_MISIONES: [1,0,0,0,1],
     },
     "General (Personal sin rol específico)": {
+      ESCALAS:        [1,0,0,0,1],
+      POST_VUELO:     [1,0,0,0,1],
+      MANIFIESTO:     [1,0,0,0,1],
+      PERSONAS:       [1,0,0,0,1],
+      AERONAVES:      [1,0,0,0,1],
+      SICEM:          [1,0,0,0,1],
+      INFORMES:       [1,0,0,0,1],
+      TIPOS_MISIONES: [1,0,0,0,1],
+    },
+    "Jefe de Combustible": {
       ESCALAS:        [1,0,0,0,1],
       POST_VUELO:     [1,0,0,0,1],
       MANIFIESTO:     [1,0,0,0,1],

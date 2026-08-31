@@ -40,8 +40,6 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
         orderBy: { orden: "asc" },
         select: { orden: true, origen: true, destino: true },
       },
-      tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
-      acuses: { where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" }, select: { persona_id: true } },
       _count: { select: { pasajeros: { where: { deleted_at: null } } } },
     },
   })

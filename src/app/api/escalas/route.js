@@ -6,6 +6,7 @@ import { conPermiso } from "@/lib/api-helpers"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
 import { validarCanalConArchivo } from "@/lib/validacionEscala"
 import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
+import { resolverNombresUsuarios } from "@/lib/auditoria"
 
 // fecha_recepcion es opcional — no hay ningún cálculo de disponibilidad
 // ni validación de Escalas que dependa de ella. Si viene vacía o no se
@@ -56,6 +57,13 @@ export const GET = conPermiso("ESCALAS", "puede_ver", async (request, context, s
       estado: true,
       es_borrador: true,
       autorizada: true,
+      // Agregados para el panel de auditoría — antes no se pedían.
+      autorizada_por: true,
+      fecha_autorizacion: true,
+      rol_autoriza: true,
+      creado_por: true,
+      editado_por: true,
+      created_at: true,
       motivo_abortada: true,
       observacion_aborto: true,
       updated_at: true,
@@ -76,7 +84,20 @@ export const GET = conPermiso("ESCALAS", "puede_ver", async (request, context, s
     },
   })
 
-  return NextResponse.json(escalas)
+  // Resolver TODOS los ids de usuario involucrados en una sola consulta
+  // por lote, no una por escala — ver resolverNombresUsuarios en
+  // lib/auditoria.js.
+  const idsUsuarios = escalas.flatMap((e) => [e.creado_por, e.editado_por, e.autorizada_por])
+  const nombres = await resolverNombresUsuarios(idsUsuarios)
+
+  const resultado = escalas.map((e) => ({
+    ...e,
+    creado_por_nombre:     e.creado_por     ? nombres[e.creado_por]     ?? null : null,
+    editado_por_nombre:    e.editado_por    ? nombres[e.editado_por]    ?? null : null,
+    autorizada_por_nombre: e.autorizada_por ? nombres[e.autorizada_por] ?? null : null,
+  }))
+
+  return NextResponse.json(resultado)
 })
 
 export const POST = conPermiso("ESCALAS", "puede_crear", async (request, context, session) => {

@@ -86,14 +86,22 @@ export default function ManifiestoScreen({ session }) {
   }, [escalaSeleccionadaId, cargarDetalle])
 
   // Refresca lista Y detalle — se usa después de agregar/editar/borrar
-  // un pasajero o una carga, para que el contador de la lista izquierda
-  // y el panel derecho queden sincronizados.
+  // un pasajero o una carga (o eliminar el manifiesto entero), para que
+  // el contador de la lista izquierda y el panel derecho queden
+  // sincronizados.
   const refrescarTodo = useCallback(() => {
     cargarLista(busqueda)
     cargarDetalle(escalaSeleccionadaId)
   }, [busqueda, escalaSeleccionadaId, cargarLista, cargarDetalle])
 
   const puedeGestionar = detalle ? usuarioPuedeGestionarManifiesto(session, detalle) : false
+
+  // Eliminar el manifiesto ENTERO (no un pasajero/carga suelto) es
+  // exclusivo de quien tenga MANIFIESTO.puede_eliminar en la matriz —
+  // hoy, solo Comandante. Distinto de puedeGestionar, que gobierna
+  // crear/editar y sale de usuarioPuedeGestionarManifiesto() (roles
+  // globales + Supervisor de Semana).
+  const puedeEliminarManifiesto = !!session?.user?.permisos?.MANIFIESTO?.puede_eliminar
 
   return (
     <div className="flex h-full gap-4 p-4">
@@ -121,7 +129,12 @@ export default function ManifiestoScreen({ session }) {
           </div>
         )}
         {!cargandoDetalle && !errorDetalle && detalle && (
-          <PanelDetalle detalle={detalle} puedeGestionar={puedeGestionar} onCambio={refrescarTodo} />
+          <PanelDetalle
+            detalle={detalle}
+            puedeGestionar={puedeGestionar}
+            puedeEliminar={puedeEliminarManifiesto}
+            onCambio={refrescarTodo}
+          />
         )}
       </div>
     </div>

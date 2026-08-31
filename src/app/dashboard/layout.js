@@ -36,6 +36,7 @@ export default async function DashboardLayout({ children }) {
         rol={sesion.user.rol}
         permisos={sesion.user.permisos}
         esCargoDeCascada={sesion.user.esCargoDeCascada}
+        esSupervisorSemana={sesion.user.esSupervisorSemana}
       >
         {sesionDesactualizada && <CerrarSesionAutomatico />}
         {children}

@@ -2,22 +2,19 @@
 //
 // PUT — carga o corrige la hora real de salida y/o llegada de UN tramo.
 //
-// Mismo candado de "una sola vez" que ya usa POST_VUELO (ver
-// puedeEditarTramos en GET /api/escalas/[id]/post-vuelo): mientras no
-// exista un PostVuelo para esta escala, tripulante o Supervisor de
-// Semana pueden cargar/corregir tramos libremente. Una vez que el
-// post-vuelo ya se creó, corregir un tramo es lo mismo que editar el
-// cierre — pasa a depender exclusivamente de POST_VUELO.puede_editar.
-//
-// CORRECCIÓN sobre la versión anterior: faltaba el bypass de Supervisor
-// de Semana (solo chequeaba tripulante) y faltaba el candado de "ya
-// existe post-vuelo" — un tripulante podía seguir editando tramos
-// después de cerrado, sin que el backend lo frenara.
+// Mientras no exista un PostVuelo para esta escala, tripulante o
+// Supervisor de Semana pueden cargar/corregir tramos libremente, las
+// veces que haga falta (decisión: se deja así, sin candado de "una
+// sola vez" por tramo — el único paso irreversible sigue siendo el
+// cierre del Post-Vuelo). Una vez que el post-vuelo ya se creó,
+// corregir un tramo pasa a ser exclusivo de los 4 roles globales —
+// Jefe de Combustible YA NO entra acá (antes sí, por el bit de matriz
+// crudo — ver postVuelo.js).
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conSesion } from "@/lib/api-helpers"
-import { esTripulanteDeEscala, esSupervisorSemanaDeEscala } from "@/lib/postVuelo"
+import { esTripulanteDeEscala, ROLES_GLOBAL_POST_VUELO } from "@/lib/postVuelo"
 import { paraguayInputAFechaUTC } from "@/lib/fechaHora"
 
 export const PUT = conSesion("POST_VUELO", async (request, context, session) => {
@@ -33,7 +30,6 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
     select: {
       estado: true,
       tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
-      acuses: { where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" }, select: { persona_id: true } },
     },
   })
   if (!escala) {
@@ -53,17 +49,15 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
   })
 
   const esTripulante = esTripulanteDeEscala(escala, session.user.personaId)
-  const esSupervisor = esSupervisorSemanaDeEscala(escala, session.user.personaId)
-  const puedeCrearMatriz = !!session.user.permisos?.POST_VUELO?.puede_crear
-  const puedeEditarMatriz = !!session.user.permisos?.POST_VUELO?.puede_editar
+  const puedeMatriz = ROLES_GLOBAL_POST_VUELO.includes(session.user.rol)
 
-  // Mismo cálculo que puedeEditarTramos en GET /post-vuelo: si el
-  // post-vuelo ya existe, solo matriz de "editar" — mientras no exista
-  // todavía, cualquiera con permiso de crear (matriz, tripulante o
-  // supervisor) puede tocar el tramo.
+  // Si el post-vuelo ya existe, solo los 4 roles globales. Mientras no
+  // exista todavía, matriz o tripulante. Supervisor de Semana YA NO
+  // entra acá — según la observación de la matriz, no toca tramos ni
+  // el resto del Post-Vuelo, solo el campo de combustible aparte.
   const tienePermiso = postVueloExistente
-    ? puedeEditarMatriz
-    : puedeCrearMatriz || puedeEditarMatriz || esTripulante || esSupervisor
+    ? puedeMatriz
+    : puedeMatriz || esTripulante
 
   if (!tienePermiso) {
     return NextResponse.json({ error: "No tenés permiso para cargar este tramo" }, { status: 403 })

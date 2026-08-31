@@ -20,7 +20,18 @@ export default async function PersonasPage() {
     where:   { activo: true },
     orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
     include: {
-      usuario: { include: { rol: true } },
+      usuario: {
+        include: {
+          rol: true,
+          // Se agrega para que PersonasTable pueda mostrar el nombre
+          // del rol secundario (ej. "Supervisor de Semana") — a
+          // diferencia de los campos escalares (rol_secundario_id,
+          // rol_secundario_combina), que Prisma ya trae solos por venir
+          // de un include sin select, esta es una RELACIÓN aparte y
+          // necesita su propio include explícito.
+          rol_secundario: true,
+        },
+      },
       habilitaciones_medicas: {
         where:   { deleted_at: null },
         orderBy: [{ anio: "desc" }, { periodo: "desc" }],

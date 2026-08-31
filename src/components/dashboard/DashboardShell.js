@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Navbar from "./Navbar"
 
-export default function DashboardShell({ nombre, apellido, rol, permisos, esCargoDeCascada, children }) {
+export default function DashboardShell({ nombre, apellido, rol, permisos, esCargoDeCascada, esSupervisorSemana, children }) {
   const [colapsado, setColapsado] = useState(false)
 
   return (
@@ -14,6 +14,7 @@ export default function DashboardShell({ nombre, apellido, rol, permisos, esCarg
         rol={rol}
         permisos={permisos}
         esCargoDeCascada={esCargoDeCascada}
+        esSupervisorSemana={esSupervisorSemana}
         colapsado={colapsado}
         onToggleColapsado={() => setColapsado((c) => !c)}
       />

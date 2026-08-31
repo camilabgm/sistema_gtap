@@ -318,6 +318,18 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {persona.usuario?.rol?.nombre || "—"}
+                    {/* Rol secundario (ej. Supervisor de Semana) — solo
+                        aparece si tiene uno activo. "(reemplaza)" avisa
+                        cuando rol_secundario_combina es false, para no
+                        confundirlo con el caso normal de "suma". */}
+                    {persona.usuario?.rol_secundario && (
+                      <span className="block mt-0.5 text-xs font-medium text-purple-600">
+                        + {persona.usuario.rol_secundario.nombre}
+                        {!persona.usuario.rol_secundario_combina && (
+                          <span className="text-gray-400 font-normal"> (reemplaza)</span>
+                        )}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm">{badgeMedica(persona)}</td>
                   <td className="px-6 py-4 text-sm">{badgeOperacional(persona.nivel_operacional_habilitado)}</td>

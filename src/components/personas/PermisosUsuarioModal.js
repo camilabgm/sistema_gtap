@@ -11,7 +11,6 @@ const MODULOS = [
   { key: "MANIFIESTO",          label: "Manifiesto" },
   { key: "SICEM",               label: "SICEM" },
   { key: "INFORMES",            label: "Informes" },
-  { key: "INSPECCION_PREVUELO", label: "Inspección Pre-vuelo" },
 ]
 
 const ACCIONES = [

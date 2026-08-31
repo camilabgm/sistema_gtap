@@ -24,7 +24,15 @@ export const GET = conPermiso("PERSONAS", "puede_ver", async (request, context, 
           username: true,
           rol_id:   true,
           activo:   true,
+          // Necesarios para que UsuarioModal sepa si esta persona ya
+          // tiene un rol secundario activo y cómo combina permisos, y
+          // para que PersonasTable pueda mostrar su nombre en el badge.
+          rol_secundario_id:      true,
+          rol_secundario_combina: true,
           rol: {
+            select: { nombre: true },
+          },
+          rol_secundario: {
             select: { nombre: true },
           },
         },

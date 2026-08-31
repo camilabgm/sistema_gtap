@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma"
 import { necesitaAlertaHabilitacion } from "@/lib/personas"
 import { calcularAutorizanteActivo } from "@/lib/cascadaAutorizacion"
 import { ROLES_ADMIN } from "@/lib/autorizacion"
+import { teCorrespondeReportarPostVuelo } from "@/lib/postVuelo"
+import { yaPasoLaHora } from "@/lib/escalas"
 
 async function obtenerEstadisticas(sesion) {
   const aeronavesDisponibles = await prisma.aeronave.count({
@@ -59,20 +61,51 @@ async function obtenerEstadisticas(sesion) {
     })
   }
 
+  // Post-Vuelo pendientes — CORREGIDO. Antes esto contaba TODAS las
+  // escalas pendientes del sistema para cualquiera con
+  // POST_VUELO.puede_ver — que según la matriz son los 13 roles, sin
+  // excepción, así que en la práctica nunca filtraba nada. Ahora usa
+  // la misma función que ya decide el ámbar de "Te toca" en la lista
+  // de Post-Vuelo (teCorrespondeReportarPostVuelo) — tripulante de esa
+  // escala puntual, o Jefe de Combustible/Supervisor de Semana cuando
+  // falta el combustible.
   let postVueloPendientes = 0
-  if (sesion.user.personaId) {
-    const tienePermisoAmplio = !!sesion.user.permisos?.POST_VUELO?.puede_ver
-    postVueloPendientes = await prisma.escala.count({
+  {
+    const candidatas = await prisma.escala.findMany({
       where: {
         estado: "PROGRAMADA",
         autorizada: true,
         deleted_at: null,
         hora_despegue_estimada: { lte: new Date() },
-        ...(tienePermisoAmplio
-          ? {}
-          : { tripulacion: { some: { persona_id: sesion.user.personaId, deleted_at: null } } }),
+      },
+      select: {
+        tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
+        post_vuelos: { where: { deleted_at: null }, select: { combustible_consumido: true }, take: 1 },
       },
     })
+    postVueloPendientes = candidatas.filter((e) => {
+      const postVuelo = e.post_vuelos[0] ?? null
+      return teCorrespondeReportarPostVuelo(sesion, e, postVuelo)
+    }).length
+  }
+
+  // Manifiesto pendientes — NUEVO. No existía ninguna tarjeta acá
+  // todavía, a pesar de que Supervisor de Semana sí tiene su propio
+  // aviso en el sidebar desde hace rato. Cuenta escalas autorizadas,
+  // programadas, cuyo manifiesto no se cerró (ni a mano ni porque ya
+  // pasó la hora de despegue).
+  let manifiestoPendientes = 0
+  if (sesion.user.esSupervisorSemana) {
+    const candidatasManifiesto = await prisma.escala.findMany({
+      where: {
+        estado: "PROGRAMADA",
+        autorizada: true,
+        manifiesto_cerrado: false,
+        deleted_at: null,
+      },
+      select: { hora_despegue_estimada: true },
+    })
+    manifiestoPendientes = candidatasManifiesto.filter((e) => !yaPasoLaHora(e.hora_despegue_estimada)).length
   }
 
   let pendientesAutorizar = 0
@@ -100,6 +133,7 @@ async function obtenerEstadisticas(sesion) {
     alertas,
     acusesPendientes,
     postVueloPendientes,
+    manifiestoPendientes,
     pendientesAutorizar,
   }
 }
@@ -140,6 +174,12 @@ export default async function DashboardPage() {
       valor: stats.postVueloPendientes,
       descripcion: "escalas por reportar",
       color: "bg-teal-600",
+    },
+    stats.manifiestoPendientes > 0 && {
+      titulo: "Manifiesto",
+      valor: stats.manifiestoPendientes,
+      descripcion: "escalas con manifiesto por completar",
+      color: "bg-indigo-600",
     },
     stats.pendientesAutorizar > 0 && {
       titulo: "Por autorizar",

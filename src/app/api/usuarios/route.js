@@ -22,6 +22,18 @@ export const POST = conPermiso("PERSONAS", "puede_editar", async (request, conte
     return NextResponse.json({ error: "Esta persona ya tiene un usuario asignado" }, { status: 400 })
   }
 
+  // Rol secundario — mismo candado que en usuarios/[id]/route.js: nunca
+  // puede ser Comandante.
+  if (body.rol_secundario_id) {
+    const rolComandante = await prisma.rol.findUnique({
+      where:  { nombre: "Comandante" },
+      select: { id: true },
+    })
+    if (Number(body.rol_secundario_id) === rolComandante?.id) {
+      return NextResponse.json({ error: "El rol secundario no puede ser Comandante" }, { status: 400 })
+    }
+  }
+
   const passwordHash = await bcrypt.hash(body.password, 10)
 
   const usuario = await prisma.usuario.create({
@@ -30,6 +42,10 @@ export const POST = conPermiso("PERSONAS", "puede_editar", async (request, conte
       password:   passwordHash,
       persona_id: Number(body.persona_id),
       rol_id:     Number(body.rol_id),
+      rol_secundario_id:           body.rol_secundario_id ? Number(body.rol_secundario_id) : null,
+      rol_secundario_combina:      body.rol_secundario_id ? !!body.rol_secundario_combina : true,
+      rol_secundario_asignado_por: body.rol_secundario_id ? session.user.id : null,
+      rol_secundario_desde:        body.rol_secundario_id ? new Date() : null,
       creado_por: session.user.id,
     },
     select: {
@@ -37,6 +53,8 @@ export const POST = conPermiso("PERSONAS", "puede_editar", async (request, conte
       username:   true,
       persona_id: true,
       rol_id:     true,
+      rol_secundario_id:      true,
+      rol_secundario_combina: true,
       activo:     true,
       created_at: true,
     },

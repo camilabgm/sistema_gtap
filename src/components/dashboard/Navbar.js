@@ -122,7 +122,7 @@ function SubItemEscalas({ nombre, ruta, Icono, activo, badge, colapsado }) {
   )
 }
 
-export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCascada, colapsado, onToggleColapsado }) {
+export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCascada, esSupervisorSemana, colapsado, onToggleColapsado }) {
   const pathname = usePathname()
   const [pendientesParaMi, setPendientesParaMi] = useState(0)
   const [postVueloParaMi, setPostVueloParaMi] = useState(0)
@@ -328,8 +328,22 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
         {!colapsado && (
           <>
             <p className="text-sm font-semibold text-white">{nombre} {apellido}</p>
-            <p className="text-sm font-medium text-blue-400">{rol}</p>
+            <p className="text-sm font-medium text-blue-400">
+              {rol}
+              {esSupervisorSemana && (
+                <span className="ml-1.5 text-xs font-medium text-purple-400">+ Supervisor de Semana</span>
+              )}
+            </p>
           </>
+        )}
+        {colapsado && esSupervisorSemana && (
+          // Sin nombre/rol visible en modo colapsado — un puntito
+          // morado alcanza para avisar "tenés el turno activo", sin
+          // necesitar espacio para texto.
+          <span
+            title={`${rol} + Supervisor de Semana`}
+            className="h-2 w-2 rounded-full bg-purple-400"
+          />
         )}
         <div className={colapsado ? "flex flex-col gap-3" : "pt-1 space-y-1"}>
           <Link

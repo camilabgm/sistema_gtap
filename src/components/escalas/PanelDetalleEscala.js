@@ -1,18 +1,13 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Link from "next/link"
 import { useTick } from "@/lib/useTick"
-import { ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO_ABORTO, calcularEstadoVisual, estaPendienteDeAutorizacion, formatearHora, formatearRangoVuelo } from "@/lib/escalas"
+import { ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO_ABORTO, calcularEstadoVisual, estaPendienteDeAutorizacion, formatearRangoVuelo } from "@/lib/escalas"
 import { puedeCargarPostVuelo } from "@/lib/postVuelo"
+import { manifiestoEstaCerrado } from "@/lib/manifiesto"
 import { formatearFechaHora } from "@/lib/fechaHora"
 import SeparadorSeccion from "@/components/shared/SeparadorSeccion"
-
-const ETIQUETAS_NOVEDAD = {
-  SIN_NOVEDAD: "Sin novedad",
-  INCIDENTE: "Incidente",
-  ACCIDENTE: "Accidente",
-}
+import PanelAuditoria from "@/components/shared/PanelAuditoria"
 
 const ETIQUETAS_ROL_ACUSE = {
   PILOTO: "Piloto",
@@ -21,19 +16,19 @@ const ETIQUETAS_ROL_ACUSE = {
   SUPERVISOR_SEMANA: "Supervisor de Semana",
 }
 
-function formatearMinutos(min) {
-  if (min === null || min === undefined) return "—"
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return `${h}h ${m}min`
-}
-
 // NOTA: "Abortar escala" ya NO vive acá — se movió a
 // AbortarEscalaAccion.js, disponible como ícono en la fila de
-// Gestión de Escalas. Este panel (usado también por Agenda, que es de
-// solo lectura) quedó solo con información + acuse + post-vuelo de
-// lectura. La prop puedeEditar queda sin uso interno por ahora, se
-// deja en la firma por compatibilidad con quien la siga pasando.
+// Gestión de Escalas. El detalle completo de Post-Vuelo (tramos,
+// horas, destino, combustible, etc.) TAMPOCO vive acá — queda
+// exclusivamente en su propio módulo (PanelPostVuelo), al que ya se
+// accede con un click desde el ícono de Post-Vuelo en la misma fila.
+// Repetirlo acá era duplicar información sin agregar nada, y hacía la
+// fila expandida demasiado larga para lo que Gestión necesita (barrer
+// muchas escalas rápido, no leer el detalle de una). Este panel
+// (usado también por Agenda, que es de solo lectura) queda con
+// información básica + acuse + auditoría de los tres módulos. La prop
+// puedeEditar queda sin uso interno por ahora, se deja en la firma por
+// compatibilidad con quien la siga pasando.
 export default function PanelDetalleEscala({ escala, puedeEditar, mostrarPostVuelo = true, onCerrar, onActualizada }) {
   useTick() // el estado visual (Programada/En vuelo) se actualiza solo
 
@@ -43,6 +38,19 @@ export default function PanelDetalleEscala({ escala, puedeEditar, mostrarPostVue
   const primerTramo = e.itinerarios?.[0]
   const ultimoTramo = e.itinerarios?.[e.itinerarios.length - 1]
   const ruta = primerTramo && ultimoTramo ? `${primerTramo.origen} → ${ultimoTramo.destino}` : "Sin itinerario cargado"
+
+  // ── Manifiesto — solo para el panel de auditoría ────────────────
+  // MANIFIESTO.puede_ver es Ver=true para todos los roles según la
+  // matriz, así que este fetch nunca debería dar 403 sin importar
+  // quién esté mirando este panel (Gestión o Agenda).
+  const [manifiestoData, setManifiestoData] = useState(null)
+
+  useEffect(() => {
+    fetch(`/api/manifiesto/${e.id}`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setManifiestoData)
+      .catch(() => setManifiestoData(null))
+  }, [e.id])
 
   // ── Acuse de Recibo ─────────────────────────────────────────────
   const [acuse, setAcuse] = useState(null)
@@ -84,35 +92,40 @@ export default function PanelDetalleEscala({ escala, puedeEditar, mostrarPostVue
     }
   }
 
-  // ── Post-Vuelo — SOLO LECTURA ────────────────────────────────────
-  // La edición (tramos y cierre) vive únicamente en el módulo
-  // Post-Vuelo (PanelPostVuelo). Acá solo se muestra lo ya cargado,
-  // para no repetir la lógica de edición en dos lugares y no
-  // sobrecargar Gestión/Agenda.
+  // ── Post-Vuelo — SOLO para completar la auditoría ────────────────
+  // Ya no se renderiza ningún detalle acá (tramos, horas, combustible,
+  // etc.) — eso vive únicamente en PanelPostVuelo. Este fetch se
+  // mantiene solo para tener creado_por_nombre/editado_por_nombre
+  // disponibles en itemsAuditoria, más abajo.
   const relevantePostVuelo = mostrarPostVuelo && (e.estado === "CUMPLIDA" || puedeCargarPostVuelo(e))
-
-  const [pvCargando, setPvCargando] = useState(false)
   const [pvData, setPvData] = useState(null)
-  const [pvError, setPvError] = useState(null)
 
-  const cargarPostVuelo = useCallback(() => {
-    if (!relevantePostVuelo) return
-    setPvCargando(true)
-    setPvError(null)
-    fetch(`/api/escalas/${e.id}/post-vuelo`, { credentials: "include" })
-      .then(async (r) => {
-        const data = await r.json()
-        if (!r.ok) throw new Error(data.error || "Error al cargar el post-vuelo")
-        return data
-      })
-      .then((data) => setPvData(data))
-      .catch((err) => setPvError(err.message))
-      .finally(() => setPvCargando(false))
-  }, [e.id, relevantePostVuelo])
+  // ── Panel de auditoría — Escala + Manifiesto + Post-Vuelo juntos ──
+  // Cada fila dice explícitamente a qué módulo pertenece. Si un dato
+  // no existe (ej. todavía no se editó nada), PanelAuditoria ya lo
+  // filtra solo — no hace falta lógica extra acá para "si no se tocó,
+  // mostrar solo el creador": eso ya pasa porque *_editado_por_nombre
+  // viene null hasta que alguien realmente edite.
+  const itemsAuditoria = [
+    { etiqueta: "Escala creada por", nombre: e.creado_por_nombre, fecha: e.created_at },
+    { etiqueta: "Escala editada por", nombre: e.editado_por_nombre, fecha: e.updated_at },
+    { etiqueta: "Escala autorizada por", nombre: e.autorizada_por_nombre, fecha: e.fecha_autorizacion },
+    { etiqueta: "Manifiesto cargado por", nombre: manifiestoData?.manifiesto_creado_por_nombre, fecha: manifiestoData?.manifiesto_creado_en },
+    { etiqueta: "Manifiesto cerrado por", nombre: manifiestoData?.manifiesto_cerrado_por_nombre, fecha: manifiestoData?.manifiesto_cerrado_en },
+    ...(manifiestoData && !manifiestoData.manifiesto_cerrado && manifiestoEstaCerrado(manifiestoData)
+      ? [{ etiqueta: "Manifiesto cerrado", nombre: "Automáticamente (venció la hora de despegue)", fecha: manifiestoData.hora_despegue_estimada }]
+      : []),
+    { etiqueta: "Post-vuelo cargado por", nombre: pvData?.postVuelo?.creado_por_nombre, fecha: pvData?.postVuelo?.created_at },
+    { etiqueta: "Post-vuelo editado por", nombre: pvData?.postVuelo?.editado_por_nombre, fecha: pvData?.postVuelo?.updated_at },
+  ]
 
   useEffect(() => {
-    cargarPostVuelo()
-  }, [cargarPostVuelo])
+    if (!relevantePostVuelo) return
+    fetch(`/api/escalas/${e.id}/post-vuelo`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setPvData)
+      .catch(() => setPvData(null))
+  }, [e.id, relevantePostVuelo])
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -188,70 +201,12 @@ export default function PanelDetalleEscala({ escala, puedeEditar, mostrarPostVue
         </div>
       )}
 
-      {relevantePostVuelo && (
-        <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
-          <SeparadorSeccion texto="Post-Vuelo" />
-
-          {pvCargando ? (
-            <p className="text-xs text-gray-400">Cargando post-vuelo...</p>
-          ) : pvError && !pvData ? (
-            <div className="p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-xs">{pvError}</div>
-          ) : !pvData ? null : pvData.escala.itinerarios.length === 0 ? (
-            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-md text-xs">
-              Esta escala no tiene ningún tramo cargado en su itinerario.
-            </div>
-          ) : (
-            <>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-gray-700">Tramos — hora real</p>
-                {pvData.escala.itinerarios.map((t) => (
-                  <p key={t.id} className="text-xs text-gray-600">
-                    {t.origen} → {t.destino}: {t.hora_real_salida ? formatearHora(t.hora_real_salida) : "—"} →{" "}
-                    {t.hora_real_llegada ? formatearHora(t.hora_real_llegada) : "—"}
-                  </p>
-                ))}
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-                <p className="text-sm font-bold text-blue-900">
-                  Vuelo: {formatearMinutos(pvData.horasCalculadas.horas_vuelo_minutos)} · Tierra:{" "}
-                  {formatearMinutos(pvData.horasCalculadas.horas_tierra_minutos)} · Total:{" "}
-                  {formatearMinutos(pvData.horasCalculadas.horas_vuelo_minutos + pvData.horasCalculadas.horas_tierra_minutos)}
-                </p>
-              </div>
-
-              {pvData.postVuelo ? (
-                <div className="space-y-1 pt-2 border-t border-gray-100">
-                  <p className="text-xs font-semibold text-gray-700">Post-vuelo</p>
-                  <p className="text-xs text-gray-600">Destino real: {pvData.postVuelo.destino_real}</p>
-                  <p className="text-xs text-gray-600">
-                    Aterrizajes: {pvData.postVuelo.aterrizajes}
-                    {pvData.postVuelo.combustible_consumido != null && ` · Combustible: ${pvData.postVuelo.combustible_consumido} L`}
-                    {pvData.postVuelo.pasajeros != null && ` · Pasajeros: ${pvData.postVuelo.pasajeros}`}
-                  </p>
-                  {pvData.postVuelo.novedad !== "SIN_NOVEDAD" && (
-                    <p className="text-xs text-red-600">
-                      {ETIQUETAS_NOVEDAD[pvData.postVuelo.novedad]}: {pvData.postVuelo.detalle_novedad}
-                    </p>
-                  )}
-                  {pvData.postVuelo.observaciones && (
-                    <p className="text-xs text-gray-500">Obs.: {pvData.postVuelo.observaciones}</p>
-                  )}
-                </div>
-              ) : (
-                <div className="pt-2 border-t border-gray-100">
-                  <p className="text-xs text-gray-400">
-                    Todavía no se cargó el post-vuelo.{" "}
-                    <Link href="/dashboard/post-vuelo" className="text-blue-600 hover:underline">
-                      Reportarlo en Post-Vuelo →
-                    </Link>
-                  </p>
-                </div>
-              )}
-            </>
-          )}
+      <div className="mt-3 pt-3 border-t border-gray-100">
+        <SeparadorSeccion texto="Auditoría" />
+        <div className="mt-3">
+          <PanelAuditoria items={itemsAuditoria} />
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -15,9 +15,9 @@ async function buscarCargaConEscala(id) {
       escala: {
         select: {
           id: true,
+          estado: true,
+          hora_despegue_estimada: true,
           manifiesto_cerrado: true,
-          tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
-          acuses: { where: { deleted_at: null, rol: "SUPERVISOR_SEMANA" }, select: { persona_id: true } },
         },
       },
     },
