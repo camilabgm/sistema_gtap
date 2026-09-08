@@ -1,5 +1,13 @@
+// Destino: src/app/dashboard/page.js
+//
+// Tarjetas ahora clickeables. Las que dependen de UNA escala puntual
+// (Post-Vuelo, Manifiesto) llevan directo a la primera pendiente, no
+// solo a la lista general — para eso, obtenerEstadisticas() ahora
+// también guarda el id de esa primera escala, no solo el conteo.
+
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
+import Link from "next/link"
 import prisma from "@/lib/prisma"
 import { necesitaAlertaHabilitacion } from "@/lib/personas"
 import { calcularAutorizanteActivo } from "@/lib/cascadaAutorizacion"
@@ -25,10 +33,6 @@ async function obtenerEstadisticas(sesion) {
     },
   })
 
-  // Personal activo y Alertas son datos del módulo Personas — los dos
-  // se gatean con el mismo permiso, no solo las alertas. null = "esta
-  // tarjeta ni se calcula ni se muestra" (distinto de 0, que sí sería
-  // un dato real).
   const tienePersonas = !!sesion.user.permisos?.PERSONAS?.puede_ver
 
   let alertas = null
@@ -50,26 +54,40 @@ async function obtenerEstadisticas(sesion) {
     alertas = personasParaAlertas.filter((p) => necesitaAlertaHabilitacion(p)).length
   }
 
-  // ── Lo que te toca hacer — personal, no depende del permiso de
-  // ningún módulo, sino de si SOS parte (tripulante/autorizante) de
-  // algo puntual. Mismo criterio que ya usa el sidebar.
+  // ── Lo que te toca hacer ──────────────────────────────────────────
 
   let acusesPendientes = 0
+  let primeraEscalaAcuse = null
+  let primeraFechaAcuse = null
   if (sesion.user.personaId) {
-    acusesPendientes = await prisma.acuseRecibo.count({
+    const acuses = await prisma.acuseRecibo.findMany({
       where: { persona_id: sesion.user.personaId, fecha_acuse: null, deleted_at: null },
+      select: {
+        escala_id: true,
+        escala: { select: { hora_despegue_estimada: true } },
+      },
+      orderBy: { created_at: "asc" },
     })
+    acusesPendientes = acuses.length
+    primeraEscalaAcuse = acuses[0]?.escala_id ?? null
+    // Formateado a mano (no toISOString) para no correr el riesgo de
+    // que un vuelo tarde en la noche paraguaya cruce a otro día en
+    // UTC y termine apuntando a la fecha equivocada en Agenda.
+    const horaDespegue = acuses[0]?.escala?.hora_despegue_estimada
+    if (horaDespegue) {
+      const d = new Date(horaDespegue)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, "0")
+      const dia = String(d.getDate()).padStart(2, "0")
+      primeraFechaAcuse = `${y}-${m}-${dia}`
+    }
   }
 
-  // Post-Vuelo pendientes — CORREGIDO. Antes esto contaba TODAS las
-  // escalas pendientes del sistema para cualquiera con
-  // POST_VUELO.puede_ver — que según la matriz son los 13 roles, sin
-  // excepción, así que en la práctica nunca filtraba nada. Ahora usa
-  // la misma función que ya decide el ámbar de "Te toca" en la lista
-  // de Post-Vuelo (teCorrespondeReportarPostVuelo) — tripulante de esa
-  // escala puntual, o Jefe de Combustible/Supervisor de Semana cuando
-  // falta el combustible.
+  // Post-Vuelo pendientes — ahora también guarda el id de la primera
+  // escala, para que la tarjeta pueda llevar directo ahí en vez de
+  // solo a la lista general.
   let postVueloPendientes = 0
+  let primeraEscalaPostVuelo = null
   {
     const candidatas = await prisma.escala.findMany({
       where: {
@@ -79,22 +97,24 @@ async function obtenerEstadisticas(sesion) {
         hora_despegue_estimada: { lte: new Date() },
       },
       select: {
+        id: true,
         tripulacion: { where: { deleted_at: null }, select: { persona_id: true } },
         post_vuelos: { where: { deleted_at: null }, select: { combustible_consumido: true }, take: 1 },
       },
+      orderBy: { hora_despegue_estimada: "asc" },
     })
-    postVueloPendientes = candidatas.filter((e) => {
+    const filtradas = candidatas.filter((e) => {
       const postVuelo = e.post_vuelos[0] ?? null
       return teCorrespondeReportarPostVuelo(sesion, e, postVuelo)
-    }).length
+    })
+    postVueloPendientes = filtradas.length
+    primeraEscalaPostVuelo = filtradas[0]?.id ?? null
   }
 
-  // Manifiesto pendientes — NUEVO. No existía ninguna tarjeta acá
-  // todavía, a pesar de que Supervisor de Semana sí tiene su propio
-  // aviso en el sidebar desde hace rato. Cuenta escalas autorizadas,
-  // programadas, cuyo manifiesto no se cerró (ni a mano ni porque ya
-  // pasó la hora de despegue).
+  // Manifiesto pendientes — mismo criterio, guarda el id de la
+  // primera escala.
   let manifiestoPendientes = 0
+  let primeraEscalaManifiesto = null
   if (sesion.user.esSupervisorSemana) {
     const candidatasManifiesto = await prisma.escala.findMany({
       where: {
@@ -103,9 +123,12 @@ async function obtenerEstadisticas(sesion) {
         manifiesto_cerrado: false,
         deleted_at: null,
       },
-      select: { hora_despegue_estimada: true },
+      select: { id: true, hora_despegue_estimada: true },
+      orderBy: { hora_despegue_estimada: "asc" },
     })
-    manifiestoPendientes = candidatasManifiesto.filter((e) => !yaPasoLaHora(e.hora_despegue_estimada)).length
+    const filtradas = candidatasManifiesto.filter((e) => !yaPasoLaHora(e.hora_despegue_estimada))
+    manifiestoPendientes = filtradas.length
+    primeraEscalaManifiesto = filtradas[0]?.id ?? null
   }
 
   let pendientesAutorizar = 0
@@ -132,8 +155,12 @@ async function obtenerEstadisticas(sesion) {
     escalasHoy,
     alertas,
     acusesPendientes,
+    primeraEscalaAcuse,
+    primeraFechaAcuse,
     postVueloPendientes,
+    primeraEscalaPostVuelo,
     manifiestoPendientes,
+    primeraEscalaManifiesto,
     pendientesAutorizar,
   }
 }
@@ -168,24 +195,34 @@ export default async function DashboardPage() {
       valor: stats.acusesPendientes,
       descripcion: "escalas por confirmar",
       color: "bg-purple-500",
+      href: stats.primeraEscalaAcuse && stats.primeraFechaAcuse
+        ? `/dashboard/escalas?fecha=${stats.primeraFechaAcuse}&escala=${stats.primeraEscalaAcuse}`
+        : "/dashboard/escalas",
     },
     stats.postVueloPendientes > 0 && {
       titulo: "Post-Vuelo",
       valor: stats.postVueloPendientes,
       descripcion: "escalas por reportar",
       color: "bg-teal-600",
+      href: stats.primeraEscalaPostVuelo
+        ? `/dashboard/post-vuelo?escala=${stats.primeraEscalaPostVuelo}`
+        : "/dashboard/post-vuelo",
     },
     stats.manifiestoPendientes > 0 && {
       titulo: "Manifiesto",
       valor: stats.manifiestoPendientes,
       descripcion: "escalas con manifiesto por completar",
       color: "bg-indigo-600",
+      href: stats.primeraEscalaManifiesto
+        ? `/dashboard/manifiesto?escala=${stats.primeraEscalaManifiesto}`
+        : "/dashboard/manifiesto",
     },
     stats.pendientesAutorizar > 0 && {
       titulo: "Por autorizar",
       valor: stats.pendientesAutorizar,
       descripcion: "escalas esperando tu autorización",
       color: "bg-amber-500",
+      href: "/dashboard/escalas/pendientes-autorizar",
     },
   ].filter(Boolean)
 
@@ -195,12 +232,14 @@ export default async function DashboardPage() {
       valor:       stats.escalasHoy,
       descripcion: "vuelos programados",
       color:       "bg-blue-500",
+      href:        "/dashboard/escalas",
     },
     {
       titulo:      "Aeronaves",
       valor:       `${stats.aeronavesDisponibles}/${stats.totalAeronaves}`,
       descripcion: "disponibles",
       color:       "bg-green-500",
+      href:        "/dashboard/aeronaves",
     },
   ]
 
@@ -210,6 +249,7 @@ export default async function DashboardPage() {
       valor:       stats.totalPersonas,
       descripcion: "personas registradas",
       color:       "bg-indigo-500",
+      href:        "/dashboard/personas",
     })
   }
   if (stats.alertas !== null) {
@@ -218,6 +258,7 @@ export default async function DashboardPage() {
       valor:       stats.alertas,
       descripcion: "habilitaciones que requieren atención",
       color:       "bg-red-500",
+      href:        "/dashboard/personas",
     })
   }
 
@@ -235,13 +276,17 @@ export default async function DashboardPage() {
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Lo que te toca hacer</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {tareasPersonales.map((tarjeta) => (
-              <div key={tarjeta.titulo} className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-l-red-400">
+              <Link
+                key={tarjeta.titulo}
+                href={tarjeta.href}
+                className="block bg-white rounded-lg shadow-sm p-6 border-l-4 border-l-red-400 hover:shadow-md transition-shadow"
+              >
                 <div className={`inline-block px-3 py-1 rounded-full text-white text-xs font-medium ${tarjeta.color} mb-3`}>
                   {tarjeta.titulo}
                 </div>
                 <p className="text-3xl font-bold text-gray-800">{tarjeta.valor}</p>
                 <p className="text-sm text-gray-500 mt-1">{tarjeta.descripcion}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -249,13 +294,17 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {tarjetasOperativas.map((tarjeta) => (
-          <div key={tarjeta.titulo} className="bg-white rounded-lg shadow-sm p-6">
+          <Link
+            key={tarjeta.titulo}
+            href={tarjeta.href}
+            className="block bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
+          >
             <div className={`inline-block px-3 py-1 rounded-full text-white text-xs font-medium ${tarjeta.color} mb-3`}>
               {tarjeta.titulo}
             </div>
             <p className="text-3xl font-bold text-gray-800">{tarjeta.valor}</p>
             <p className="text-sm text-gray-500 mt-1">{tarjeta.descripcion}</p>
-          </div>
+          </Link>
         ))}
       </div>
 

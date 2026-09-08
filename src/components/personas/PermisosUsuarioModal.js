@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 
 const MODULOS = [
   { key: "PERSONAS",            label: "Personas" },
+  { key: "PARTE_DIARIO",        label: "Parte Diario" },
   { key: "AERONAVES",           label: "Aeronaves" },
   { key: "TIPOS_MISIONES",      label: "Tipos de Misiones" },
   { key: "ESCALAS",             label: "Escalas de Vuelo" },

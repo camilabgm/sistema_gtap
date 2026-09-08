@@ -65,6 +65,16 @@ async function main() {
   // "Resumen General" (verde=permitido, rojo=denegado) — no se usa
   // ninguna aclaración verbal, solo lo que dice la planilla.
   // INSPECCION_PREVUELO queda sin permisos (diferida a Fase 2).
+  //
+  // PARTE_DIARIO — módulo NUEVO, agregado el 02/09/2026. No existe en
+  // la planilla original (antes vivía piggybacked sobre PERSONAS). Se
+  // le dio a los mismos 4 roles que hoy tienen PERSONAS.puede_editar
+  // (Comandante, Jefe de Operaciones, Cmdte. Esc. Aéreo, Jefe de
+  // Personal) — mismo criterio que ya regía de facto, ahora en su
+  // propio módulo. "ver" queda en 1 SOLO para esos mismos 4 — la idea
+  // es que ni siquiera se pueda VER el parte diario sin poder tocarlo,
+  // a diferencia del resto de los módulos donde ver es más amplio que
+  // editar. Revisar/ajustar si el criterio real difiere.
 
   const matrizPermisos = {
     "Comandante": {
@@ -76,6 +86,7 @@ async function main() {
       SICEM:          [1,1,1,1,1],
       INFORMES:       [1,1,1,1,1],
       TIPOS_MISIONES: [1,1,1,1,1],
+      PARTE_DIARIO:   [1,1,1,0,1],
     },
     "Jefe de Operaciones": {
       ESCALAS:        [1,1,1,0,1],
@@ -86,6 +97,7 @@ async function main() {
       SICEM:          [1,1,1,0,1],
       INFORMES:       [1,1,1,0,1],
       TIPOS_MISIONES: [1,1,1,0,1],
+      PARTE_DIARIO:   [1,1,1,0,1],
     },
     "Comandante del Escuadrón Aéreo": {
       ESCALAS:        [1,1,1,0,1],
@@ -96,6 +108,7 @@ async function main() {
       SICEM:          [1,0,0,0,1],
       INFORMES:       [1,1,1,0,1],
       TIPOS_MISIONES: [1,1,1,0,1],
+      PARTE_DIARIO:   [1,1,1,0,1],
     },
     "Jefe de Programación y Control": {
       ESCALAS:        [1,1,1,0,1],
@@ -106,6 +119,7 @@ async function main() {
       SICEM:          [1,0,0,0,0],
       INFORMES:       [1,1,1,0,1],
       TIPOS_MISIONES: [1,1,1,0,1],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
     "Comandante del Escuadrón de Mantenimiento": {
       ESCALAS:        [1,1,1,0,1],
@@ -116,6 +130,7 @@ async function main() {
       SICEM:          [1,1,1,0,1],
       INFORMES:       [1,0,0,0,1],
       TIPOS_MISIONES: [1,0,0,0,1],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
     "Jefe de Personal": {
       ESCALAS:        [1,1,1,0,1],
@@ -126,6 +141,7 @@ async function main() {
       SICEM:          [1,0,0,0,0],
       INFORMES:       [1,0,0,0,1],
       TIPOS_MISIONES: [1,0,0,0,1],
+      PARTE_DIARIO:   [1,1,1,0,1],
     },
     "Piloto": {
       ESCALAS:        [1,0,0,0,1],
@@ -136,6 +152,7 @@ async function main() {
       SICEM:          [1,0,0,0,0],
       INFORMES:       [0,0,0,0,0],
       TIPOS_MISIONES: [0,0,0,0,0],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
     "Copiloto": {
       ESCALAS:        [1,0,0,0,1],
@@ -146,6 +163,7 @@ async function main() {
       SICEM:          [1,0,0,0,0],
       INFORMES:       [0,0,0,0,0],
       TIPOS_MISIONES: [0,0,0,0,0],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
     "Técnico de Vuelo": {
       ESCALAS:        [1,0,0,0,1],
@@ -156,6 +174,7 @@ async function main() {
       SICEM:          [1,0,0,0,0],
       INFORMES:       [0,0,0,0,0],
       TIPOS_MISIONES: [0,0,0,0,0],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
     "Supervisor de Semana": {
       ESCALAS:        [1,0,0,0,1],
@@ -166,6 +185,7 @@ async function main() {
       SICEM:          [1,0,0,0,1],
       INFORMES:       [0,0,0,0,0],
       TIPOS_MISIONES: [0,0,0,0,0],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
     "Estadística": {
       ESCALAS:        [1,0,0,0,1],
@@ -176,6 +196,7 @@ async function main() {
       SICEM:          [1,0,0,0,1],
       INFORMES:       [1,0,0,0,1],
       TIPOS_MISIONES: [1,0,0,0,1],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
     "General (Personal sin rol específico)": {
       ESCALAS:        [1,0,0,0,1],
@@ -186,6 +207,7 @@ async function main() {
       SICEM:          [1,0,0,0,1],
       INFORMES:       [1,0,0,0,1],
       TIPOS_MISIONES: [1,0,0,0,1],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
     "Jefe de Combustible": {
       ESCALAS:        [1,0,0,0,1],
@@ -196,6 +218,7 @@ async function main() {
       SICEM:          [1,0,0,0,1],
       INFORMES:       [1,0,0,0,1],
       TIPOS_MISIONES: [1,0,0,0,1],
+      PARTE_DIARIO:   [0,0,0,0,0],
     },
   }
 

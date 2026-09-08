@@ -1,3 +1,5 @@
+// Destino: src/app/dashboard/parte-diario/page.js
+
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
@@ -11,7 +13,11 @@ function hoyComoFecha() {
 export default async function ParteDiarioDashboardPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.permisos?.PERSONAS?.puede_ver) {
+  // Migrado de PERSONAS.puede_ver a PARTE_DIARIO.puede_ver — este
+  // chequeo del lado del servidor es el que de verdad protege la
+  // pantalla, incluso si alguien entra por URL directa sin pasar por
+  // el sidebar (que ya lo esconde por su cuenta).
+  if (!session?.user?.permisos?.PARTE_DIARIO?.puede_ver) {
     return (
       <div className="p-8">
         <h1 className="text-xl font-semibold text-gray-900">Sin permisos</h1>
@@ -42,7 +48,7 @@ export default async function ParteDiarioDashboardPage() {
     orderBy: { created_at: "asc" },
   })
 
-  const permisos = session.user.permisos.PERSONAS
+  const permisos = session.user.permisos.PARTE_DIARIO
 
   return (
     <ParteDiarioPage

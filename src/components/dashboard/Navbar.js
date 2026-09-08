@@ -129,7 +129,9 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
   const [acusesParaMi, setAcusesParaMi] = useState(0)
 
   const dentroDeEscalas = pathname.startsWith("/dashboard/escalas")
-  const vePersonas = permisos?.PERSONAS?.puede_ver
+  // Migrado de PERSONAS.puede_ver a su propio módulo — Parte Diario ya
+  // no depende de Personas, tiene su fila propia en la matriz.
+  const vePartediario = permisos?.PARTE_DIARIO?.puede_ver
   const veEscalas  = permisos?.ESCALAS?.puede_ver
 
   const modulosAntesVisibles = modulosAntes.filter(
@@ -208,7 +210,7 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
             </li>
           ))}
 
-          {vePersonas && (
+          {vePartediario && (
             <li>
               <ItemModulo
                 nombre="Parte Diario"
@@ -337,9 +339,6 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
           </>
         )}
         {colapsado && esSupervisorSemana && (
-          // Sin nombre/rol visible en modo colapsado — un puntito
-          // morado alcanza para avisar "tenés el turno activo", sin
-          // necesitar espacio para texto.
           <span
             title={`${rol} + Supervisor de Semana`}
             className="h-2 w-2 rounded-full bg-purple-400"

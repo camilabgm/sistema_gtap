@@ -1,9 +1,15 @@
+// Destino: src/app/api/parte-diario/route.js
+//
+// Migrado de PERSONAS a su propio módulo PARTE_DIARIO — antes vivía
+// piggybacked sobre los permisos de Personas, ahora tiene los suyos
+// propios en la matriz (ver seed.js).
+
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
 import { normalizarFechaSoloDia, hoyEnParaguay } from "@/lib/fechaSoloDia"
 
-export const GET = conPermiso("PERSONAS", "puede_ver", async (request, context, session) => {
+export const GET = conPermiso("PARTE_DIARIO", "puede_ver", async (request, context, session) => {
   const { searchParams } = new URL(request.url)
   const fechaParam = searchParams.get("fecha")
   const fecha = fechaParam ? normalizarFechaSoloDia(fechaParam) : hoyEnParaguay()
@@ -21,7 +27,7 @@ export const GET = conPermiso("PERSONAS", "puede_ver", async (request, context, 
   return NextResponse.json({ novedades, fecha: fecha.toISOString().slice(0, 10) })
 })
 
-export const POST = conPermiso("PERSONAS", "puede_editar", async (request, context, session) => {
+export const POST = conPermiso("PARTE_DIARIO", "puede_crear", async (request, context, session) => {
   const body = await request.json()
   const { persona_id, observacion } = body
 
@@ -43,7 +49,7 @@ export const POST = conPermiso("PERSONAS", "puede_editar", async (request, conte
   return NextResponse.json(novedad, { status: 201 })
 })
 
-export const DELETE = conPermiso("PERSONAS", "puede_editar", async (request, context, session) => {
+export const DELETE = conPermiso("PARTE_DIARIO", "puede_editar", async (request, context, session) => {
   const { searchParams } = new URL(request.url)
   const novedadId = parseInt(searchParams.get("novedadId"))
 

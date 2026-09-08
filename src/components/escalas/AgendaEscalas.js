@@ -1,6 +1,20 @@
 "use client"
 
+// src/components/escalas/AgendaEscalas.js
+//
+// Agregado: soporte para ?fecha=YYYY-MM-DD&escala=ID en la URL — salta
+// directo a esa semana/día y abre esa escala ya expandida, en vez de
+// arrancar siempre en "hoy" como hacía antes. Lo usa la tarjeta de
+// "Acuses de recibo" del dashboard, para llevarte a la escala puntual
+// que falta acusar, no solo a la Agenda en general.
+//
+// IMPORTANTE: usa useSearchParams(), que en el App Router de Next
+// necesita que el componente esté envuelto en <Suspense> más arriba
+// en el árbol. Si el build tira el warning de "should be wrapped in a
+// suspense boundary", envolver <AgendaEscalas /> en el page.js padre.
+
 import { useState, useEffect, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import GanttAeronavesDia from "./GanttAeronavesDia"
@@ -31,18 +45,41 @@ function lunesDeLaSemana(fecha) {
   return d
 }
 
+// Cuántas semanas de diferencia hay entre dos lunes — para calcular el
+// offsetSemanas inicial cuando venimos con ?fecha= de otra semana.
+function diferenciaEnSemanas(lunesObjetivo, lunesActual) {
+  const msPorSemana = 7 * 24 * 60 * 60 * 1000
+  return Math.round((lunesObjetivo.getTime() - lunesActual.getTime()) / msPorSemana)
+}
+
 export default function AgendaEscalas({ puedeCrear }) {
-  const [offsetSemanas, setOffsetSemanas] = useState(0)
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(null)
-  const [escalasSemana, setEscalasSemana] = useState([])
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState(null)
-  const [vista, setVista] = useState("LISTA")
-  const [filaExpandidaId, setFilaExpandidaId] = useState(null)
+  const searchParams = useSearchParams()
+  const fechaParam   = searchParams.get("fecha")
+  const escalaParam  = searchParams.get("escala")
 
   const hoy = new Date()
   const hoyISO = formatearISO(hoy)
   const lunesActual = lunesDeLaSemana(hoy)
+
+  // Si venimos con ?fecha=, arrancamos directo en la semana que
+  // corresponde a esa fecha, no en la semana actual.
+  const offsetInicial = fechaParam
+    ? diferenciaEnSemanas(lunesDeLaSemana(new Date(fechaParam + "T00:00:00")), lunesActual)
+    : 0
+
+  const [offsetSemanas, setOffsetSemanas] = useState(offsetInicial)
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(fechaParam || null)
+  const [escalasSemana, setEscalasSemana] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState(null)
+  const [vista, setVista] = useState("LISTA")
+  const [filaExpandidaId, setFilaExpandidaId] = useState(escalaParam ? Number(escalaParam) : null)
+  // Mientras esto sea true, el efecto de "resetear a hoy" (más abajo)
+  // se queda quieto — se apaga apenas el usuario navega a mano
+  // (flechas de semana, o clickea un día), para no pisar la fecha que
+  // vino por URL antes de que el usuario haga nada.
+  const [modoInicialUrl, setModoInicialUrl] = useState(!!fechaParam)
+
   const lunesMostrado = new Date(lunesActual)
   lunesMostrado.setDate(lunesMostrado.getDate() + offsetSemanas * 7)
 
@@ -53,7 +90,20 @@ export default function AgendaEscalas({ puedeCrear }) {
   })
   const domingoMostrado = diasSemana[6]
 
+  // Sincroniza fechaSeleccionada con la URL apenas esté disponible —
+  // en un efecto aparte del valor inicial de useState, por si
+  // useSearchParams() todavía no tenía el valor listo en el primerísimo
+  // render (evita depender de timing frágil).
   useEffect(() => {
+    if (modoInicialUrl && fechaParam) {
+      setFechaSeleccionada(fechaParam)
+    }
+  }, [fechaParam, modoInicialUrl])
+
+  useEffect(() => {
+    // Mientras estemos en modo inicial por URL, este efecto no toca
+    // nada — la fecha la maneja el efecto de arriba.
+    if (modoInicialUrl) return
     if (offsetSemanas === 0) {
       setFechaSeleccionada(hoyISO)
     } else {
@@ -142,7 +192,7 @@ export default function AgendaEscalas({ puedeCrear }) {
 
         <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() => setOffsetSemanas((o) => o - 1)}
+            onClick={() => { setModoInicialUrl(false); setOffsetSemanas((o) => o - 1) }}
             className="h-9 flex items-center gap-1 px-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -152,7 +202,7 @@ export default function AgendaEscalas({ puedeCrear }) {
             <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{etiquetaSemana}</span>
             {offsetSemanas !== 0 && (
               <button
-                onClick={() => setOffsetSemanas(0)}
+                onClick={() => { setModoInicialUrl(false); setOffsetSemanas(0) }}
                 className="text-xs text-blue-600 hover:underline font-medium"
               >
                 Hoy
@@ -160,7 +210,7 @@ export default function AgendaEscalas({ puedeCrear }) {
             )}
           </div>
           <button
-            onClick={() => setOffsetSemanas((o) => o + 1)}
+            onClick={() => { setModoInicialUrl(false); setOffsetSemanas((o) => o + 1) }}
             className="h-9 flex items-center gap-1 px-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
             Semana siguiente
@@ -178,7 +228,7 @@ export default function AgendaEscalas({ puedeCrear }) {
             return (
               <button
                 key={iso}
-                onClick={() => { setFechaSeleccionada(iso); setFilaExpandidaId(null) }}
+                onClick={() => { setModoInicialUrl(false); setFechaSeleccionada(iso); setFilaExpandidaId(null) }}
                 className={`flex-1 text-center py-2 px-1 rounded-md border transition-colors ${
                   esSeleccionado
                     ? "bg-blue-600 border-blue-600 text-white"

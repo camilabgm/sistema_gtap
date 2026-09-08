@@ -39,9 +39,6 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
   const [eliminando,            setEliminando]            = useState(null)
   const [modalPermisos,         setModalPermisos]         = useState(false)
 
-  // Puede ver el filtro de inactivas quien puede editar — no tiene
-  // sentido mostrarle la lista de inactivas a quien no puede hacer
-  // nada con ellas (ni reactivar, ni editar).
   const puedeVerInactivas = !!permisos?.puede_editar
 
   const personasFiltradas = personas.filter((p) => {
@@ -81,8 +78,6 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
   function toggleMostrarInactivas() {
     setMostrarInactivas((prev) => {
       const nuevoValor = !prev
-      // Recarga con el valor NUEVO — no el que todavía tiene el estado
-      // en este render.
       setCargandoLista(true)
       const url = nuevoValor ? "/api/personas?incluirInactivas=true" : "/api/personas"
       fetch(url, { credentials: "include" })
@@ -141,18 +136,33 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
     setEliminando(null)
   }
 
+  // Mismo criterio de 30 días que badgeVencimiento() en
+  // HabilitacionesModal.js, para no tener dos definiciones de "por
+  // vencer" dando vueltas por el sistema.
+  //
+  // Corrección clave: entre las habilitaciones TODAVÍA vigentes, se
+  // elige la que vence MÁS PRONTO (no la que vence más lejos). Si hay
+  // dos períodos vigentes a la vez (ej. el actual y el próximo ya
+  // cargado de antemano), lo que importa mostrar acá es cuál vence
+  // primero — es lo que determina si hay que preocuparse ya.
   function badgeMedica(persona) {
     const habs = persona.habilitaciones_medicas || []
     const hoy  = new Date()
 
-    const vigente = habs
+    const vigentes = habs
       .filter((h) => !h.deleted_at && new Date(h.vence) >= hoy)
-      .sort((a, b) => new Date(b.vence) - new Date(a.vence))[0]
+      .sort((a, b) => new Date(a.vence) - new Date(b.vence))
+
+    const vigente = vigentes[0]
 
     if (vigente) {
+      const dias = Math.ceil((new Date(vigente.vence) - hoy) / (1000 * 60 * 60 * 24))
+      const porVencer = dias <= 30
+      const color = porVencer ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
+      const icono = porVencer ? "⚠" : "✓"
       return (
-        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-          ✓ {vigente.periodo}/{vigente.anio}
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>
+          {icono} {vigente.periodo}/{vigente.anio}
         </span>
       )
     }
@@ -188,9 +198,6 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
       : <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">✗ No habilitado</span>
   }
 
-  // Acceso: distingue tres estados, no dos — con acceso, sin acceso
-  // (nunca se le creó Usuario), y acceso desactivado (tiene Usuario,
-  // pero está inactivo).
   function badgeAcceso(persona) {
     if (!persona.usuario) {
       return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Sin acceso</span>
@@ -201,8 +208,6 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
     return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">✓ Con acceso</span>
   }
 
-  // Varias especialidades por persona: se listan como texto separado por
-  // coma. Si es solo una, se ve igual que antes.
   function textoEspecialidades(persona) {
     const lista = persona.especialidades || []
     if (lista.length === 0) return "—"
@@ -318,10 +323,6 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {persona.usuario?.rol?.nombre || "—"}
-                    {/* Rol secundario (ej. Supervisor de Semana) — solo
-                        aparece si tiene uno activo. "(reemplaza)" avisa
-                        cuando rol_secundario_combina es false, para no
-                        confundirlo con el caso normal de "suma". */}
                     {persona.usuario?.rol_secundario && (
                       <span className="block mt-0.5 text-xs font-medium text-purple-600">
                         + {persona.usuario.rol_secundario.nombre}

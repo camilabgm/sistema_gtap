@@ -563,7 +563,23 @@ export default function EditarEscala({ escalaId }) {
             <>
               <div className="space-y-2">
                 {tripulacion.map((t, i) => {
-                  const personasParaFila = candidatosPersonas.filter((p) => (p.especialidades || []).includes(t.rol_en_vuelo))
+                  // No repetir la misma persona en dos filas — si ya
+                  // está elegida como Piloto en la fila 1, no tiene
+                  // que aparecer también como candidata a Copiloto en
+                  // la fila 2. Se excluyen los ids ya usados en OTRAS
+                  // filas (no la propia — si no, la fila se quedaría
+                  // sin poder mostrar a la persona que ella misma ya
+                  // tiene seleccionada).
+                  const idsYaElegidosEnOtrasFilas = tripulacion
+                    .filter((_, otroIndex) => otroIndex !== i)
+                    .map((otro) => otro.persona_id)
+                    .filter(Boolean)
+
+                  const personasParaFila = candidatosPersonas.filter(
+                    (p) =>
+                      (p.especialidades || []).includes(t.rol_en_vuelo) &&
+                      !idsYaElegidosEnOtrasFilas.includes(String(p.id))
+                  )
                   return (
                     <div key={i} className="flex gap-2 items-end bg-gray-50 p-2 rounded-md">
                       <div className="flex-1 min-w-0">
