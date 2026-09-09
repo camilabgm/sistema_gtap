@@ -3,8 +3,16 @@
 // Destino: src/components/informes/InformeTotales.js
 //
 // Grupo 2 — totales agregados: por tripulante, por aeronave, por tipo
-// de misión (combustible). Mismo filtro de fecha para las 3, cambia
-// solo la pestaña activa.
+// de misión (combustible). Mismo filtro de fecha para las 3.
+//
+// Cada pestaña tiene su propio selector "Todos / específico":
+// - Por tripulante: Todos los roles (suma horas de todos los roles que
+//   voló esa persona) o un rol puntual (Piloto/Copiloto/Técnico).
+// - Por aeronave: todas las aeronaves del período, o una puntual.
+// - Combustible: todos los tipos de misión, o uno puntual.
+// Las opciones específicas de aeronave y tipo de misión se arman solas
+// a partir de lo que trajo la búsqueda (no tiene sentido ofrecer una
+// aeronave que no voló nada en el período).
 
 import { useState, useEffect, useCallback } from "react"
 
@@ -18,6 +26,11 @@ function formatearISO(fecha) {
   const d = String(fecha.getDate()).padStart(2, "0")
   return `${y}-${m}-${d}`
 }
+function formatearHoras(minutos) {
+  const h = Math.floor(minutos / 60)
+  const m = minutos % 60
+  return `${h}h ${m}min`
+}
 
 const PESTANAS = [
   { key: "por_tripulante", label: "Por tripulante" },
@@ -25,10 +38,34 @@ const PESTANAS = [
   { key: "por_tipo_mision", label: "Combustible por tipo de misión" },
 ]
 
+const ROLES_TRIPULANTE = [
+  { value: "PILOTO", label: "Piloto" },
+  { value: "COPILOTO", label: "Copiloto" },
+  { value: "TECNICO_DE_VUELO", label: "Técnico de vuelo" },
+]
+
+// Cuando se elige "Todos los roles", vuelve a sumar en una sola fila
+// por persona lo que la API trae desglosado por persona+rol.
+function agregarTodosLosRoles(filasPorRol) {
+  const mapa = new Map()
+  filasPorRol.forEach((f) => {
+    if (!mapa.has(f.nombre)) mapa.set(f.nombre, { nombre: f.nombre, vuelos: 0, minutos: 0 })
+    const entry = mapa.get(f.nombre)
+    entry.vuelos += f.vuelos
+    entry.minutos += f.minutos
+  })
+  return [...mapa.values()]
+    .map((e) => ({ ...e, horas_texto: formatearHoras(e.minutos) }))
+    .sort((a, b) => b.minutos - a.minutos)
+}
+
 export default function InformeTotales() {
   const [desde, setDesde] = useState(formatearISO(primerDiaDelMes()))
   const [hasta, setHasta] = useState(formatearISO(new Date()))
   const [pestana, setPestana] = useState("por_tripulante")
+  const [filtroTripulante, setFiltroTripulante] = useState("TODOS")
+  const [filtroAeronave, setFiltroAeronave] = useState("TODOS")
+  const [filtroTipoMision, setFiltroTipoMision] = useState("TODOS")
   const [datos, setDatos] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
@@ -39,8 +76,16 @@ export default function InformeTotales() {
     try {
       const res = await fetch(`/api/informes/totales?desde=${desde}&hasta=${hasta}`, { credentials: "include" })
       const data = await res.json()
-      if (res.ok) setDatos(data)
-      else setError(data.error || "Error al cargar")
+      if (res.ok) {
+        setDatos(data)
+        // Al traer datos nuevos, los selectores de específico vuelven a
+        // "Todos" — la opción puntual anterior puede ya no existir en
+        // este nuevo período.
+        setFiltroAeronave("TODOS")
+        setFiltroTipoMision("TODOS")
+      } else {
+        setError(data.error || "Error al cargar")
+      }
     } catch {
       setError("Error al cargar")
     } finally {
@@ -50,7 +95,27 @@ export default function InformeTotales() {
 
   useEffect(() => { buscar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filas = datos?.[pestana] || []
+  const porTripulanteCrudo = datos?.por_tripulante || []
+  const porAeronaveCrudo = datos?.por_aeronave || []
+  const porTipoMisionCrudo = datos?.por_tipo_mision || []
+
+  const opcionesAeronave = porAeronaveCrudo.map((f) => f.matricula)
+  const opcionesTipoMision = porTipoMisionCrudo.map((f) => f.nombre)
+
+  let filas = []
+  if (pestana === "por_tripulante") {
+    filas = filtroTripulante === "TODOS"
+      ? agregarTodosLosRoles(porTripulanteCrudo)
+      : porTripulanteCrudo.filter((f) => f.rol === filtroTripulante)
+  } else if (pestana === "por_aeronave") {
+    filas = filtroAeronave === "TODOS"
+      ? porAeronaveCrudo
+      : porAeronaveCrudo.filter((f) => f.matricula === filtroAeronave)
+  } else {
+    filas = filtroTipoMision === "TODOS"
+      ? porTipoMisionCrudo
+      : porTipoMisionCrudo.filter((f) => f.nombre === filtroTipoMision)
+  }
 
   return (
     <div>
@@ -82,6 +147,39 @@ export default function InformeTotales() {
             </button>
           ))}
         </div>
+
+        {pestana === "por_tripulante" && (
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Rol</label>
+            <select value={filtroTripulante} onChange={(e) => setFiltroTripulante(e.target.value)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+              <option value="TODOS">Todos los roles</option>
+              {ROLES_TRIPULANTE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+          </div>
+        )}
+
+        {pestana === "por_aeronave" && (
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Aeronave</label>
+            <select value={filtroAeronave} onChange={(e) => setFiltroAeronave(e.target.value)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+              <option value="TODOS">Todas</option>
+              {opcionesAeronave.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        )}
+
+        {pestana === "por_tipo_mision" && (
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de misión</label>
+            <select value={filtroTipoMision} onChange={(e) => setFiltroTipoMision(e.target.value)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+              <option value="TODOS">Todos</option>
+              {opcionesTipoMision.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {error ? (
@@ -90,7 +188,9 @@ export default function InformeTotales() {
         <p className="text-sm text-gray-400">Cargando...</p>
       ) : filas.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
-          Sin datos para este período.
+          {pestana === "por_tripulante" && filtroTripulante !== "TODOS"
+            ? `Nadie voló como ${ROLES_TRIPULANTE.find((r) => r.value === filtroTripulante)?.label.toLowerCase()} en este período.`
+            : "Sin datos para este período."}
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

@@ -39,7 +39,10 @@ export const GET = conPermiso("INFORMES", "puede_ver", async (request, context, 
       tipo_mision: { select: { id: true, codigo: true, nombre: true } },
       tripulacion: {
         where: { deleted_at: null },
-        select: { persona: { select: { id: true, grado: true, apellido: true } } },
+        select: {
+          rol_en_vuelo: true,
+          persona: { select: { id: true, grado: true, apellido: true } },
+        },
       },
       post_vuelos: {
         where: { deleted_at: null },
@@ -60,9 +63,17 @@ export const GET = conPermiso("INFORMES", "puede_ver", async (request, context, 
     const combustible = pv.combustible_consumido != null ? Number(pv.combustible_consumido) : 0
 
     for (const t of e.tripulacion) {
-      const key = t.persona.id
+      // Clave compuesta persona+rol — así alguien que voló de Piloto
+      // en una escala y de Técnico en otra aparece como dos filas
+      // separadas, no mezcladas en una sola suma de horas.
+      const key = `${t.persona.id}-${t.rol_en_vuelo}`
       if (!porTripulante.has(key)) {
-        porTripulante.set(key, { nombre: `${t.persona.grado} ${t.persona.apellido}`, vuelos: 0, minutos: 0 })
+        porTripulante.set(key, {
+          nombre: `${t.persona.grado} ${t.persona.apellido}`,
+          rol: t.rol_en_vuelo,
+          vuelos: 0,
+          minutos: 0,
+        })
       }
       const entry = porTripulante.get(key)
       entry.vuelos += 1

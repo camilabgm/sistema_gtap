@@ -3,6 +3,13 @@
 //
 // Pantalla de administración: solo usuarios dentro de ROLES_ADMIN pueden
 // ver y modificar esto — es lo que reparte el poder de autorizar escalas.
+//
+// NO invalida sesión al reasignar — se evaluó agregarlo (mismo patrón
+// que rol/rol_secundario) pero se descartó: el endpoint que autoriza de
+// verdad (escalas/[id]/autorizar/route.js) recalcula
+// calcularAutorizanteActivo() en vivo contra la base en cada intento,
+// sin leer nada de la sesión. Invalidar acá solo refrescaría el sidebar
+// un poco más rápido, a costa de cerrar sesiones sin necesidad real.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
