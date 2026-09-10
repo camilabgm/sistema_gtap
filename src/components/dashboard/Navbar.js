@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { ROLES_ADMIN } from "@/lib/autorizacion"
 import { yaPasoLaHora } from "@/lib/escalas"
+import { necesitaAlerta } from "@/lib/sicem"
 
 const modulosAntes = [
   { nombre: "Inicio",            ruta: "/dashboard",                Icono: Home  },
@@ -19,10 +20,12 @@ const modulosAntes = [
   { nombre: "Personas",          ruta: "/dashboard/personas",       Icono: Users, modulo: "PERSONAS" },
 ]
 
+// SICEM salió de acá — pasó a ser una sección desplegable (como
+// Escalas), porque ahora tiene sub-páginas (Componentes, y más
+// adelante Eventos/Alertas) en vez de una sola pantalla.
 const modulosDespues = [
   { nombre: "Manifiesto", ruta: "/dashboard/manifiesto", Icono: FileText,  modulo: "MANIFIESTO" },
   { nombre: "Informes",   ruta: "/dashboard/informes",   Icono: BarChart3, modulo: "INFORMES" },
-  { nombre: "SICEM",      ruta: "/dashboard/sicem",      Icono: Wrench,    modulo: "SICEM" },
 ]
 
 function ItemModulo({ nombre, ruta, Icono, activo, colapsado }) {
@@ -87,6 +90,10 @@ function ItemModuloConBadge({ nombre, ruta, Icono, activo, badge, colapsado }) {
   )
 }
 
+// Nombre heredado de cuando era exclusivo de Escalas — quedó genérico
+// (nombre/ruta/Icono/activo/badge/colapsado) y ahora también lo usa
+// SICEM. No se renombra para no tocar los usos existentes sin que lo
+// pidas.
 function SubItemEscalas({ nombre, ruta, Icono, activo, badge, colapsado }) {
   if (colapsado) {
     return (
@@ -127,12 +134,15 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
   const [pendientesParaMi, setPendientesParaMi] = useState(0)
   const [postVueloParaMi, setPostVueloParaMi] = useState(0)
   const [acusesParaMi, setAcusesParaMi] = useState(0)
+  const [alertasSicem, setAlertasSicem] = useState(0)
 
   const dentroDeEscalas = pathname.startsWith("/dashboard/escalas")
+  const dentroDeSicem = pathname.startsWith("/dashboard/sicem")
   // Migrado de PERSONAS.puede_ver a su propio módulo — Parte Diario ya
   // no depende de Personas, tiene su fila propia en la matriz.
   const vePartediario = permisos?.PARTE_DIARIO?.puede_ver
   const veEscalas  = permisos?.ESCALAS?.puede_ver
+  const veSicem    = permisos?.SICEM?.puede_ver
 
   const modulosAntesVisibles = modulosAntes.filter(
     (m) => !m.modulo || permisos?.[m.modulo]?.puede_ver
@@ -173,6 +183,16 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
       .then((data) => setAcusesParaMi(Array.isArray(data) ? data.length : 0))
       .catch(() => {})
   }, [pathname])
+
+  useEffect(() => {
+    if (!veSicem) return
+    // El endpoint ya calcula necesita_alerta por componente — acá solo
+    // se cuenta, el detalle vive en el Panel de Alertas.
+    fetch("/api/sicem/componentes?soloAlertas=true", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setAlertasSicem(Array.isArray(data) ? data.length : 0))
+      .catch(() => {})
+  }, [pathname, veSicem])
 
   return (
     <div
@@ -305,6 +325,61 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
               <ItemModulo {...modulo} activo={pathname === modulo.ruta} colapsado={colapsado} />
             </li>
           ))}
+
+          {/* SICEM — desplegable, mismo patrón que Escalas. El enlace
+              principal apunta a Componentes y lleva el badge general
+              de alertas (igual criterio que Escalas con acusesParaMi);
+              el submenú tiene sus tres pantallas. */}
+          {veSicem && (
+            <li>
+              {colapsado ? (
+                <Link
+                  href="/dashboard/sicem/componentes"
+                  title={alertasSicem > 0 ? `SICEM (${alertasSicem} alertas)` : "SICEM"}
+                  className={`relative flex items-center justify-center py-2.5 rounded-md transition-colors ${
+                    dentroDeSicem ? "text-white bg-gray-800" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                  }`}
+                >
+                  <Wrench size={18} />
+                  {alertasSicem > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full" />}
+                </Link>
+              ) : (
+                <Link
+                  href="/dashboard/sicem/componentes"
+                  className={`flex items-center justify-between px-4 py-2 rounded-md text-sm transition-colors ${
+                    dentroDeSicem ? "text-white font-medium" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Wrench size={18} className="shrink-0" />
+                    SICEM
+                  </span>
+                  {alertasSicem > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                      {alertasSicem}
+                    </span>
+                  )}
+                </Link>
+              )}
+
+              {dentroDeSicem && (
+                <ul className="mt-1 space-y-0.5">
+                  <li>
+                    <SubItemEscalas nombre="Alertas" ruta="/dashboard/sicem/alertas" Icono={ShieldCheck}
+                      activo={pathname === "/dashboard/sicem/alertas"} badge={alertasSicem} colapsado={colapsado} />
+                  </li>
+                  <li>
+                    <SubItemEscalas nombre="Componentes" ruta="/dashboard/sicem/componentes" Icono={Wrench}
+                      activo={pathname === "/dashboard/sicem/componentes"} colapsado={colapsado} />
+                  </li>
+                  <li>
+                    <SubItemEscalas nombre="Eventos" ruta="/dashboard/sicem/eventos" Icono={ClipboardList}
+                      activo={pathname === "/dashboard/sicem/eventos"} colapsado={colapsado} />
+                  </li>
+                </ul>
+              )}
+            </li>
+          )}
         </ul>
 
         {ROLES_ADMIN.includes(rol) && (

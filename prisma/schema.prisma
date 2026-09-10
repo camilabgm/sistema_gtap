@@ -136,6 +136,25 @@ enum Novedad {
   ACCIDENTE
 }
 
+// ─────────────────────────────  ENUMS M7 — SICEM  ──────────────────────
+
+enum TipoComponente {
+  MOTOR
+  HELICE
+  APU
+}
+
+enum TipoEventoMantenimiento {
+  PROGRAMADO // se cumplió el umbral de horas
+  NO_PROGRAMADO // por incidente/accidente
+  CALENDARIO // se cumplió la fecha
+}
+
+enum LugarMantenimiento {
+  INTERNO // taller propio / Escuadrón de Mantenimiento
+  TERCERIZADO
+}
+
 // ─────────────────────────────  MODELOS M0–M3 ────────────────────────────
 model Persona {
   id                  Int                   @id @default(autoincrement())
@@ -213,11 +232,6 @@ model Rol {
   editado_por   Int?
   eliminado_por Int?
 
-  // Dos relaciones distintas hacia Usuario, por eso necesitan nombre:
-  // RolPrincipal = el rol de base de cada Usuario (Usuario.rol_id).
-  // RolSecundario = el turno rotativo activo (Usuario.rol_secundario_id),
-  // ej. Supervisor de Semana — no reemplaza al rol principal, se suma
-  // o no según Usuario.rol_secundario_combina.
   usuarios            Usuario[]    @relation("RolPrincipal")
   usuarios_secundario Usuario[]    @relation("RolSecundario")
   permisos_rol        PermisoRol[]
@@ -235,10 +249,6 @@ model Usuario {
   bloqueado_hasta      DateTime?
   password_temporal    Boolean   @default(true)
 
-  // Rol secundario — turno rotativo (ej. Supervisor de Semana) que se
-  // activa/desactiva sin tocar el rol de base de la persona. Ver
-  // auth.js: si rol_secundario_combina es true, sus permisos se SUMAN
-  // a los del rol base; si es false, lo reemplazan mientras dure.
   rol_secundario_id           Int?
   rol_secundario              Rol?      @relation("RolSecundario", fields: [rol_secundario_id], references: [id])
   rol_secundario_combina      Boolean   @default(true)
@@ -348,6 +358,14 @@ model Aeronave {
   motivo_otro          String?
   activo               Boolean             @default(true)
 
+  // SICEM — "odómetro" de la aeronave: nunca resetea, se usa en
+  // Informes y como fuente de las horas de cada ComponenteMantenimiento
+  // auto-actualizable. Ciclos y aterrizajes quedan manuales hasta
+  // validar que coinciden 1 a 1 con el campo aterrizajes de Post-Vuelo.
+  horas_vuelo_totales_minutos Int @default(0)
+  ciclos_acumulados           Int @default(0)
+  aterrizajes_acumulados      Int @default(0)
+
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -355,7 +373,9 @@ model Aeronave {
   editado_por   Int?
   eliminado_por Int?
 
-  escalas Escala[]
+  escalas                   Escala[]
+  componentes_mantenimiento ComponenteMantenimiento[]
+  eventos_mantenimiento     EventoMantenimiento[]
 
   @@map("aeronaves")
 }
@@ -403,16 +423,10 @@ model Escala {
   observacion_aborto     String?
   es_borrador            Boolean         @default(true)
 
-  // Manifiesto: candado de cierre. Se cierra a mano (usuario habilitado
-  // aprieta "cerrar"), o solo al pasar la hora estimada de despegue /
-  // CUMPLIDA / ABORTADA — ver manifiestoEstaCerrado() en manifiesto.js.
   manifiesto_cerrado     Boolean   @default(false)
   manifiesto_cerrado_por Int?
   manifiesto_cerrado_en  DateTime?
 
-  // Quién y cuándo creó el Manifiesto — hace falta guardarlo aparte
-  // porque en un vuelo "sin pasajeros y sin carga" no queda ninguna
-  // fila en EscalaPasajero/EscalaCarga de la cual inferirlo.
   manifiesto_creado_por    Int?
   manifiesto_creado_en     DateTime?
   manifiesto_sin_pasajeros Boolean   @default(false)
@@ -617,9 +631,6 @@ model PostVuelo {
   destino_real          String
   combustible_consumido Decimal? @db.Decimal(8, 2)
   pasajeros             Int?
-  // Peso total de carga (kg) — sugerido a partir de lo que ya está en
-  // el Manifiesto de esta escala, pero editable: puede diferir (carga
-  // que no llegó a subir, por ejemplo).
   carga_kg              Decimal? @db.Decimal(8, 2)
   aterrizajes           Int
 
@@ -627,6 +638,10 @@ model PostVuelo {
   detalle_novedad String?
 
   observaciones String?
+
+  // SICEM — eventos de mantenimiento no programado que se originaron
+  // en el cierre de este post-vuelo (ej. novedad = INCIDENTE/ACCIDENTE).
+  eventos_mantenimiento EventoMantenimiento[]
 
   creado_por    Int
   editado_por   Int?
@@ -657,7 +672,6 @@ model EscalaPasajero {
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
 
-  // Evita cargar dos veces al mismo documento en la misma escala por error.
   @@unique([escala_id, nro_documento])
   @@map("escala_pasajeros")
 }
@@ -679,4 +693,86 @@ model EscalaCarga {
   deleted_at    DateTime?
 
   @@map("escala_cargas")
+}
+
+// ─────────────────────────────  MODELO M7 — SICEM  ────────────────────
+
+model ComponenteMantenimiento {
+  id Int @id @default(autoincrement())
+
+  aeronave_id Int
+  aeronave    Aeronave       @relation(fields: [aeronave_id], references: [id])
+  tipo        TipoComponente
+
+  // Horas desde el último overhaul/cambio de ESTE componente en
+  // particular (no de la aeronave completa). Se resetea a 0 cuando se
+  // registra un EventoMantenimiento con es_cambio_componente = true
+  // para este componente. Para MOTOR/HELICE se incrementa solo al
+  // cerrar un tramo de Post-Vuelo (ver lib/sicem.js); para APU lo
+  // carga a mano el Jefe de SICEM.
+  horas_acumuladas_minutos Int @default(0)
+
+  // Editable: un componente de reemplazo (fábrica vs. reacondicionado)
+  // puede traer un intervalo distinto al original.
+  umbral_horas_minutos Int?
+
+  // Solo aplica a componentes con control por calendario (ej. hélice).
+  fecha_proxima_inspeccion DateTime? @db.Date
+
+  activo Boolean @default(true)
+
+  eventos EventoMantenimiento[]
+
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  // Un solo MOTOR y una sola HÉLICE controlados por aeronave — así lo
+  // trackea el GTAP hoy (confirmado: el Citation, aunque es bimotor,
+  // se controla como un único valor combinado desde siempre).
+  @@unique([aeronave_id, tipo])
+  @@map("componentes_mantenimiento")
+}
+
+model EventoMantenimiento {
+  id Int @id @default(autoincrement())
+
+  aeronave_id Int
+  aeronave    Aeronave @relation(fields: [aeronave_id], references: [id])
+
+  componente_id Int?
+  componente    ComponenteMantenimiento? @relation(fields: [componente_id], references: [id])
+
+  tipo  TipoEventoMantenimiento
+  lugar LugarMantenimiento?
+
+  // Si true, al guardar el evento se resetea horas_acumuladas_minutos
+  // del componente a 0 (representa un cambio/overhaul real, no
+  // cualquier evento de mantenimiento).
+  es_cambio_componente Boolean @default(false)
+
+  // Mismo patrón que Escala.manifiesto_cerrado — abierto/cerrado
+  // simple, no una Orden de Trabajo con flujo de aprobación.
+  cerrado     Boolean   @default(false)
+  cerrado_por Int?
+  cerrado_en  DateTime?
+
+  observacion String?
+
+  // Si este evento salió de un incidente/accidente reportado en
+  // Post-Vuelo, queda la trazabilidad de qué vuelo lo originó.
+  post_vuelo_id Int?
+  post_vuelo    PostVuelo? @relation(fields: [post_vuelo_id], references: [id])
+
+  creado_por    Int?
+  editado_por   Int?
+  eliminado_por Int?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("eventos_mantenimiento")
 }

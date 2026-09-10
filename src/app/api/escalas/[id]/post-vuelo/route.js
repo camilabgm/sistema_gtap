@@ -6,6 +6,15 @@
 // total sin querer (tramos, destino, novedades — no solo combustible).
 // Ahora se chequea contra ROLES_GLOBAL_POST_VUELO (lista fija de 4
 // roles), igual que ya se hace en Manifiesto.
+//
+// CAMBIO (SICEM): al crear, editar o eliminar el cierre, se sincroniza
+// el "odómetro" de la aeronave (horas_vuelo_totales_minutos) y sus
+// componentes auto-actualizables (motor, hélice) vía
+// sincronizarSicemPorTramo(). Editar suma solo la DIFERENCIA entre el
+// valor nuevo y el anterior — no el valor completo de nuevo, para no
+// duplicar horas ya contadas. Eliminar resta lo que se había sumado,
+// porque el post-vuelo vuelve la escala a PROGRAMADA (como si el
+// tramo nunca se hubiera cerrado).
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -17,9 +26,31 @@ import {
   calcularHorasDesdeTramosReales,
   ROLES_GLOBAL_POST_VUELO,
 } from "@/lib/postVuelo"
+import { COMPONENTES_AUTO_ACTUALIZABLES } from "@/lib/sicem"
 import { resolverNombresUsuarios } from "@/lib/auditoria"
 
 const NOVEDADES_VALIDAS = ["SIN_NOVEDAD", "INCIDENTE", "ACCIDENTE"]
+
+// SICEM — ver comentario de cabecera. Si la escala no tiene aeronave
+// asignada (aeronave_id null) o el delta es 0, no hay nada que hacer.
+async function sincronizarSicemPorTramo(tx, aeronaveId, deltaMinutos) {
+  if (!aeronaveId || !deltaMinutos) return
+
+  await tx.aeronave.update({
+    where: { id: aeronaveId },
+    data: { horas_vuelo_totales_minutos: { increment: deltaMinutos } },
+  })
+
+  await tx.componenteMantenimiento.updateMany({
+    where: {
+      aeronave_id: aeronaveId,
+      tipo: { in: COMPONENTES_AUTO_ACTUALIZABLES },
+      deleted_at: null,
+      activo: true,
+    },
+    data: { horas_acumuladas_minutos: { increment: deltaMinutos } },
+  })
+}
 
 async function cargarEscalaConDatos(escalaId) {
   return prisma.escala.findFirst({
@@ -31,6 +62,7 @@ async function cargarEscalaConDatos(escalaId) {
       autorizada: true,
       hora_despegue_estimada: true,
       hora_arribo_estimada: true,
+      aeronave_id: true, // SICEM — necesario para saber a qué aeronave sincronizar
       aeronave: { select: { matricula: true } },
       itinerarios: {
         where: { deleted_at: null },
@@ -61,6 +93,10 @@ async function cargarEscalaConDatos(escalaId) {
 async function cargarPostVueloActivo(escalaId) {
   return prisma.postVuelo.findFirst({
     where: { escala_id: escalaId, deleted_at: null },
+    // SICEM — se agrega el aeronave_id de la escala para poder
+    // revertir la sincronización al eliminar, sin tener que volver a
+    // consultar la escala completa en el DELETE.
+    include: { escala: { select: { aeronave_id: true } } },
   })
 }
 
@@ -105,9 +141,6 @@ export const GET = conSesion("POST_VUELO", async (request, context, session) => 
   const esSupervisor = !!session.user.esSupervisorSemana
   const puedeMatriz = ROLES_GLOBAL_POST_VUELO.includes(session.user.rol)
 
-  // Ver: sí incluye a Supervisor de Semana — necesita poder ver el
-  // post-vuelo para saber si le falta cargar el combustible, aunque no
-  // participe del resto.
   const puedeVer = !!session.user.permisos?.POST_VUELO?.puede_ver || esTripulante || esSupervisor || puedeMatriz
   if (!puedeVer) {
     return NextResponse.json({ error: "No tenés permiso para ver este post-vuelo" }, { status: 403 })
@@ -115,34 +148,15 @@ export const GET = conSesion("POST_VUELO", async (request, context, session) => 
 
   const postVuelo = await cargarPostVueloActivo(escalaId)
 
-  // "Una sola vez": tripulante puede CREAR el cierre (una vez, en el
-  // POST de abajo), pero no volver a editarlo — puedeEditarPostVuelo
-  // queda exclusivo de los 4 roles globales.
-  //
-  // Supervisor de Semana YA NO entra en puedeCrear — según la
-  // observación de la matriz, no toca el Post-Vuelo en general, solo
-  // el campo de combustible (ver puedeEditarCombustible más abajo).
   const puedeCrear = puedeMatriz || esTripulante
   const puedeEditarPostVuelo = puedeMatriz
 
-  // Tramos: libres de editar mientras no exista el cierre (están
-  // "completando" antes de la carga única); una vez creado el
-  // post-vuelo, corregir un tramo es lo mismo que editar, así que pasa
-  // a depender solo de los 4 roles globales — Jefe de Combustible ya
-  // no entra acá.
   const puedeEditarTramos = postVuelo
     ? puedeEditarPostVuelo
     : puedeCrear && escala.estado === "PROGRAMADA"
 
-  // Eliminar sigue dependiendo únicamente del permiso de la matriz —
-  // sin bypass de tripulante/supervisor, es una acción más sensible
-  // que corregir. Este bit sí se deja tal cual: la matriz ya restringe
-  // Eliminar solo a Comandante, Jefe de Combustible no lo tiene.
   const puedeEliminarPostVuelo = !!session.user.permisos?.POST_VUELO?.puede_eliminar
 
-  // Mismo cálculo que el PATCH dedicado (post-vuelo/combustible/route.js)
-  // — se repite acá porque la pantalla necesita saber de antemano si
-  // mostrar el bloque para cargarlo, sin tener que intentarlo primero.
   const faltaCombustible = postVuelo ? postVuelo.combustible_consumido === null : false
   const puedeEditarCombustible =
     !!postVuelo &&
@@ -150,8 +164,6 @@ export const GET = conSesion("POST_VUELO", async (request, context, session) => 
 
   const calculo = calcularHorasDesdeTramosReales(escala.itinerarios)
 
-  // Panel de auditoría — resuelve a nombre solo si hay post-vuelo
-  // cargado (si no existe todavía, no hay nada que resolver).
   let postVueloConNombres = null
   if (postVuelo) {
     const nombres = await resolverNombresUsuarios([postVuelo.creado_por, postVuelo.editado_por])
@@ -193,8 +205,6 @@ export const POST = conSesion("POST_VUELO", async (request, context, session) =>
 
   const esTripulante = esTripulanteDeEscala(escala, session.user.personaId)
   const puedeMatriz = ROLES_GLOBAL_POST_VUELO.includes(session.user.rol)
-  // Supervisor de Semana YA NO puede crear el post-vuelo — solo carga
-  // combustible después, por el PATCH aparte.
   if (!puedeMatriz && !esTripulante) {
     return NextResponse.json({ error: "No tenés permiso para cargar este post-vuelo" }, { status: 403 })
   }
@@ -232,9 +242,6 @@ export const POST = conSesion("POST_VUELO", async (request, context, session) =>
         horas_tierra_minutos: calculo.horas_tierra_minutos,
         total_minutos: calculo.horas_vuelo_minutos + calculo.horas_tierra_minutos,
         destino_real: `${body.destino_real}`.trim(),
-        // combustible_consumido NUNCA se acepta acá, aunque venga en el
-        // body — se completa después, exclusivamente por PATCH
-        // /api/escalas/[id]/post-vuelo/combustible.
         combustible_consumido: null,
         pasajeros: body.pasajeros ?? null,
         carga_kg: body.carga_kg !== undefined && body.carga_kg !== "" ? body.carga_kg : null,
@@ -250,6 +257,9 @@ export const POST = conSesion("POST_VUELO", async (request, context, session) =>
       where: { id: escalaId },
       data: { estado: "CUMPLIDA", editado_por: session.user.id },
     })
+
+    // SICEM — recién ahora existen horas de vuelo reales para sumar.
+    await sincronizarSicemPorTramo(tx, escala.aeronave_id, calculo.horas_vuelo_minutos)
 
     return nuevo
   })
@@ -274,10 +284,6 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
     return NextResponse.json({ error: "Esta escala todavía no tiene post-vuelo cargado" }, { status: 404 })
   }
 
-  // Editar un post-vuelo ya cargado es EXCLUSIVO de los 4 roles
-  // globales — tripulante y Supervisor de Semana ya usaron su única
-  // carga al crearlo, y Jefe de Combustible tiene su propio PATCH
-  // aparte para el campo de combustible, no este endpoint general.
   const puedeEditarPostVuelo = ROLES_GLOBAL_POST_VUELO.includes(session.user.rol)
   if (!puedeEditarPostVuelo) {
     return NextResponse.json({ error: "No tenés permiso para editar este post-vuelo" }, { status: 403 })
@@ -297,25 +303,33 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
     return NextResponse.json({ error: errorValidacion }, { status: 400 })
   }
 
-  const actualizado = await prisma.postVuelo.update({
-    where: { id: postVuelo.id },
-    data: {
-      horas_vuelo_minutos: calculo.horas_vuelo_minutos,
-      horas_tierra_minutos: calculo.horas_tierra_minutos,
-      total_minutos: calculo.horas_vuelo_minutos + calculo.horas_tierra_minutos,
-      destino_real: `${body.destino_real}`.trim(),
-      // Los 4 roles globales sí pueden tocar combustible desde acá
-      // también — a diferencia de Jefe de Combustible, que solo tiene
-      // el PATCH dedicado.
-      combustible_consumido: body.combustible_consumido ?? postVuelo.combustible_consumido,
-      pasajeros: body.pasajeros ?? null,
-      carga_kg: body.carga_kg !== undefined && body.carga_kg !== "" ? body.carga_kg : null,
-      aterrizajes: Number(body.aterrizajes),
-      novedad: body.novedad || "SIN_NOVEDAD",
-      detalle_novedad: body.novedad && body.novedad !== "SIN_NOVEDAD" ? `${body.detalle_novedad}`.trim() : null,
-      observaciones: body.observaciones ? `${body.observaciones}`.trim() : null,
-      editado_por: session.user.id,
-    },
+  // SICEM — solo se sincroniza la DIFERENCIA respecto de lo que ya
+  // estaba sumado. Si las horas del tramo no cambiaron, delta es 0 y
+  // sincronizarSicemPorTramo no toca nada.
+  const deltaMinutos = calculo.horas_vuelo_minutos - postVuelo.horas_vuelo_minutos
+
+  const actualizado = await prisma.$transaction(async (tx) => {
+    const actualizado = await tx.postVuelo.update({
+      where: { id: postVuelo.id },
+      data: {
+        horas_vuelo_minutos: calculo.horas_vuelo_minutos,
+        horas_tierra_minutos: calculo.horas_tierra_minutos,
+        total_minutos: calculo.horas_vuelo_minutos + calculo.horas_tierra_minutos,
+        destino_real: `${body.destino_real}`.trim(),
+        combustible_consumido: body.combustible_consumido ?? postVuelo.combustible_consumido,
+        pasajeros: body.pasajeros ?? null,
+        carga_kg: body.carga_kg !== undefined && body.carga_kg !== "" ? body.carga_kg : null,
+        aterrizajes: Number(body.aterrizajes),
+        novedad: body.novedad || "SIN_NOVEDAD",
+        detalle_novedad: body.novedad && body.novedad !== "SIN_NOVEDAD" ? `${body.detalle_novedad}`.trim() : null,
+        observaciones: body.observaciones ? `${body.observaciones}`.trim() : null,
+        editado_por: session.user.id,
+      },
+    })
+
+    await sincronizarSicemPorTramo(tx, postVuelo.escala.aeronave_id, deltaMinutos)
+
+    return actualizado
   })
 
   return NextResponse.json(actualizado)
@@ -343,6 +357,11 @@ export const DELETE = conPermiso("POST_VUELO", "puede_eliminar", async (request,
       where: { id: escalaId },
       data: { estado: "PROGRAMADA", editado_por: session.user.id },
     })
+
+    // SICEM — revierte lo que este tramo había sumado, como si nunca
+    // se hubiera cerrado (mismo criterio que el estado de la escala,
+    // que vuelve a PROGRAMADA).
+    await sincronizarSicemPorTramo(tx, postVuelo.escala.aeronave_id, -postVuelo.horas_vuelo_minutos)
   })
 
   return NextResponse.json({ ok: true })
