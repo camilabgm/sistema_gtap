@@ -2,8 +2,10 @@
 // src/components/aeronaves/AeronavesTable.js
 
 import { useState } from "react"
-import { Plus, Search, Pencil, Trash2 } from "lucide-react"
+import { Plus, Search, Pencil, Trash2, Eye, Ban, CircleCheck } from "lucide-react"
 import AeronavesForm from "./AeronavesForm"
+import AeronaveDisponibilidadModal from "./AeronaveDisponibilidadModal"
+import PanelVerAeronave from "./PanelVerAeronave"
 import AccionIcono from "@/components/shared/AccionIcono"
 
 const MOTIVOS = {
@@ -20,7 +22,10 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
   const [filtroEstado,         setFiltroEstado]         = useState("TODOS")
   const [modalAbierto,         setModalAbierto]         = useState(false)
   const [aeronaveSeleccionada, setAeronaveSeleccionada] = useState(null)
+  const [modalDisponibilidad,  setModalDisponibilidad]  = useState(null)
+  const [aeronaveVer,          setAeronaveVer]          = useState(null)
   const [eliminando,           setEliminando]           = useState(null)
+  const [cambiandoDisp,        setCambiandoDisp]        = useState(null)
 
   const aeronavesFiltradas = aeronaves.filter((a) => {
     const texto = busqueda.toLowerCase()
@@ -58,6 +63,27 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
     setEliminando(null)
   }
 
+  async function handleVolverDisponible(aeronave) {
+    if (!window.confirm(`¿Volver a marcar ${aeronave.matricula} como Disponible?`)) return
+    setCambiandoDisp(aeronave.id)
+    const res = await fetch(`/api/aeronaves/${aeronave.id}/disponibilidad`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: "DISPONIBLE" }),
+    })
+    if (!res.ok) {
+      const datos = await res.json()
+      alert(datos.error || "Error al cambiar la disponibilidad")
+    }
+    await recargarDatos()
+    setCambiandoDisp(null)
+  }
+
+  async function handleGuardadoDisponibilidad() {
+    setModalDisponibilidad(null)
+    await recargarDatos()
+  }
+
   function renderEstado(aeronave) {
     if (aeronave.estado === "DISPONIBLE") {
       return (
@@ -76,6 +102,43 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
       <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
         {texto}
       </span>
+    )
+  }
+
+  // Acción de disponibilidad — contextual según el estado actual.
+  // Bloqueada del todo si SICEM tiene un Evento abierto: ahí la
+  // disponibilidad se gestiona desde ese módulo, no desde acá.
+  function renderAccionDisponibilidad(aeronave) {
+    if (aeronave.tiene_evento_abierto) {
+      return (
+        <AccionIcono
+          icono={Ban}
+          etiqueta="Gestionado por SICEM — cerrá el evento desde ahí"
+          onClick={() => {}}
+          disabled
+        />
+      )
+    }
+    if (aeronave.estado === "DISPONIBLE") {
+      return (
+        <AccionIcono
+          icono={Ban}
+          etiqueta="Marcar como no disponible (Otro)"
+          onClick={() => setModalDisponibilidad(aeronave)}
+        />
+      )
+    }
+    // No disponible sin evento abierto — puede ser "Otro" o un motivo
+    // de SICEM que ya se resolvió y quedó desactualizado; cualquiera
+    // de los dos casos se soluciona igual, devolviéndola a Disponible.
+    return (
+      <AccionIcono
+        icono={CircleCheck}
+        etiqueta="Volver a Disponible"
+        onClick={() => handleVolverDisponible(aeronave)}
+        disabled={cambiandoDisp === aeronave.id}
+        color="primario"
+      />
     )
   }
 
@@ -177,9 +240,11 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="flex justify-end items-center gap-0.5">
+                      <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setAeronaveVer(aeronave)} />
                       {permisos?.puede_editar && (
                         <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(aeronave)} color="primario" />
                       )}
+                      {permisos?.puede_editar && renderAccionDisponibilidad(aeronave)}
                       {permisos?.puede_eliminar && (
                         <AccionIcono
                           icono={Trash2}
@@ -188,9 +253,6 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
                           disabled={eliminando === aeronave.id}
                           color="peligro"
                         />
-                      )}
-                      {!permisos?.puede_editar && !permisos?.puede_eliminar && (
-                        <span className="text-xs text-gray-300">Sin acciones</span>
                       )}
                     </div>
                   </td>
@@ -213,6 +275,18 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
           onGuardado={handleGuardado}
           onCerrar={handleCerrar}
         />
+      )}
+
+      {modalDisponibilidad && (
+        <AeronaveDisponibilidadModal
+          aeronave={modalDisponibilidad}
+          onGuardado={handleGuardadoDisponibilidad}
+          onCerrar={() => setModalDisponibilidad(null)}
+        />
+      )}
+
+      {aeronaveVer && (
+        <PanelVerAeronave aeronave={aeronaveVer} onCerrar={() => setAeronaveVer(null)} />
       )}
 
     </div>

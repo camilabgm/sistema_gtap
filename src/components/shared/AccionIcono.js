@@ -12,6 +12,13 @@
 // que un tooltip centrado sobre un ícono pegado al borde derecho
 // quedaba cortado. Con el portal, el tooltip vive fuera de ese
 // contenedor y nunca se recorta.
+//
+// CAMBIO: cuando está deshabilitado, ya NO se renderiza como
+// <button disabled> — los navegadores no disparan onMouseEnter sobre
+// un elemento con pointer-events:none (que es lo que agrega la clase
+// disabled: de Tailwind), así que el tooltip nunca llegaba a
+// mostrarse. Ahora usa un <span> inerte, igual que ya hacía la rama
+// de href — mismo criterio, aplicado también a los botones.
 
 import { useState, useRef, useLayoutEffect } from "react"
 import { createPortal } from "react-dom"
@@ -36,7 +43,7 @@ export default function AccionIcono({ icono: Icono, etiqueta, onClick, href, col
     })
   }, [mostrarTooltip])
 
-  const clases = `relative inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:opacity-40 disabled:pointer-events-none ${COLORES[color]}`
+  const clases = `relative inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${COLORES[color]}`
   const clasesDeshabilitado = "relative inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-300 cursor-not-allowed"
 
   const eventos = {
@@ -79,8 +86,17 @@ export default function AccionIcono({ icono: Icono, etiqueta, onClick, href, col
     )
   }
 
+  if (disabled) {
+    return (
+      <span ref={botonRef} className={clasesDeshabilitado} aria-label={etiqueta} {...eventos}>
+        <Icono className="h-4 w-4" />
+        {tooltip}
+      </span>
+    )
+  }
+
   return (
-    <button type="button" ref={botonRef} onClick={onClick} disabled={disabled} className={clases} aria-label={etiqueta} {...eventos}>
+    <button type="button" ref={botonRef} onClick={onClick} className={clases} aria-label={etiqueta} {...eventos}>
       <Icono className="h-4 w-4" />
       {tooltip}
     </button>

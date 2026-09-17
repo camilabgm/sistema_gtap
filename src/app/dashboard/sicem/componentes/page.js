@@ -27,7 +27,14 @@ export default async function ComponentesSicemPage() {
     }),
     prisma.aeronave.findMany({
       where: { deleted_at: null, activo: true },
-      select: { id: true, matricula: true },
+      select: {
+        id: true,
+        matricula: true,
+        horas_vuelo_totales_minutos: true,
+        trackea_ciclos_aterrizajes: true,
+        ciclos_acumulados: true,
+        aterrizajes_acumulados: true,
+      },
       orderBy: { matricula: "asc" },
     }),
   ])

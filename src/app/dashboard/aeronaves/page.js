@@ -13,15 +13,31 @@ export default async function AeronavesPage() {
     return <SinPermisos mensaje="No tenés permiso para ver aeronaves." />
   }
 
-  const aeronaves = await prisma.aeronave.findMany({
-    where:   { activo: true },
-    orderBy: { matricula: "asc" },
-  })
+  // CAMBIO: se trae aparte qué aeronaves tienen un Evento de SICEM
+  // abierto — la tabla lo necesita para bloquear la acción de
+  // disponibilidad ("Gestionado por SICEM"). Se calcula con una
+  // consulta simple en vez de un _count filtrado, para no depender de
+  // una versión puntual de Prisma.
+  const [aeronaves, eventosAbiertos] = await Promise.all([
+    prisma.aeronave.findMany({
+      where:   { activo: true },
+      orderBy: { matricula: "asc" },
+    }),
+    prisma.eventoMantenimiento.findMany({
+      where:  { cerrado: false, deleted_at: null },
+      select: { aeronave_id: true },
+    }),
+  ])
 
-  // Extraemos los permisos del módulo AERONAVES de la sesión
+  const idsConEventoAbierto = new Set(eventosAbiertos.map((e) => e.aeronave_id))
+  const aeronavesConEstado = aeronaves.map((a) => ({
+    ...a,
+    tiene_evento_abierto: idsConEventoAbierto.has(a.id),
+  }))
+
   const permisos = session?.user?.permisos?.AERONAVES
 
   return (
-    <AeronavesTable aeronaves={aeronaves} permisos={permisos} />
+    <AeronavesTable aeronaves={aeronavesConEstado} permisos={permisos} />
   )
 }

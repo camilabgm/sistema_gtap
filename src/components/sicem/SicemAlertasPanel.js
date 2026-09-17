@@ -23,7 +23,7 @@ function formatearMinutos(min) {
 
 function formatearFecha(fecha) {
   if (!fecha) return "—"
-  return new Date(fecha).toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" })
+  return new Date(fecha).toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" })
 }
 
 function badgeMotivo(motivo) {

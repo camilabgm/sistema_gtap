@@ -28,9 +28,16 @@ function validarCamposComponente(body) {
     if (!Number.isInteger(umbral) || umbral < 0) return "El umbral de horas no es válido"
   }
 
+  if (body.horas_acumuladas_minutos !== undefined && body.horas_acumuladas_minutos !== null) {
+    const horas = Number(body.horas_acumuladas_minutos)
+    if (!Number.isInteger(horas) || horas < 0) return "Las horas acumuladas no pueden ser negativas"
+  }
+
   if (body.fecha_proxima_inspeccion) {
     const fecha = new Date(body.fecha_proxima_inspeccion)
     if (isNaN(fecha.getTime())) return "La fecha de próxima inspección no es válida"
+    const anio = fecha.getFullYear()
+    if (anio < 2000 || anio > 2100) return "La fecha de próxima inspección tiene un año fuera de rango"
   }
 
   return null
@@ -43,15 +50,17 @@ export const GET = conPermiso("SICEM", "puede_ver", async (request) => {
   const { searchParams } = new URL(request.url)
   const aeronaveId = searchParams.get("aeronave_id")
   const soloAlertas = searchParams.get("soloAlertas") === "true"
+  const incluirInactivos = searchParams.get("incluirInactivos") === "true"
 
   const componentes = await prisma.componenteMantenimiento.findMany({
     where: {
       deleted_at: null,
-      activo: true,
+      ...(incluirInactivos ? {} : { activo: true }),
       ...(aeronaveId ? { aeronave_id: Number(aeronaveId) } : {}),
     },
     include: {
       aeronave: { select: { id: true, matricula: true, tipo: true } },
+      _count: { select: { historial: true, eventos: true } },
     },
     orderBy: [{ aeronave_id: "asc" }, { tipo: "asc" }],
   })
@@ -60,11 +69,12 @@ export const GET = conPermiso("SICEM", "puede_ver", async (request) => {
     ...c,
     horas_disponibles_minutos: calcularHorasDisponibles(c),
     necesita_alerta: necesitaAlerta(c),
-    // Usado por el Panel de Alertas para mostrar POR QUÉ alerta
-    // (horas, calendario, o ambos) — Componentes en sí no lo muestra,
-    // pero viaja igual para que el refresco del panel tenga la misma
-    // forma que la carga inicial del server.
     motivos_alerta: motivosAlerta(c),
+    // Eliminable si nunca tuvo un Evento real — las ediciones manuales
+    // (typos, correcciones mientras se está configurando) NO cuentan
+    // para esto, aunque ya hayan generado historial. Lo único que
+    // representa algo real es un Evento de Mantenimiento.
+    puede_eliminarse: c._count.eventos === 0,
   }))
 
   const resultado = soloAlertas ? conCalculo.filter((c) => c.necesita_alerta) : conCalculo
@@ -92,8 +102,13 @@ export const POST = conPermiso("SICEM", "puede_crear", async (request, context, 
     return NextResponse.json({ error: "La aeronave indicada no existe" }, { status: 404 })
   }
 
+  // Un componente desactivado no cuenta como "ya existe" — desactivar
+  // libera el lugar para configurar uno nuevo del mismo tipo. Si lo
+  // que se quiere es corregir datos, lo correcto es reactivar y
+  // editar (no crear otro), pero el sistema no debe bloquear a quien
+  // sí quiere empezar de cero.
   const yaExiste = await prisma.componenteMantenimiento.findFirst({
-    where: { aeronave_id: aeronaveId, tipo: body.tipo, deleted_at: null },
+    where: { aeronave_id: aeronaveId, tipo: body.tipo, deleted_at: null, activo: true },
   })
   if (yaExiste) {
     return NextResponse.json(

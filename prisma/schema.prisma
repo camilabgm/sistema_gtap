@@ -17,6 +17,7 @@ enum Escuadron {
 
 enum Modulo {
   PERSONAS
+  PARTE_DIARIO
   AERONAVES
   TIPOS_MISIONES
   ESCALAS
@@ -362,9 +363,13 @@ model Aeronave {
   // Informes y como fuente de las horas de cada ComponenteMantenimiento
   // auto-actualizable. Ciclos y aterrizajes quedan manuales hasta
   // validar que coinciden 1 a 1 con el campo aterrizajes de Post-Vuelo.
-  horas_vuelo_totales_minutos Int @default(0)
-  ciclos_acumulados           Int @default(0)
-  aterrizajes_acumulados      Int @default(0)
+  // Estos 4 campos solo se cargan/editan desde la pantalla de SICEM
+  // (permiso SICEM), nunca desde el formulario de Aeronaves (permiso
+  // AERONAVES) — son roles distintos en la matriz del GTAP.
+  trackea_ciclos_aterrizajes  Boolean @default(false)
+  horas_vuelo_totales_minutos Int     @default(0)
+  ciclos_acumulados           Int     @default(0)
+  aterrizajes_acumulados      Int     @default(0)
 
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
@@ -721,7 +726,8 @@ model ComponenteMantenimiento {
 
   activo Boolean @default(true)
 
-  eventos EventoMantenimiento[]
+  eventos   EventoMantenimiento[]
+  historial HistorialComponenteMantenimiento[]
 
   creado_por    Int?
   editado_por   Int?
@@ -774,5 +780,38 @@ model EventoMantenimiento {
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
 
+  historial_generado HistorialComponenteMantenimiento[]
+
   @@map("eventos_mantenimiento")
+}
+
+// ─────────────────────────────  MODELO M8 — HISTORIAL SICEM  ──────────
+
+enum MotivoHistorialComponente {
+  EDICION_MANUAL // alguien editó el componente a mano
+  RESET_POR_EVENTO // un Evento de Mantenimiento con cambio de componente lo reseteó
+}
+
+model HistorialComponenteMantenimiento {
+  id Int @id @default(autoincrement())
+
+  componente_id Int
+  componente    ComponenteMantenimiento @relation(fields: [componente_id], references: [id])
+
+  // "Foto" de cómo estaba el componente INMEDIATAMENTE ANTES de este
+  // cambio — nunca se sobrescribe ni se actualiza, es historia.
+  horas_acumuladas_minutos Int
+  umbral_horas_minutos     Int?
+  fecha_proxima_inspeccion DateTime? @db.Date
+
+  motivo MotivoHistorialComponente
+
+  // Solo se completa cuando motivo = RESET_POR_EVENTO.
+  evento_mantenimiento_id Int?
+  evento_mantenimiento    EventoMantenimiento? @relation(fields: [evento_mantenimiento_id], references: [id])
+
+  registrado_por Int?
+  created_at     DateTime @default(now())
+
+  @@map("historial_componentes_mantenimiento")
 }

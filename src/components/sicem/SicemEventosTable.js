@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, CheckCircle2 } from "lucide-react"
+import { Plus, CheckCircle2, Pencil, Trash2, Eye } from "lucide-react"
 import SicemEventosForm from "./SicemEventosForm"
+import PanelVerEvento from "./PanelVerEvento"
 import AccionIcono from "@/components/shared/AccionIcono"
 import { formatearFechaHoraCompacta } from "@/lib/escalas"
 
@@ -48,7 +49,10 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
   const [filtroAeronave,   setFiltroAeronave]   = useState("TODAS")
   const [filtroEstado,     setFiltroEstado]     = useState("TODOS")
   const [modalAbierto,     setModalAbierto]     = useState(false)
+  const [eventoSeleccionado, setEventoSeleccionado] = useState(null)
   const [cerrandoId,       setCerrandoId]       = useState(null)
+  const [eliminandoId,     setEliminandoId]     = useState(null)
+  const [eventoVer,        setEventoVer]        = useState(null)
 
   const eventosFiltrados = eventos.filter((ev) => {
     const pasaAeronave = filtroAeronave === "TODAS" || ev.aeronave_id === Number(filtroAeronave)
@@ -59,8 +63,9 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
     return pasaAeronave && pasaEstado
   })
 
-  function handleNuevo()  { setModalAbierto(true) }
-  function handleCerrarModal() { setModalAbierto(false) }
+  function handleNuevo()  { setEventoSeleccionado(null); setModalAbierto(true) }
+  function handleEditar(ev) { setEventoSeleccionado(ev); setModalAbierto(true) }
+  function handleCerrarModal() { setModalAbierto(false); setEventoSeleccionado(null) }
 
   async function recargarDatos() {
     const res = await fetch("/api/sicem/eventos", { credentials: "include" })
@@ -82,6 +87,24 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
     }
     await recargarDatos()
     setCerrandoId(null)
+  }
+
+  async function handleEliminarEvento(evento) {
+    const avisoReset = evento.es_cambio_componente
+      ? " Este evento reseteó un componente — al eliminarlo, ese componente vuelve a las horas que tenía antes del reseteo."
+      : ""
+    const avisoAeronave = !evento.cerrado
+      ? " Si es el único evento abierto de esta aeronave, vuelve a quedar Disponible."
+      : ""
+    if (!window.confirm(`¿Eliminar este evento de ${evento.aeronave.matricula}? Esto SÍ borra el registro para siempre.${avisoReset}${avisoAeronave}`)) return
+    setEliminandoId(evento.id)
+    const res = await fetch(`/api/sicem/eventos/${evento.id}`, { method: "DELETE", credentials: "include" })
+    if (!res.ok) {
+      const datos = await res.json()
+      alert(datos.error || "Error al eliminar el evento")
+    }
+    await recargarDatos()
+    setEliminandoId(null)
   }
 
   return (
@@ -158,16 +181,32 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
                   <td className="px-6 py-4 text-sm">{badgeEstado(ev.cerrado)}</td>
                   <td className="px-6 py-4 text-sm">
                     <div className="flex justify-end items-center gap-0.5">
+                      <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setEventoVer(ev)} />
+                      {permisos?.puede_editar && (
+                        <AccionIcono
+                          icono={Pencil}
+                          etiqueta="Editar"
+                          onClick={() => handleEditar(ev)}
+                          color="primario"
+                        />
+                      )}
                       {!ev.cerrado && permisos?.puede_editar && (
                         <AccionIcono
                           icono={CheckCircle2}
                           etiqueta="Cerrar evento"
                           onClick={() => handleCerrarEvento(ev)}
                           disabled={cerrandoId === ev.id}
-                          color="primario"
                         />
                       )}
-                      {ev.cerrado && <span className="text-xs text-gray-300">Sin acciones</span>}
+                      {permisos?.puede_eliminar && (
+                        <AccionIcono
+                          icono={Trash2}
+                          etiqueta="Eliminar"
+                          onClick={() => handleEliminarEvento(ev)}
+                          disabled={eliminandoId === ev.id}
+                          color="peligro"
+                        />
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -182,11 +221,16 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
 
       {modalAbierto && (
         <SicemEventosForm
+          evento={eventoSeleccionado}
           aeronaves={aeronaves}
           componentes={componentes}
           onGuardado={handleGuardado}
           onCerrar={handleCerrarModal}
         />
+      )}
+
+      {eventoVer && (
+        <PanelVerEvento evento={eventoVer} onCerrar={() => setEventoVer(null)} />
       )}
     </div>
   )

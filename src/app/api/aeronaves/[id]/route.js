@@ -4,6 +4,12 @@ import { conPermiso } from "@/lib/api-helpers"
 
 // ============================================
 // PUT — edita una aeronave existente
+//
+// CAMBIO: ya no toca estado/motivo_no_disponible/motivo_otro — esos
+// campos salieron de este endpoint. El caso "Otro" tiene su propio
+// PATCH dedicado (ver /api/aeronaves/[id]/disponibilidad/route.js),
+// y el resto de los motivos (Accidentada, En mantenimiento) los
+// escribe únicamente SICEM desde sus propios endpoints de Eventos.
 // ============================================
 export const PUT = conPermiso("AERONAVES", "puede_editar", async (request, { params }, session) => {
   const { id } = await params
@@ -32,24 +38,6 @@ export const PUT = conPermiso("AERONAVES", "puede_editar", async (request, { par
       { error: "El fabricante es obligatorio" },
       { status: 400 }
     )
-  }
-
-  if (body.estado === "NO_DISPONIBLE") {
-    if (!body.motivo_no_disponible) {
-      return NextResponse.json(
-        { error: "Debe seleccionar un motivo de no disponibilidad" },
-        { status: 400 }
-      )
-    }
-
-    if (body.motivo_no_disponible === "OTRO") {
-      if (!body.motivo_otro || body.motivo_otro.trim() === "") {
-        return NextResponse.json(
-          { error: "Debe describir el motivo de no disponibilidad" },
-          { status: 400 }
-        )
-      }
-    }
   }
 
   // ==========================================
@@ -86,11 +74,6 @@ export const PUT = conPermiso("AERONAVES", "puede_editar", async (request, { par
       estela_turbulencia:   body.estela_turbulencia || null,
       color:                body.color || null,
       categoria:            body.categoria,
-      estado:               body.estado,
-      motivo_no_disponible: body.estado === "NO_DISPONIBLE" ? body.motivo_no_disponible : null,
-      motivo_otro:          body.estado === "NO_DISPONIBLE" && body.motivo_no_disponible === "OTRO"
-                              ? body.motivo_otro.trim()
-                              : null,
       editado_por:          session.user.id,
     },
   })

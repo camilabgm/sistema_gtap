@@ -7,8 +7,9 @@
 // flujo de aprobación, es el registro simple que decidimos: tipo,
 // lugar, observación libre, y (opcional) qué componente afecta. Al
 // abrirse dentro de una transacción:
-//   1. si es_cambio_componente, resetea horas_acumuladas_minutos del
-//      componente a 0 (representa que se le hizo overhaul/cambio real)
+//   1. si es_cambio_componente, guarda una "foto" del componente en
+//      HistorialComponenteMantenimiento y recién ahí resetea
+//      horas_acumuladas_minutos a 0 (representa un overhaul/cambio real)
 //   2. pone la aeronave en NO_DISPONIBLE con el motivo que corresponda
 //
 // Mismo criterio que Post-Vuelo con detalle_novedad: si el tipo es
@@ -19,6 +20,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
 import { motivoNoDisponiblePara } from "@/lib/sicem"
+import { resolverNombresUsuarios } from "@/lib/auditoria"
 
 const TIPOS_VALIDOS = ["PROGRAMADO", "NO_PROGRAMADO", "CALENDARIO"]
 const LUGARES_VALIDOS = ["INTERNO", "TERCERIZADO"]
@@ -69,7 +71,21 @@ export const GET = conPermiso("SICEM", "puede_ver", async (request) => {
     orderBy: { created_at: "desc" },
   })
 
-  return NextResponse.json(eventos)
+  const idsAResolver = [
+    ...new Set(
+      eventos.flatMap((ev) => [ev.creado_por, ev.editado_por, ev.cerrado_por]).filter(Boolean)
+    ),
+  ]
+  const nombres = await resolverNombresUsuarios(idsAResolver)
+
+  const eventosConNombres = eventos.map((ev) => ({
+    ...ev,
+    creado_por_nombre: ev.creado_por ? nombres[ev.creado_por] ?? null : null,
+    editado_por_nombre: ev.editado_por ? nombres[ev.editado_por] ?? null : null,
+    cerrado_por_nombre: ev.cerrado_por ? nombres[ev.cerrado_por] ?? null : null,
+  }))
+
+  return NextResponse.json(eventosConNombres)
 })
 
 // ============================================
@@ -90,6 +106,17 @@ export const POST = conPermiso("SICEM", "puede_crear", async (request, context, 
   })
   if (!aeronave) {
     return NextResponse.json({ error: "La aeronave indicada no existe" }, { status: 404 })
+  }
+
+  // Jerarquía: si Aeronaves ya la marcó No disponible por un motivo
+  // propio (Otro), SICEM no abre un Evento nuevo para ella hasta que
+  // se dé de alta desde ahí — evita que dos sistemas se pisen
+  // escribiendo el mismo estado.
+  if (aeronave.estado === "NO_DISPONIBLE" && aeronave.motivo_no_disponible === "OTRO") {
+    return NextResponse.json(
+      { error: `Esta aeronave está No disponible desde Aeronaves (${aeronave.motivo_otro || "Otro"}) — hay que darla de alta ahí antes de abrir un Evento.` },
+      { status: 409 }
+    )
   }
 
   let componente = null
@@ -120,6 +147,18 @@ export const POST = conPermiso("SICEM", "puede_crear", async (request, context, 
     })
 
     if (body.es_cambio_componente && componente) {
+      await tx.historialComponenteMantenimiento.create({
+        data: {
+          componente_id: componente.id,
+          horas_acumuladas_minutos: componente.horas_acumuladas_minutos,
+          umbral_horas_minutos: componente.umbral_horas_minutos,
+          fecha_proxima_inspeccion: componente.fecha_proxima_inspeccion,
+          motivo: "RESET_POR_EVENTO",
+          evento_mantenimiento_id: nuevo.id,
+          registrado_por: session.user.id,
+        },
+      })
+
       await tx.componenteMantenimiento.update({
         where: { id: componente.id },
         data: { horas_acumuladas_minutos: 0, editado_por: session.user.id },

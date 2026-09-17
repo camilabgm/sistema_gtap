@@ -376,6 +376,10 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
                     <SubItemEscalas nombre="Eventos" ruta="/dashboard/sicem/eventos" Icono={ClipboardList}
                       activo={pathname === "/dashboard/sicem/eventos"} colapsado={colapsado} />
                   </li>
+                  <li>
+                    <SubItemEscalas nombre="Estadística" ruta="/dashboard/sicem/estadisticas" Icono={BarChart3}
+                      activo={pathname === "/dashboard/sicem/estadisticas"} colapsado={colapsado} />
+                  </li>
                 </ul>
               )}
             </li>

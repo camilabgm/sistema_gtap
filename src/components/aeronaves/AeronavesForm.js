@@ -1,5 +1,12 @@
 "use client"
 // src/components/aeronaves/AeronavesForm.js
+//
+// CAMBIO: Estado y Motivo de no disponibilidad salieron de este
+// formulario — ya no le pertenecen. Ahora ese estado lo maneja SICEM
+// (Eventos) casi siempre, y el único caso que le queda a Aeronaves
+// ("Otro") tiene su propia acción chica en la tabla, separada de
+// editar los datos descriptivos de la aeronave. Este formulario ya
+// nunca toca disponibilidad.
 
 import { useState, useEffect } from "react"
 
@@ -19,9 +26,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
     estela_turbulencia:   aeronave?.estela_turbulencia   || "",
     color:                aeronave?.color                || "",
     categoria:            aeronave?.categoria            || "PROPIA",
-    estado:               aeronave?.estado               || "DISPONIBLE",
-    motivo_no_disponible: aeronave?.motivo_no_disponible || "",
-    motivo_otro:          aeronave?.motivo_otro          || "",
   })
 
   const [cargando, setCargando] = useState(false)
@@ -36,25 +40,8 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
     return () => document.removeEventListener("keydown", manejarTecla)
   }, [form])
 
-  function handleEstadoChange(e) {
-    const nuevoEstado = e.target.value
-    setForm({
-      ...form,
-      estado:               nuevoEstado,
-      motivo_no_disponible: nuevoEstado === "NO_DISPONIBLE" ? form.motivo_no_disponible : "",
-      motivo_otro:          nuevoEstado === "NO_DISPONIBLE" ? form.motivo_otro : "",
-    })
-  }
-
   async function handleGuardar() {
     if (cargando) return
-
-    if (modoEdicion && form.estado !== aeronave.estado && form.estado === "NO_DISPONIBLE") {
-      const confirmar = window.confirm(
-        `¿Confirmás marcar ${form.matricula} como No disponible? La aeronave no podrá ser asignada a escalas.`
-      )
-      if (!confirmar) return
-    }
 
     setCargando(true)
     setError("")
@@ -221,49 +208,6 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
               <option value="INCAUTADA">Incautada</option>
             </select>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Estado <span className="text-red-500">*</span>
-            </label>
-            <select value={form.estado}
-              onChange={handleEstadoChange}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="DISPONIBLE">Disponible</option>
-              <option value="NO_DISPONIBLE">No disponible</option>
-            </select>
-          </div>
-
-          {/* Campos de motivo — solo si estado es NO_DISPONIBLE */}
-          {form.estado === "NO_DISPONIBLE" && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Motivo
-                </label>
-                <select value={form.motivo_no_disponible}
-                  onChange={(e) => setForm({ ...form, motivo_no_disponible: e.target.value, motivo_otro: "" })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Sin especificar</option>
-                  <option value="ACCIDENTADA">Accidentada</option>
-                  <option value="EN_MANTENIMIENTO">En mantenimiento</option>
-                  <option value="OTRO">Otro</option>
-                </select>
-              </div>
-
-              {form.motivo_no_disponible === "OTRO" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Especificar motivo
-                  </label>
-                  <input type="text" value={form.motivo_otro}
-                    onChange={(e) => setForm({ ...form, motivo_otro: e.target.value })}
-                    placeholder="Describí el motivo..."
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              )}
-            </>
-          )}
 
         </div>
 

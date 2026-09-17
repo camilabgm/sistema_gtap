@@ -34,7 +34,7 @@ export function calcularHorasDisponibles(componente) {
 // horas / 30 días.
 export function motivosAlerta(
   componente,
-  { umbralAvisoMinutos = 50 * 60, umbralAvisoDias = 30 } = {}
+  { umbralAvisoMinutos = 60 * 60, umbralAvisoDias = 45 } = {}
 ) {
   const motivos = []
 

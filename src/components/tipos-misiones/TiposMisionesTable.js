@@ -2,8 +2,9 @@
 // src/components/tipos-misiones/TiposMisionesTable.js
 
 import { useState } from "react"
-import { Plus, Search, Pencil, Trash2 } from "lucide-react"
+import { Plus, Search, Eye, Pencil, Trash2 } from "lucide-react"
 import TiposMisionesForm from "./TiposMisionesForm"
+import PanelVerTipoMision from "./PanelVerTipoMision"
 import AccionIcono from "@/components/shared/AccionIcono"
 
 const ETIQUETAS_CLASIFICACION = {
@@ -19,6 +20,7 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
   const [filtroClasificacion, setFiltroClasificacion] = useState("TODAS")
   const [modalAbierto,       setModalAbierto]       = useState(false)
   const [tipoSeleccionado,   setTipoSeleccionado]   = useState(null)
+  const [tipoVer,            setTipoVer]            = useState(null)
   const [eliminando,         setEliminando]         = useState(null)
 
   const tiposFiltrados = tiposMisiones.filter((t) => {
@@ -156,6 +158,7 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex justify-end items-center gap-0.5">
+                        <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setTipoVer(tipo)} />
                         {permisos?.puede_editar && (
                           <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(tipo)} color="primario" />
                         )}
@@ -167,9 +170,6 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
                             disabled={eliminando === tipo.id}
                             color="peligro"
                           />
-                        )}
-                        {!permisos?.puede_editar && !permisos?.puede_eliminar && (
-                          <span className="text-xs text-gray-300">Sin acciones</span>
                         )}
                       </div>
                     </td>
@@ -193,6 +193,10 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
           onGuardado={handleGuardado}
           onCerrar={handleCerrar}
         />
+      )}
+
+      {tipoVer && (
+        <PanelVerTipoMision tipoMision={tipoVer} onCerrar={() => setTipoVer(null)} />
       )}
     </div>
   )
