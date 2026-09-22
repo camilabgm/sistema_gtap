@@ -13,8 +13,14 @@
 // Las opciones específicas de aeronave y tipo de misión se arman solas
 // a partir de lo que trajo la búsqueda (no tiene sentido ofrecer una
 // aeronave que no voló nada en el período).
+//
+// CAMBIO: se agrega exportar a PDF — mismo criterio que Vuelos, manda
+// exactamente lo que está en pantalla (pestaña activa + su filtro
+// específico), no las 3 pestañas juntas.
 
 import { useState, useEffect, useCallback } from "react"
+import { Download } from "lucide-react"
+import { exportarInformeTotalesPDF } from "@/lib/exportarInformeTotalesPDF"
 
 function primerDiaDelMes() {
   const hoy = new Date()
@@ -117,10 +123,34 @@ export default function InformeTotales() {
       : porTipoMisionCrudo.filter((f) => f.nombre === filtroTipoMision)
   }
 
+  function handleExportarPDF() {
+    let filtroTexto = ""
+    if (pestana === "por_tripulante" && filtroTripulante !== "TODOS") {
+      filtroTexto = `Rol: ${ROLES_TRIPULANTE.find((r) => r.value === filtroTripulante)?.label}`
+    } else if (pestana === "por_aeronave" && filtroAeronave !== "TODOS") {
+      filtroTexto = `Aeronave: ${filtroAeronave}`
+    } else if (pestana === "por_tipo_mision" && filtroTipoMision !== "TODOS") {
+      filtroTexto = `Tipo de misión: ${filtroTipoMision}`
+    }
+    exportarInformeTotalesPDF(filas, { pestana, desde, hasta, filtroTexto })
+  }
+
   return (
     <div>
       <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex items-start justify-between mb-1">
+          <p className="text-sm text-gray-500">Totales agregados por tripulante, aeronave y combustible por tipo de misión</p>
+          <button
+            onClick={handleExportarPDF}
+            disabled={filas.length === 0}
+            className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors h-9 shrink-0 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Exportar PDF
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3 mt-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
             <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)}

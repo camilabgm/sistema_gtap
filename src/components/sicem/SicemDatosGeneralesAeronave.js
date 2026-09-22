@@ -11,7 +11,14 @@ function horasYMinutosAMinutos(horas, minutos) {
   return h * 60 + m
 }
 
-export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado }) {
+// CAMBIO: ahora recibe permisos y lo respeta de verdad — antes el
+// botón de Guardar se mostraba sin ninguna condición, y cualquiera
+// que entrara a Componentes (con solo permiso de Ver en SICEM) podía
+// intentar guardar. Los inputs también quedan deshabilitados, no solo
+// el botón, para que no parezca editable sin serlo.
+export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado, permisos }) {
+
+  const puedeEditar = !!permisos?.puede_editar
 
   const odo = minutosAHorasYMinutos(aeronave.horas_vuelo_totales_minutos)
 
@@ -26,6 +33,8 @@ export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado }) {
   const [guardadoOk, setGuardadoOk] = useState(false)
 
   async function handleGuardar() {
+    if (!puedeEditar) return
+
     setCargando(true)
     setError("")
     setGuardadoOk(false)
@@ -62,7 +71,9 @@ export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado }) {
         Datos generales — {aeronave.matricula}
       </h3>
       <p className="text-xs text-gray-400 mb-3">
-        Se carga una sola vez al migrar esta aeronave — las horas de motor y hélice suben solas con cada vuelo cerrado en Post-Vuelo.
+        {puedeEditar
+          ? "Se carga una sola vez al migrar esta aeronave — las horas de motor y hélice suben solas con cada vuelo cerrado en Post-Vuelo."
+          : "Solo lectura — tu rol no tiene permiso para editar SICEM."}
       </p>
 
       {error && (
@@ -74,43 +85,50 @@ export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado }) {
           <label className="block text-xs font-medium text-gray-700 mb-1">Horas totales de vuelo</label>
           <div className="flex gap-2">
             <input type="number" min="0" value={horasH} onChange={(e) => setHorasH(e.target.value)}
+              disabled={!puedeEditar}
               placeholder="Horas"
-              className="w-1/2 border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+              className="w-1/2 border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
             <input type="number" min="0" max="59" value={horasM} onChange={(e) => setHorasM(e.target.value)}
+              disabled={!puedeEditar}
               placeholder="Min"
-              className="w-1/2 border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+              className="w-1/2 border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
           </div>
         </div>
         <div className={trackea ? "" : "opacity-40 pointer-events-none"}>
           <label className="block text-xs font-medium text-gray-700 mb-1">Ciclos acumulados</label>
           <input type="number" min="0" value={ciclos} onChange={(e) => setCiclos(e.target.value)}
-            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+            disabled={!puedeEditar}
+            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
         </div>
         <div className={trackea ? "" : "opacity-40 pointer-events-none"}>
           <label className="block text-xs font-medium text-gray-700 mb-1">Aterrizajes acumulados</label>
           <input type="number" min="0" value={aterrizajes} onChange={(e) => setAterrizajes(e.target.value)}
-            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+            disabled={!puedeEditar}
+            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-3">
+      <label className={`flex items-center gap-2 text-sm text-gray-700 mb-3 ${puedeEditar ? "cursor-pointer" : ""}`}>
         <input
           type="checkbox"
           checked={trackea}
+          disabled={!puedeEditar}
           onChange={(e) => setTrackea(e.target.checked)}
-          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
         />
         Esta aeronave trackea ciclos y aterrizajes
         <span className="text-gray-400 font-normal">(algunas, como el BE90, no los usan)</span>
       </label>
 
-      <div className="flex items-center gap-3">
-        <button onClick={handleGuardar} disabled={cargando}
-          className="px-3.5 py-1.5 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50">
-          {cargando ? "Guardando..." : "Guardar datos generales"}
-        </button>
-        {guardadoOk && <span className="text-xs text-green-600">Guardado</span>}
-      </div>
+      {puedeEditar && (
+        <div className="flex items-center gap-3">
+          <button onClick={handleGuardar} disabled={cargando}
+            className="px-3.5 py-1.5 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50">
+            {cargando ? "Guardando..." : "Guardar datos generales"}
+          </button>
+          {guardadoOk && <span className="text-xs text-green-600">Guardado</span>}
+        </div>
+      )}
     </div>
   )
 }

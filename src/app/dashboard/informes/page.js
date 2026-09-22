@@ -1,20 +1,23 @@
 // Destino: src/app/dashboard/informes/page.js
+//
+// CAMBIO: usa tienePermiso() + SinPermisos, igual que el resto de los
+// módulos — antes tenía la condición escrita a mano
+// (session?.user?.permisos?.INFORMES?.puede_ver), que hacía lo mismo
+// pero por fuera de la función compartida. Mismo comportamiento,
+// ahora consistente con todo lo demás.
 
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import InformesTabs from "@/components/informes/InformesTabs"
+import { tienePermiso } from "@/lib/permisos"
+import SinPermisos from "@/components/shared/SinPermisos"
 
 export default async function InformesPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.permisos?.INFORMES?.puede_ver) {
-    return (
-      <div className="p-8">
-        <h1 className="text-xl font-semibold text-gray-900">Sin permisos</h1>
-        <p className="mt-2 text-gray-600">No tenés permiso para ver los informes.</p>
-      </div>
-    )
+  if (!tienePermiso(session, "INFORMES", "puede_ver")) {
+    return <SinPermisos mensaje="No tenés permiso para ver los informes." />
   }
 
   const [aeronaves, tiposMision] = await Promise.all([

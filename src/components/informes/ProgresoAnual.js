@@ -4,9 +4,15 @@
 //
 // Grupo 3 — gráfico + tabla combinados, como se decidió. Usa Recharts
 // (npm install recharts si todavía no está en el proyecto).
+//
+// CAMBIO: se agrega exportar a PDF — exporta la tabla de meses del año
+// elegido (el gráfico en sí no se captura, ver el comentario del
+// exportador).
 
 import { useState, useEffect, useCallback } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { Download } from "lucide-react"
+import { exportarProgresoAnualPDF } from "@/lib/exportarProgresoAnualPDF"
 
 const NOMBRES_MES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
@@ -43,10 +49,14 @@ export default function ProgresoAnual() {
   const anioActual = new Date().getFullYear()
   const opcionesAnio = [anioActual - 2, anioActual - 1, anioActual, anioActual + 1]
 
+  function handleExportarPDF() {
+    exportarProgresoAnualPDF(meses, anio)
+  }
+
   return (
     <div>
       <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-end gap-3">
+        <div className="flex items-end justify-between gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Año</label>
             <select value={anio} onChange={(e) => setAnio(Number(e.target.value))}
@@ -54,6 +64,14 @@ export default function ProgresoAnual() {
               {opcionesAnio.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
+          <button
+            onClick={handleExportarPDF}
+            disabled={meses.length === 0}
+            className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors h-9 shrink-0 disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Exportar PDF
+          </button>
         </div>
       </div>
 
