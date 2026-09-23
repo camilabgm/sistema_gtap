@@ -391,6 +391,7 @@ model ParteDiario {
   persona_id  Int
   observacion String?
   creado_por  Int?
+  editado_por Int?
 
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt

@@ -14,6 +14,7 @@ import { calcularAutorizanteActivo } from "@/lib/cascadaAutorizacion"
 import { ROLES_ADMIN } from "@/lib/autorizacion"
 import { teCorrespondeReportarPostVuelo } from "@/lib/postVuelo"
 import { yaPasoLaHora } from "@/lib/escalas"
+import { ROLES_GLOBAL_MANIFIESTO } from "@/lib/manifiesto"
 
 async function obtenerEstadisticas(sesion) {
   const aeronavesDisponibles = await prisma.aeronave.count({
@@ -90,8 +91,11 @@ async function obtenerEstadisticas(sesion) {
   let primeraEscalaPostVuelo = null
   {
     const candidatas = await prisma.escala.findMany({
+      // Ahora — mismo criterio que ya usa GET /api/post-vuelo, para que el
+      // Jefe de Combustible vea acá también las escalas que ya cerraron
+      // tramos (CUMPLIDA) pero les sigue faltando el combustible:
       where: {
-        estado: "PROGRAMADA",
+        estado: { in: ["PROGRAMADA", "CUMPLIDA"] },
         autorizada: true,
         deleted_at: null,
         hora_despegue_estimada: { lte: new Date() },
@@ -115,7 +119,7 @@ async function obtenerEstadisticas(sesion) {
   // primera escala.
   let manifiestoPendientes = 0
   let primeraEscalaManifiesto = null
-  if (sesion.user.esSupervisorSemana) {
+  if (sesion.user.esSupervisorSemana || ROLES_GLOBAL_MANIFIESTO.includes(sesion.user.rol)) {
     const candidatasManifiesto = await prisma.escala.findMany({
       where: {
         estado: "PROGRAMADA",

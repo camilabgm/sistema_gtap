@@ -7,6 +7,7 @@ import UsuarioModal from "./UsuarioModal"
 import PermisosUsuarioModal from "./PermisosUsuarioModal"
 import HabilitacionesModal from "./HabilitacionesModal"
 import AccionIcono from "@/components/shared/AccionIcono"
+import { normalizarParaBusqueda as normalizarTexto } from "@/lib/texto"
 
 const ETIQUETAS_ESCUADRON = {
   ESCUADRON_OPERACIONES_AEREAS: "Esc. Operaciones",
@@ -23,6 +24,7 @@ const ETIQUETAS_ESPECIALIDAD = {
   ADMINISTRATIVO:   "Administrativo",
   OTRO:             "Otro",
 }
+
 
 export default function PersonasTable({ personas: datosIniciales, permisos, esAdministrador }) {
 
@@ -42,12 +44,12 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
   const puedeVerInactivas = !!permisos?.puede_editar
 
   const personasFiltradas = personas.filter((p) => {
-    const texto = busqueda.toLowerCase()
+    const texto = normalizarTexto(busqueda)
     const pasaBusqueda =
       busqueda === "" ||
-      p.nombre.toLowerCase().includes(texto)        ||
-      p.apellido.toLowerCase().includes(texto)      ||
-      p.nro_documento.toLowerCase().includes(texto)
+      normalizarTexto(p.nombre).includes(texto)        ||
+      normalizarTexto(p.apellido).includes(texto)      ||
+      normalizarTexto(p.nro_documento).includes(texto)
     const pasaEspecialidad =
       filtroEspecialidad === "TODAS" || (p.especialidades || []).includes(filtroEspecialidad)
     const pasaEscuadron =

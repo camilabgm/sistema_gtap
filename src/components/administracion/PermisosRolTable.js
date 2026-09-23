@@ -11,6 +11,7 @@ const MODULOS = [
   { key: "MANIFIESTO",     label: "Manifiesto" },
   { key: "SICEM",          label: "SICEM" },
   { key: "INFORMES",       label: "Informes" },
+  { key: "PARTE_DIARIO",   label: "Parte Diario" },
 ]
 
 const ACCIONES = [

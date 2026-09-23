@@ -3,15 +3,13 @@
 import { signOut } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useEffect } from "react"
 import {
   Home, Tag, Plane, Users, CalendarCheck, CalendarDays, PlusCircle,
   ShieldCheck, UserCog, ClipboardList, FileText, BarChart3, Wrench, Lock,
   ScrollText, Menu, LogOut, KeyRound, PlaneLanding,
 } from "lucide-react"
 import { ROLES_ADMIN } from "@/lib/autorizacion"
-import { yaPasoLaHora } from "@/lib/escalas"
-import { necesitaAlerta } from "@/lib/sicem"
+import { useBadgesDashboard } from "@/hooks/useBadgesDashboard"
 
 const modulosAntes = [
   { nombre: "Inicio",            ruta: "/dashboard",                Icono: Home  },
@@ -131,10 +129,11 @@ function SubItemEscalas({ nombre, ruta, Icono, activo, badge, colapsado }) {
 
 export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCascada, esSupervisorSemana, colapsado, onToggleColapsado }) {
   const pathname = usePathname()
-  const [pendientesParaMi, setPendientesParaMi] = useState(0)
-  const [postVueloParaMi, setPostVueloParaMi] = useState(0)
-  const [acusesParaMi, setAcusesParaMi] = useState(0)
-  const [alertasSicem, setAlertasSicem] = useState(0)
+
+  // FIX: los 4 useState + useEffect que estaban acá se movieron al
+  // hook useBadgesDashboard — esta línea reemplaza a los 4 bloques
+  // enteros que antes calculaban cada badge por separado.
+  const { acusesParaMi, pendientesParaMi, postVueloParaMi, alertasSicem } = useBadgesDashboard(permisos, esCargoDeCascada)
 
   const dentroDeEscalas = pathname.startsWith("/dashboard/escalas")
   const dentroDeSicem = pathname.startsWith("/dashboard/sicem")
@@ -150,49 +149,6 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
   const modulosDespuesVisibles = modulosDespues.filter(
     (m) => !m.modulo || permisos?.[m.modulo]?.puede_ver
   )
-
-  useEffect(() => {
-    if (!esCargoDeCascada) return
-    fetch("/api/escalas/pendientes-autorizar", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data?.podesActuar) { setPendientesParaMi(0); return }
-        // Solo cuenta las que se pueden autorizar de verdad ahora
-        // mismo — una escala vencida necesita que alguien la edite y
-        // reprograme primero, no tiene sentido que "pese" en el badge
-        // como si fuera algo accionable de inmediato.
-        const accionables = (data.escalas || []).filter((e) => !yaPasoLaHora(e.hora_despegue_estimada))
-        setPendientesParaMi(accionables.length)
-      })
-      .catch(() => {})
-  }, [pathname, esCargoDeCascada])
-
-  useEffect(() => {
-    fetch("/api/post-vuelo", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        const cantidad = Array.isArray(data) ? data.filter((e) => e.te_corresponde).length : 0
-        setPostVueloParaMi(cantidad)
-      })
-      .catch(() => {})
-  }, [pathname])
-
-  useEffect(() => {
-    fetch("/api/acuses/pendientes", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setAcusesParaMi(Array.isArray(data) ? data.length : 0))
-      .catch(() => {})
-  }, [pathname])
-
-  useEffect(() => {
-    if (!veSicem) return
-    // El endpoint ya calcula necesita_alerta por componente — acá solo
-    // se cuenta, el detalle vive en el Panel de Alertas.
-    fetch("/api/sicem/componentes?soloAlertas=true", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setAlertasSicem(Array.isArray(data) ? data.length : 0))
-      .catch(() => {})
-  }, [pathname, veSicem])
 
   return (
     <div

@@ -1,10 +1,18 @@
 // Destino: src/app/api/escalas/route.js
+//
+// FIX: el POST ya no valida y recorta "solicitante" con su propia
+// lógica en paralelo — ahora usa normalizarSolicitante() de
+// validacionEscala.js, la misma función que ya usan editar/route.js y
+// el PUT de completar borrador. Antes eran 2 validaciones distintas
+// para la misma regla de negocio; ahora es una sola, y de paso el
+// texto queda normalizado a mayúsculas desde el momento de creación,
+// no solo al editar.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
-import { validarCanalConArchivo } from "@/lib/validacionEscala"
+import { validarCanalConArchivo, normalizarSolicitante } from "@/lib/validacionEscala"
 import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
 import { resolverNombresUsuarios } from "@/lib/auditoria"
 
@@ -12,8 +20,11 @@ import { resolverNombresUsuarios } from "@/lib/auditoria"
 // ni validación de Escalas que dependa de ella. Si viene vacía o no se
 // manda, normalizarFechaSoloDia() ya devuelve null sola, sin que haga
 // falta ningún chequeo extra acá.
-function validarDatosSolicitud({ solicitante, fechaRecepcion, canal, nombreArchivo }) {
-  if (!solicitante || !`${solicitante}`.trim()) return "El solicitante es obligatorio"
+//
+// "solicitante" ya NO se valida acá — eso lo hace normalizarSolicitante()
+// antes de llamar a esta función, para no tener la misma regla escrita
+// dos veces.
+function validarDatosSolicitud({ fechaRecepcion, canal, nombreArchivo }) {
   if (fechaRecepcion && isNaN(new Date(fechaRecepcion).getTime())) return "La fecha de recepción no es válida"
   return validarCanalConArchivo(canal, nombreArchivo)
 }
@@ -106,7 +117,7 @@ export const POST = conPermiso("ESCALAS", "puede_crear", async (request, context
 
   try {
     const formData = await request.formData()
-    const solicitante     = formData.get("solicitante")
+    const solicitanteRaw  = formData.get("solicitante")
     const fechaRecepcion  = formData.get("fecha_recepcion")
     const canal           = formData.get("canal")
     const observaciones   = formData.get("observaciones")
@@ -115,8 +126,17 @@ export const POST = conPermiso("ESCALAS", "puede_crear", async (request, context
     const hayArchivo =
       archivo && typeof archivo.arrayBuffer === "function" && archivo.size > 0
 
+    // FIX: antes acá se validaba "solicitante" a mano y se guardaba con
+    // solicitante.trim() — ahora pasa por la misma función que usan
+    // editar/route.js y el PUT de completar borrador, así queda
+    // normalizado a mayúsculas también al crear, no solo al editar.
+    const solicitanteRes = normalizarSolicitante(solicitanteRaw)
+    if (solicitanteRes.error) {
+      return NextResponse.json({ error: solicitanteRes.error }, { status: 400 })
+    }
+
     const errorValidacion = validarDatosSolicitud({
-      solicitante, fechaRecepcion, canal,
+      fechaRecepcion, canal,
       nombreArchivo: hayArchivo ? archivo.name : null,
     })
     if (errorValidacion) {
@@ -125,7 +145,7 @@ export const POST = conPermiso("ESCALAS", "puede_crear", async (request, context
 
     escalaCreada = await prisma.escala.create({
       data: {
-        solicitante: solicitante.trim(),
+        solicitante: solicitanteRes.valor,
         observaciones: observaciones ? `${observaciones}`.trim() : null,
         es_borrador: true,
         creado_por: session.user.id,

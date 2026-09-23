@@ -3,12 +3,20 @@
 // GET /api/informes/totales?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
 //
 // Trae las escalas CUMPLIDA del período (una sola consulta) y agrega
-// en JS por tripulante, por aeronave, y por tipo de misión —
-// evita 3 consultas separadas a la base para lo mismo.
-
+// en JS por tripulante, por aeronave, por tipo de misión y por
+// institución solicitante — evita 4 consultas separadas a la base
+// para lo mismo.
+//
+// FIX: la clave de agrupación de institución solicitante ahora pasa
+// por normalizarNombreInstitucion() antes de agrupar — así "ANDE" y
+// "Ande" caen en la misma fila sin importar cómo se haya escrito al
+// cargar la escala. Esto es un parche de LECTURA: corrige el reporte
+// ya mismo, pero no corrige el dato guardado en la base — eso se
+// resuelve aparte, normalizando al guardar la Escala.
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
+import { normalizarNombreInstitucion } from "@/lib/texto"
 
 function formatearHoras(minutos) {
   const h = Math.floor(minutos / 60)
@@ -35,6 +43,7 @@ export const GET = conPermiso("INFORMES", "puede_ver", async (request, context, 
       },
     },
     select: {
+      solicitante: true,
       aeronave: { select: { id: true, matricula: true } },
       tipo_mision: { select: { id: true, codigo: true, nombre: true } },
       tripulacion: {
@@ -55,6 +64,7 @@ export const GET = conPermiso("INFORMES", "puede_ver", async (request, context, 
   const porTripulante = new Map()
   const porAeronave = new Map()
   const porTipoMision = new Map()
+  const porSolicitante = new Map()
 
   for (const e of escalas) {
     const pv = e.post_vuelos[0]
@@ -99,6 +109,16 @@ export const GET = conPermiso("INFORMES", "puede_ver", async (request, context, 
       entry.vuelos += 1
       entry.litros += combustible
     }
+
+    // Institución solicitante — clave YA normalizada (mayúsculas,
+    // sin espacios de más), así "ANDE" y "Ande" agrupan junto.
+    const nombreSolicitante = normalizarNombreInstitucion(e.solicitante) || "SIN ESPECIFICAR"
+    if (!porSolicitante.has(nombreSolicitante)) {
+      porSolicitante.set(nombreSolicitante, { nombre: nombreSolicitante, vuelos: 0, minutos: 0 })
+    }
+    const entrySolicitante = porSolicitante.get(nombreSolicitante)
+    entrySolicitante.vuelos += 1
+    entrySolicitante.minutos += minutos
   }
 
   const respuesta = {
@@ -111,6 +131,9 @@ export const GET = conPermiso("INFORMES", "puede_ver", async (request, context, 
     por_tipo_mision: [...porTipoMision.values()]
       .map((e) => ({ ...e, litros: Math.round(e.litros * 100) / 100 }))
       .sort((a, b) => b.litros - a.litros),
+    por_solicitante: [...porSolicitante.values()]
+      .map((e) => ({ ...e, horas_texto: formatearHoras(e.minutos) }))
+      .sort((a, b) => b.minutos - a.minutos),
   }
 
   return NextResponse.json(respuesta)

@@ -13,6 +13,7 @@ const MODULOS_VALIDOS = [
   "MANIFIESTO",
   "SICEM",
   "INFORMES",
+  "PARTE_DIARIO",
 ]
 
 export function tienePermiso(session, modulo, accion = "puede_ver") {

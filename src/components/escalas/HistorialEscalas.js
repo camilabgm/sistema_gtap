@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useEffect, Fragment } from "react"
-import { jsPDF } from "jspdf"
-import autoTable from "jspdf-autotable"
 import { Eye, Pencil, Trash2, Users, ClipboardCheck, Search, Download, ChevronDown, X } from "lucide-react"
 import {
   estadoDetallado,
@@ -13,6 +11,7 @@ import {
   formatearFechaHoraCompacta,
 } from "@/lib/escalas"
 import { formatearFechaSoloDia } from "@/lib/fechaSoloDia"
+import { exportarGestionEscalasPDF } from "@/lib/exportarGestionEscalasPDF"
 import PanelDetalleEscala from "./PanelDetalleEscala"
 import AbortarEscalaAccion from "./AbortarEscalaAccion"
 import AccionIcono from "@/components/shared/AccionIcono"
@@ -53,11 +52,6 @@ function contarPorBalde(escalas) {
     else contadores.PROGRAMADA++
   }
   return contadores
-}
-
-function textoTripulacion(tripulacion) {
-  if (!tripulacion || tripulacion.length === 0) return "—"
-  return tripulacion.map((t) => `${t.persona.grado} ${t.persona.apellido}`).join(", ")
 }
 
 function textoRuta(itinerarios) {
@@ -167,36 +161,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
 
   function descargarPDF() {
-    const doc = new jsPDF({ orientation: "landscape" })
-    doc.setFontSize(14)
-    doc.text("Gestión de Escalas — Sistema GTAP", 14, 15)
-    doc.setFontSize(9)
-    doc.setTextColor(120)
-    doc.text(`Generado: ${new Date().toLocaleString("es-PY")}`, 14, 21)
-
-    // El PDF sigue completo (para el reporte impreso), aunque la tabla
-    // en pantalla se recortó a lo esencial — acá sí interesa tener
-    // Tripulación y Tipo de misión visibles sin tener que abrir nada.
-    autoTable(doc, {
-      startY: 26,
-      head: [["Solicitante", "Fecha del vuelo", "Aeronave", "Ruta", "Salida", "N. Orden", "Tripulación", "Tipo de misión", "Estado"]],
-      body: filtradas.map((e) => [
-        e.solicitante || "—",
-        formatearFechaSoloDia(e.fecha),
-        e.aeronave?.matricula || "—",
-        textoRuta(e.itinerarios),
-        formatearFechaHoraCompacta(e.hora_despegue_estimada),
-        e.nro_orden || "—",
-        textoTripulacion(e.tripulacion),
-        e.tipo_mision ? `${e.tipo_mision.codigo} — ${e.tipo_mision.nombre}` : "—",
-        estadoDetallado(e).texto,
-      ]),
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [37, 99, 235] },
-      alternateRowStyles: { fillColor: [249, 250, 251] },
-    })
-
-    doc.save(`gestion-escalas-${new Date().toISOString().slice(0, 10)}.pdf`)
+    exportarGestionEscalasPDF(filtradas)
   }
 
   return (

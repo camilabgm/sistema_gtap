@@ -7,9 +7,17 @@
 //
 // Regla del proyecto: validaciones simétricas — si se cambia una regla
 // acá, aplica automáticamente a los tres flujos.
+//
+// FIX: normalizarSolicitante() ahora normaliza el texto a mayúsculas
+// (mismo criterio que ya usa Memo 40 y el resto de instituciones del
+// sistema: ANDE, OCD, PRESIDENCIA), en vez de solo recortar espacios.
+// Esto corrige el dato desde el ORIGEN — antes solo se corregía al
+// leer, en el informe de Totales. Aplica automáticamente a los 3
+// flujos que llaman a esta función: crear, completar borrador, editar.
 
 import prisma from "@/lib/prisma"
 import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
+import { normalizarNombreInstitucion } from "@/lib/texto"
 
 const ROLES_EN_VUELO = ["PILOTO", "COPILOTO", "TECNICO_DE_VUELO"]
 
@@ -92,9 +100,12 @@ export function normalizarSubtipoElegido(valor) {
   return { tocado: true, valor: recortado === "" ? null : recortado }
 }
 
+// Solicitante — normaliza a mayúsculas y espacios simples (ver
+// normalizarNombreInstitucion en lib/texto.js), no solo recorta.
+// "ande", "Ande " y "ANDE" terminan guardando el mismo valor: "ANDE".
 export function normalizarSolicitante(valor) {
   if (valor === undefined) return { tocado: false, valor: undefined, error: null }
-  const recortado = typeof valor === "string" ? valor.trim() : ""
+  const recortado = typeof valor === "string" ? normalizarNombreInstitucion(valor) : ""
   if (!recortado) return { tocado: true, valor: null, error: "El solicitante no puede quedar vacío" }
   return { tocado: true, valor: recortado, error: null }
 }

@@ -3,10 +3,10 @@
 // Mismo criterio visual que exportarInformeVuelosPDF.js — banda de
 // color en encabezados, filas cebra, numeración de página. Exporta
 // exactamente lo que está en pantalla: la pestaña activa (Por
-// tripulante / Por aeronave / Combustible por tipo de misión) con el
-// filtro específico que esté aplicado en ese momento — no las 3
-// pestañas juntas — así el PDF siempre coincide con lo que la persona
-// está mirando cuando aprieta el botón.
+// tripulante / Por aeronave / Por tipo de misión / Por institución
+// solicitante) con el filtro específico que esté aplicado en ese
+// momento — no las 4 pestañas juntas — así el PDF siempre coincide
+// con lo que la persona está mirando cuando aprieta el botón.
 
 import { jsPDF } from "jspdf"
 
@@ -14,6 +14,7 @@ const TITULOS = {
   por_tripulante: "INFORME DE TOTALES — POR TRIPULANTE",
   por_aeronave: "INFORME DE TOTALES — POR AERONAVE",
   por_tipo_mision: "INFORME DE TOTALES — COMBUSTIBLE POR TIPO DE MISIÓN",
+  por_solicitante: "INFORME DE TOTALES — POR INSTITUCIÓN SOLICITANTE",
 }
 
 const COLUMNAS_POR_PESTANA = {
@@ -31,6 +32,14 @@ const COLUMNAS_POR_PESTANA = {
     { titulo: "Tipo de misión", ancho: 110, campo: "nombre" },
     { titulo: "Vuelos", ancho: 30, campo: "vuelos", alinear: "right" },
     { titulo: "Combustible", ancho: 40, campo: "litros", alinear: "right", sufijo: " L" },
+  ],
+  // NUEVO: mismas 3 columnas que Tripulante/Aeronave (vuelos + horas
+  // de vuelo, no combustible) — misma naturaleza de dato, distinta
+  // dimensión de agrupación.
+  por_solicitante: [
+    { titulo: "Institución solicitante", ancho: 110, campo: "nombre" },
+    { titulo: "Vuelos", ancho: 30, campo: "vuelos", alinear: "right" },
+    { titulo: "Horas de vuelo", ancho: 40, campo: "horas_texto", alinear: "right" },
   ],
 }
 
