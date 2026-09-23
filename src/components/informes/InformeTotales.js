@@ -3,20 +3,22 @@
 // Destino: src/components/informes/InformeTotales.js
 //
 // Grupo 2 — totales agregados: por tripulante, por aeronave, por tipo
-// de misión (combustible). Mismo filtro de fecha para las 3.
+// de misión (combustible), y por institución solicitante. Mismo
+// filtro de fecha para las 4.
 //
 // Cada pestaña tiene su propio selector "Todos / específico":
 // - Por tripulante: Todos los roles (suma horas de todos los roles que
 //   voló esa persona) o un rol puntual (Piloto/Copiloto/Técnico).
 // - Por aeronave: todas las aeronaves del período, o una puntual.
 // - Combustible: todos los tipos de misión, o uno puntual.
-// Las opciones específicas de aeronave y tipo de misión se arman solas
-// a partir de lo que trajo la búsqueda (no tiene sentido ofrecer una
-// aeronave que no voló nada en el período).
+// - Por institución solicitante: todas, o una puntual.
+// Las opciones específicas de aeronave, tipo de misión e institución
+// se arman solas a partir de lo que trajo la búsqueda (no tiene
+// sentido ofrecer una opción que no voló nada en el período).
 //
-// CAMBIO: se agrega exportar a PDF — mismo criterio que Vuelos, manda
-// exactamente lo que está en pantalla (pestaña activa + su filtro
-// específico), no las 3 pestañas juntas.
+// CAMBIO: se agrega la 4ta pestaña, "Por institución solicitante" —
+// mismas 3 columnas que Tripulante/Aeronave (vuelos + horas de vuelo,
+// no combustible como Tipo de Misión).
 
 import { useState, useEffect, useCallback } from "react"
 import { Download } from "lucide-react"
@@ -42,6 +44,7 @@ const PESTANAS = [
   { key: "por_tripulante", label: "Por tripulante" },
   { key: "por_aeronave", label: "Por aeronave" },
   { key: "por_tipo_mision", label: "Combustible por tipo de misión" },
+  { key: "por_solicitante", label: "Por institución solicitante" },
 ]
 
 const ROLES_TRIPULANTE = [
@@ -72,6 +75,7 @@ export default function InformeTotales() {
   const [filtroTripulante, setFiltroTripulante] = useState("TODOS")
   const [filtroAeronave, setFiltroAeronave] = useState("TODOS")
   const [filtroTipoMision, setFiltroTipoMision] = useState("TODOS")
+  const [filtroSolicitante, setFiltroSolicitante] = useState("TODOS")
   const [datos, setDatos] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
@@ -89,6 +93,7 @@ export default function InformeTotales() {
         // este nuevo período.
         setFiltroAeronave("TODOS")
         setFiltroTipoMision("TODOS")
+        setFiltroSolicitante("TODOS")
       } else {
         setError(data.error || "Error al cargar")
       }
@@ -104,9 +109,11 @@ export default function InformeTotales() {
   const porTripulanteCrudo = datos?.por_tripulante || []
   const porAeronaveCrudo = datos?.por_aeronave || []
   const porTipoMisionCrudo = datos?.por_tipo_mision || []
+  const porSolicitanteCrudo = datos?.por_solicitante || []
 
   const opcionesAeronave = porAeronaveCrudo.map((f) => f.matricula)
   const opcionesTipoMision = porTipoMisionCrudo.map((f) => f.nombre)
+  const opcionesSolicitante = porSolicitanteCrudo.map((f) => f.nombre)
 
   let filas = []
   if (pestana === "por_tripulante") {
@@ -117,10 +124,14 @@ export default function InformeTotales() {
     filas = filtroAeronave === "TODOS"
       ? porAeronaveCrudo
       : porAeronaveCrudo.filter((f) => f.matricula === filtroAeronave)
-  } else {
+  } else if (pestana === "por_tipo_mision") {
     filas = filtroTipoMision === "TODOS"
       ? porTipoMisionCrudo
       : porTipoMisionCrudo.filter((f) => f.nombre === filtroTipoMision)
+  } else {
+    filas = filtroSolicitante === "TODOS"
+      ? porSolicitanteCrudo
+      : porSolicitanteCrudo.filter((f) => f.nombre === filtroSolicitante)
   }
 
   function handleExportarPDF() {
@@ -131,6 +142,8 @@ export default function InformeTotales() {
       filtroTexto = `Aeronave: ${filtroAeronave}`
     } else if (pestana === "por_tipo_mision" && filtroTipoMision !== "TODOS") {
       filtroTexto = `Tipo de misión: ${filtroTipoMision}`
+    } else if (pestana === "por_solicitante" && filtroSolicitante !== "TODOS") {
+      filtroTexto = `Institución: ${filtroSolicitante}`
     }
     exportarInformeTotalesPDF(filas, { pestana, desde, hasta, filtroTexto })
   }
@@ -139,7 +152,7 @@ export default function InformeTotales() {
     <div>
       <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
         <div className="flex items-start justify-between mb-1">
-          <p className="text-sm text-gray-500">Totales agregados por tripulante, aeronave y combustible por tipo de misión</p>
+          <p className="text-sm text-gray-500">Totales agregados por tripulante, aeronave, combustible por tipo de misión e institución solicitante</p>
           <button
             onClick={handleExportarPDF}
             disabled={filas.length === 0}
@@ -210,6 +223,17 @@ export default function InformeTotales() {
             </select>
           </div>
         )}
+
+        {pestana === "por_solicitante" && (
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Institución solicitante</label>
+            <select value={filtroSolicitante} onChange={(e) => setFiltroSolicitante(e.target.value)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+              <option value="TODOS">Todas</option>
+              {opcionesSolicitante.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {error ? (
@@ -228,7 +252,13 @@ export default function InformeTotales() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {pestana === "por_tripulante" ? "Tripulante" : pestana === "por_aeronave" ? "Aeronave" : "Tipo de misión"}
+                  {pestana === "por_tripulante"
+                    ? "Tripulante"
+                    : pestana === "por_aeronave"
+                    ? "Aeronave"
+                    : pestana === "por_tipo_mision"
+                    ? "Tipo de misión"
+                    : "Institución solicitante"}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Vuelos</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
