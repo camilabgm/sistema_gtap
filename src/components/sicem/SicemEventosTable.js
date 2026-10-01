@@ -1,5 +1,18 @@
 "use client"
 
+// CAMBIO: tabla→tarjetas en mobile (8 columnas), mismo patrón que
+// HistorialEscalas/PersonasTable — acciones extraídas a un componente
+// compartido.
+//
+// FIX: la tabla de escritorio pasa a table-fixed con colgroup de
+// anchos explícitos — mismo problema y misma solución que en
+// PersonasTable. Con layout automático, la columna "Observación"
+// (con su propio truncate) más las otras 7 empujaban el ancho total
+// más allá del contenedor disponible cuando el sidebar estaba
+// expandido, recortando la columna de Acciones sin aviso — con el
+// sidebar colapsado (más espacio libre) sí entraba. Con anchos fijos,
+// cada columna tiene su espacio garantizado y Acciones nunca se pierde.
+
 import { useState } from "react"
 import { Plus, CheckCircle2, Pencil, Trash2, Eye } from "lucide-react"
 import SicemEventosForm from "./SicemEventosForm"
@@ -31,7 +44,7 @@ function badgeTipo(tipo) {
     CALENDARIO: "bg-purple-100 text-purple-700",
   }
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${colores[tipo] || "bg-gray-100 text-gray-500"}`}>
+    <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${colores[tipo] || "bg-gray-100 text-gray-500"}`}>
       {ETIQUETAS_TIPO[tipo] || tipo}
     </span>
   )
@@ -39,8 +52,8 @@ function badgeTipo(tipo) {
 
 function badgeEstado(cerrado) {
   return cerrado
-    ? <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">✓ Cerrado</span>
-    : <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">● Abierto</span>
+    ? <span className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-green-100 text-green-700">✓ Cerrado</span>
+    : <span className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-amber-100 text-amber-700">● Abierto</span>
 }
 
 export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, componentes, permisos }) {
@@ -107,6 +120,37 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
     setEliminandoId(null)
   }
 
+  // Acciones — extraídas para no repetir la lógica de permisos entre
+  // la fila de tabla (desktop) y la tarjeta (mobile). flex-wrap por
+  // si alguien tiene los 4 íconos completos en una columna angosta.
+  function AccionesEvento({ ev }) {
+    return (
+      <div className="flex flex-wrap justify-end items-center gap-0.5">
+        <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setEventoVer(ev)} />
+        {permisos?.puede_editar && (
+          <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(ev)} color="primario" />
+        )}
+        {!ev.cerrado && permisos?.puede_editar && (
+          <AccionIcono
+            icono={CheckCircle2}
+            etiqueta="Cerrar evento"
+            onClick={() => handleCerrarEvento(ev)}
+            disabled={cerrandoId === ev.id}
+          />
+        )}
+        {permisos?.puede_eliminar && (
+          <AccionIcono
+            icono={Trash2}
+            etiqueta="Eliminar"
+            onClick={() => handleEliminarEvento(ev)}
+            disabled={eliminandoId === ev.id}
+            color="peligro"
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="p-4">
 
@@ -144,18 +188,30 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+      {/* ── Desktop: tabla, visible desde 768px — table-fixed con
+          anchos explícitos, mismo patrón que PersonasTable ── */}
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+        <table className="w-full table-fixed divide-y divide-gray-200">
+          <colgroup>
+            <col className="w-[10%]" />
+            <col className="w-[11%]" />
+            <col className="w-[10%]" />
+            <col className="w-[9%]" />
+            <col className="w-[24%]" />
+            <col className="w-[12%]" />
+            <col className="w-[10%]" />
+            <col className="w-[14%]" />
+          </colgroup>
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aeronave</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Componente</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lugar</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observación</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Abierto el</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aeronave</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Componente</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lugar</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observación</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Abierto el</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -166,57 +222,70 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
             ) : (
               eventosFiltrados.map((ev) => (
                 <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{ev.aeronave.matricula}</td>
-                  <td className="px-6 py-4 text-sm">{badgeTipo(ev.tipo)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">
+                  <td className="px-4 py-4 text-sm font-medium text-gray-900">{ev.aeronave.matricula}</td>
+                  <td className="px-4 py-4 text-sm">{badgeTipo(ev.tipo)}</td>
+                  <td className="px-4 py-4 text-sm text-gray-700">
                     {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "—"}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{ev.lugar ? ETIQUETAS_LUGAR[ev.lugar] : "—"}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">
-                    <span className="block max-w-xs truncate" title={ev.observacion || ""}>
+                  <td className="px-4 py-4 text-sm text-gray-700">{ev.lugar ? ETIQUETAS_LUGAR[ev.lugar] : "—"}</td>
+                  <td className="px-4 py-4 text-sm text-gray-700">
+                    <span className="block truncate" title={ev.observacion || ""}>
                       {ev.observacion || "—"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{formatearFechaHoraCompacta(ev.created_at)}</td>
-                  <td className="px-6 py-4 text-sm">{badgeEstado(ev.cerrado)}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <div className="flex justify-end items-center gap-0.5">
-                      <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setEventoVer(ev)} />
-                      {permisos?.puede_editar && (
-                        <AccionIcono
-                          icono={Pencil}
-                          etiqueta="Editar"
-                          onClick={() => handleEditar(ev)}
-                          color="primario"
-                        />
-                      )}
-                      {!ev.cerrado && permisos?.puede_editar && (
-                        <AccionIcono
-                          icono={CheckCircle2}
-                          etiqueta="Cerrar evento"
-                          onClick={() => handleCerrarEvento(ev)}
-                          disabled={cerrandoId === ev.id}
-                        />
-                      )}
-                      {permisos?.puede_eliminar && (
-                        <AccionIcono
-                          icono={Trash2}
-                          etiqueta="Eliminar"
-                          onClick={() => handleEliminarEvento(ev)}
-                          disabled={eliminandoId === ev.id}
-                          color="peligro"
-                        />
-                      )}
-                    </div>
+                  <td className="px-4 py-4 text-sm text-gray-700">{formatearFechaHoraCompacta(ev.created_at)}</td>
+                  <td className="px-4 py-4 text-sm">{badgeEstado(ev.cerrado)}</td>
+                  <td className="px-4 py-4 text-sm">
+                    <AccionesEvento ev={ev} />
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
           <p className="text-xs text-gray-500">{eventosFiltrados.length} de {eventos.length} eventos</p>
         </div>
+      </div>
+
+      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
+      <div className="md:hidden space-y-2">
+        {eventosFiltrados.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
+            No se encontraron eventos
+          </div>
+        ) : (
+          eventosFiltrados.map((ev) => (
+            <div key={ev.id} className="bg-white rounded-lg border border-gray-200 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{ev.aeronave.matricula}</p>
+                  <p className="text-xs text-gray-500">
+                    {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "Sin componente"}
+                    {ev.lugar ? ` · ${ETIQUETAS_LUGAR[ev.lugar]}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {badgeTipo(ev.tipo)}
+                  {badgeEstado(ev.cerrado)}
+                </div>
+              </div>
+
+              {ev.observacion && (
+                <p className="mt-2 text-xs text-gray-600 line-clamp-2">{ev.observacion}</p>
+              )}
+
+              <p className="mt-2 text-xs text-gray-400">
+                Abierto el {formatearFechaHoraCompacta(ev.created_at)}
+              </p>
+
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <AccionesEvento ev={ev} />
+              </div>
+            </div>
+          ))
+        )}
+        <p className="text-xs text-gray-500 text-center py-2">{eventosFiltrados.length} de {eventos.length} eventos</p>
       </div>
 
       {modalAbierto && (

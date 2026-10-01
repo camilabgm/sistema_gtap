@@ -1,13 +1,10 @@
 "use client"
 
-// Pantalla principal de Post-Vuelo: lista de escalas a la izquierda +
-// panel de detalle a la derecha, mismo patrón que ManifiestoScreen.js.
-// A diferencia de Manifiesto, no hace falta un fetch de "detalle"
-// aparte — PanelPostVuelo ya se encarga de traer el post-vuelo de la
-// escala seleccionada por su cuenta.
-
 import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
+import { useVistaMobileMaestroDetalle } from "@/hooks/useVistaMobileMaestroDetalle"
+import BotonVolver from "@/components/shared/BotonVolver"
+import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
 import ListaEscalasPostVuelo from "./ListaEscalasPostVuelo"
 import PanelPostVuelo from "./PanelPostVuelo"
 
@@ -24,6 +21,9 @@ export default function PostVueloScreen() {
   const [busqueda, setBusqueda] = useState("")
   const [escalaSeleccionadaId, setEscalaSeleccionadaId] = useState(idDesdeUrl)
 
+  const { esMobile, mostrarLista, mostrarDetalle, abrirDetalle, volverALista } =
+    useVistaMobileMaestroDetalle(!!idDesdeUrl)
+
   const cargarLista = useCallback(async (q) => {
     setCargandoLista(true)
     setErrorLista(null)
@@ -33,14 +33,18 @@ export default function PostVueloScreen() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "No se pudo cargar la lista de escalas")
       setEscalas(data)
-      setEscalaSeleccionadaId((actual) => actual ?? (data.length > 0 ? data[0].id : null))
+      setEscalaSeleccionadaId((actual) => {
+        if (actual) return actual
+        if (esMobile === true) return actual
+        return data.length > 0 ? data[0].id : null
+      })
     } catch (err) {
       setErrorLista(err.message)
     } finally {
       setCargandoLista(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [esMobile])
 
   useEffect(() => {
     cargarLista(undefined)
@@ -51,33 +55,54 @@ export default function PostVueloScreen() {
     return () => clearTimeout(timeout)
   }, [busqueda, cargarLista])
 
+  function handleSeleccionar(id) {
+    setEscalaSeleccionadaId(id)
+    abrirDetalle()
+  }
+
   const escalaSeleccionada = escalas.find((e) => e.id === escalaSeleccionadaId) ?? null
 
-  return (
-    <div className="flex h-full gap-4 p-4">
-      <div className="w-full max-w-sm shrink-0">
-        <ListaEscalasPostVuelo
-          escalas={escalas}
-          cargando={cargandoLista}
-          error={errorLista}
-          busqueda={busqueda}
-          onBuscar={setBusqueda}
-          escalaSeleccionadaId={escalaSeleccionadaId}
-          onSeleccionar={setEscalaSeleccionadaId}
-        />
-      </div>
+  if (esMobile === null) return null
 
-      <div className="flex-1 min-w-0">
-        {!escalaSeleccionada ? (
-          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-gray-200 bg-white text-sm text-gray-400">
-            Seleccioná una escala de la lista
+  return (
+    <div className="p-4">
+      {/* Lista: "Volver a Inicio" (fijo al Dashboard) — no hay una
+          pantalla "anterior" con sentido acá, solo un lugar claro
+          adonde volver. */}
+      {esMobile === true && mostrarLista && <BotonVolverInicio />}
+
+      <div className="flex h-full gap-4">
+        {mostrarLista && (
+          <div className={esMobile ? "w-full" : "w-full max-w-sm shrink-0"}>
+            <ListaEscalasPostVuelo
+              escalas={escalas}
+              cargando={cargandoLista}
+              error={errorLista}
+              busqueda={busqueda}
+              onBuscar={setBusqueda}
+              escalaSeleccionadaId={escalaSeleccionadaId}
+              onSeleccionar={handleSeleccionar}
+            />
           </div>
-        ) : (
-          <PanelPostVuelo
-            key={escalaSeleccionada.id}
-            escala={escalaSeleccionada}
-            onActualizada={() => cargarLista(busqueda)}
-          />
+        )}
+
+        {mostrarDetalle && (
+          <div className="flex-1 min-w-0">
+            {/* Detalle: "Volver a la lista" — se queda DENTRO del
+                módulo, toggle interno, no navega a otra URL. */}
+            {esMobile && <BotonVolver etiqueta="Volver a la lista" onClick={volverALista} />}
+            {!escalaSeleccionada ? (
+              <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-gray-200 bg-white text-sm text-gray-400">
+                Seleccioná una escala de la lista
+              </div>
+            ) : (
+              <PanelPostVuelo
+                key={escalaSeleccionada.id}
+                escala={escalaSeleccionada}
+                onActualizada={() => cargarLista(busqueda)}
+              />
+            )}
+          </div>
         )}
       </div>
     </div>

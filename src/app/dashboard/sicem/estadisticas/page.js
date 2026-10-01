@@ -1,13 +1,10 @@
 // Destino: src/app/dashboard/sicem/estadisticas/page.js
-//
-// Cuarta sección de SICEM, hermana de Componentes/Eventos/Alertas.
-// Solo lectura — junta datos que ya existen en EventoMantenimiento,
-// no necesitó ningún modelo nuevo.
 
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import SicemEstadisticasPanel from "@/components/sicem/SicemEstadisticasPanel"
+import SubNavSicem from "@/components/sicem/SubNavSicem"
 import { tienePermiso } from "@/lib/permisos"
 import SinPermisos from "@/components/shared/SinPermisos"
 
@@ -32,5 +29,13 @@ export default async function EstadisticasSicemPage() {
     orderBy: { created_at: "desc" },
   })
 
-  return <SicemEstadisticasPanel eventos={eventos} />
+  return (
+    <>
+      <SubNavSicem
+        permisos={session.user.permisos}
+        esCargoDeCascada={session.user.esCargoDeCascada}
+      />
+      <SicemEstadisticasPanel eventos={eventos} />
+    </>
+  )
 }

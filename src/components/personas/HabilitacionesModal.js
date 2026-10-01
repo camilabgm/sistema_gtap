@@ -165,7 +165,7 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
                   {errorSemestral && (
                     <p className="text-xs text-red-600 mb-3">{errorSemestral}</p>
                   )}
-                  <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div className="grid grid-cols-1 gap-3 mb-3 md:grid-cols-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
                         Período <span className="text-red-500">*</span>
@@ -223,8 +223,8 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
                   {habilitaciones.map((h) => {
                     const badge = badgeVencimiento(h.vence)
                     return (
-                      <div key={h.id} className="flex items-center justify-between py-2.5">
-                        <div className="flex items-center gap-3">
+                      <div key={h.id} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-3">
                           <span className="font-mono text-sm font-medium text-gray-900">
                             {h.periodo}/{h.anio}
                           </span>

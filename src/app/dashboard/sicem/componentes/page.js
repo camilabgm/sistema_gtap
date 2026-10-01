@@ -1,13 +1,10 @@
 // Destino: src/app/dashboard/sicem/componentes/page.js
-//
-// CORRECCIÓN: se agrega el guard tienePermiso() + <SinPermisos /> que
-// faltaba en la versión anterior — lo inferí sin tener PersonasPage
-// delante, y PersonasPage sí lo tiene. Ahora calca el patrón real.
 
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import SicemComponentesTable from "@/components/sicem/SicemComponentesTable"
+import SubNavSicem from "@/components/sicem/SubNavSicem"
 import { tienePermiso } from "@/lib/permisos"
 import SinPermisos from "@/components/shared/SinPermisos"
 import { calcularHorasDisponibles, necesitaAlerta } from "@/lib/sicem"
@@ -48,10 +45,16 @@ export default async function ComponentesSicemPage() {
   const permisos = session?.user?.permisos?.SICEM
 
   return (
-    <SicemComponentesTable
-      componentes={componentesConCalculo}
-      aeronaves={aeronaves}
-      permisos={permisos}
-    />
+    <>
+      <SubNavSicem
+        permisos={session.user.permisos}
+        esCargoDeCascada={session.user.esCargoDeCascada}
+      />
+      <SicemComponentesTable
+        componentes={componentesConCalculo}
+        aeronaves={aeronaves}
+        permisos={permisos}
+      />
+    </>
   )
 }

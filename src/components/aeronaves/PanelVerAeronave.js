@@ -4,6 +4,9 @@
 // PanelPostVuelo.js (SeparadorSeccion, grid de datos, badges), pero
 // en modal en vez de inline, porque Aeronaves es una tabla+modal, no
 // tiene una página de detalle propia como Escalas.
+//
+// FIX: las 2 grillas (Datos de la aeronave, SICEM) se apilan en
+// mobile, en fila desde 768px.
 
 import SeparadorSeccion from "@/components/shared/SeparadorSeccion"
 
@@ -54,7 +57,7 @@ export default function PanelVerAeronave({ aeronave, onCerrar }) {
 
           <div>
             <SeparadorSeccion texto="Datos de la aeronave" />
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 gap-3 pt-2 md:grid-cols-2">
               <div>
                 <div className="text-xs uppercase text-gray-400">Matrícula</div>
                 <div className="text-sm font-medium text-gray-900">{a.matricula}</div>
@@ -100,7 +103,7 @@ export default function PanelVerAeronave({ aeronave, onCerrar }) {
 
           <div>
             <SeparadorSeccion texto="SICEM — se edita solo desde ese módulo" />
-            <div className="grid grid-cols-3 gap-3 pt-2">
+            <div className="grid grid-cols-1 gap-3 pt-2 md:grid-cols-3">
               <div>
                 <div className="text-xs uppercase text-gray-400">Horas totales de vuelo</div>
                 <div className="text-sm font-medium text-gray-900">{formatearMinutos(a.horas_vuelo_totales_minutos)}</div>
@@ -117,7 +120,7 @@ export default function PanelVerAeronave({ aeronave, onCerrar }) {
                   </div>
                 </>
               ) : (
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                   <div className="text-xs uppercase text-gray-400">Ciclos / Aterrizajes</div>
                   <div className="text-sm text-gray-400">Esta aeronave no los trackea</div>
                 </div>

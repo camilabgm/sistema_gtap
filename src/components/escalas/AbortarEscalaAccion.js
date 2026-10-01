@@ -96,7 +96,7 @@ export default function AbortarEscalaAccion({ escala, onAbortada }) {
         createPortal(
           <div
             style={{ position: "fixed", top: posicion.top, right: posicion.right }}
-            className="z-50 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+            className="z-50 w-72 max-w-[90vw] rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
           >
             <p className="mb-2 text-xs font-semibold text-gray-700">
               Abortar escala {escala.nro_orden ? `#${escala.nro_orden}` : `#${escala.id}`}

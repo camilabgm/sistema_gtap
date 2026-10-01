@@ -1,11 +1,15 @@
 "use client"
 // src/components/tipos-misiones/TiposMisionesTable.js
+//
+// CAMBIO: tabla→tarjetas en mobile, mismo patrón que AeronavesTable y
+// HistorialEscalas. BotonVolverInicio arriba, oculto en desktop.
 
 import { useState } from "react"
 import { Plus, Search, Eye, Pencil, Trash2 } from "lucide-react"
 import TiposMisionesForm from "./TiposMisionesForm"
 import PanelVerTipoMision from "./PanelVerTipoMision"
 import AccionIcono from "@/components/shared/AccionIcono"
+import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
 
 const ETIQUETAS_CLASIFICACION = {
   OPERACIONAL: { label: "Operacional", color: "bg-blue-100 text-blue-700" },
@@ -66,8 +70,31 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
     setEliminando(null)
   }
 
+  function AccionesTipo({ tipo }) {
+    return (
+      <div className="flex justify-end items-center gap-0.5">
+        <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setTipoVer(tipo)} />
+        {permisos?.puede_editar && (
+          <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(tipo)} color="primario" />
+        )}
+        {permisos?.puede_eliminar && (
+          <AccionIcono
+            icono={Trash2}
+            etiqueta="Desactivar"
+            onClick={() => handleEliminar(tipo.id)}
+            disabled={eliminando === tipo.id}
+            color="peligro"
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="p-4">
+      <div className="md:hidden mb-2">
+        <BotonVolverInicio />
+      </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
         <div className="flex items-start justify-between mb-4">
@@ -111,7 +138,8 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
         </select>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* ── Desktop: tabla, visible desde 768px ── */}
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -157,21 +185,7 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
                       }
                     </td>
                     <td className="px-6 py-4 text-sm">
-                      <div className="flex justify-end items-center gap-0.5">
-                        <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setTipoVer(tipo)} />
-                        {permisos?.puede_editar && (
-                          <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(tipo)} color="primario" />
-                        )}
-                        {permisos?.puede_eliminar && (
-                          <AccionIcono
-                            icono={Trash2}
-                            etiqueta="Desactivar"
-                            onClick={() => handleEliminar(tipo.id)}
-                            disabled={eliminando === tipo.id}
-                            color="peligro"
-                          />
-                        )}
-                      </div>
+                      <AccionesTipo tipo={tipo} />
                     </td>
                   </tr>
                 )
@@ -185,6 +199,46 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
             {tiposFiltrados.length} de {tiposMisiones.length} tipos
           </p>
         </div>
+      </div>
+
+      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
+      <div className="md:hidden space-y-2">
+        {tiposFiltrados.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
+            No se encontraron tipos de misión
+          </div>
+        ) : (
+          tiposFiltrados.map((tipo) => {
+            const clasi = ETIQUETAS_CLASIFICACION[tipo.clasificacion] || { label: tipo.clasificacion, color: "bg-gray-100 text-gray-600" }
+            return (
+              <div key={tipo.id} className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-mono font-semibold text-gray-900 text-sm">{tipo.codigo}</span>
+                    <p className="text-sm font-medium text-gray-900">{tipo.nombre}</p>
+                    {tipo.descripcion && (
+                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{tipo.descripcion}</p>
+                    )}
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${clasi.color}`}>
+                    {clasi.label}
+                  </span>
+                </div>
+
+                {tipo.tiene_subtipo && (
+                  <p className="mt-1 text-xs text-purple-600">Sub-tipo: {tipo.subtipo || "Sí"}</p>
+                )}
+
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <AccionesTipo tipo={tipo} />
+                </div>
+              </div>
+            )
+          })
+        )}
+        <p className="text-xs text-gray-500 text-center py-2">
+          {tiposFiltrados.length} de {tiposMisiones.length} tipos
+        </p>
       </div>
 
       {modalAbierto && (

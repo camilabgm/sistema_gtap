@@ -80,7 +80,7 @@ export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado, perm
         <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-md text-xs">{error}</div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-3">
+      <div className="grid grid-cols-1 gap-4 mb-3 md:grid-cols-3">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Horas totales de vuelo</label>
           <div className="flex gap-2">

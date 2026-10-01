@@ -1,9 +1,17 @@
 "use client"
 // src/components/parte-diario/ParteDiarioPage.js
+//
+// CAMBIO: BotonVolverInicio arriba (oculto en desktop) — Parte Diario
+// es un módulo de una sola pantalla, sin sub-menú, así que en mobile
+// no tenía ningún camino de vuelta al Dashboard. Las filas de
+// novedades/personal pasan de una sola línea forzada a apiladas en
+// pantallas muy angostas, mismo criterio que ya usamos en
+// PendientesAutorizar.
 
 import { useState } from "react"
 import { Plus, Pencil, Trash2, Search } from "lucide-react"
 import AccionIcono from "@/components/shared/AccionIcono"
+import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
 import { normalizarParaBusqueda as normalizarTexto } from "@/lib/texto"
 
 const ETIQUETAS_ESCUADRON = {
@@ -126,6 +134,9 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
+      <div className="md:hidden mb-2">
+        <BotonVolverInicio />
+      </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
         <div className="flex items-start justify-between mb-4">
@@ -173,7 +184,7 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
             {novedades.map((nov) => (
-              <div key={nov.id} className="flex items-center justify-between px-5 py-3">
+              <div key={nov.id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-900">
                     {nov.persona.grado} {nov.persona.apellido}, {nov.persona.nombre}
@@ -219,7 +230,7 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
             <p className="px-5 py-4 text-sm text-gray-400">Sin personal disponible.</p>
           ) : (
             personasDisponibles.map((p) => (
-              <div key={p.id} className="flex items-center justify-between px-5 py-3">
+              <div key={p.id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-900">
                     {p.grado} {p.apellido}, {p.nombre}
@@ -228,7 +239,7 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
                     {ETIQUETAS_ESCUADRON[p.escuadron] || p.escuadron}
                   </p>
                 </div>
-                <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">
+                <span className="self-start px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium sm:self-auto">
                   Disponible
                 </span>
               </div>

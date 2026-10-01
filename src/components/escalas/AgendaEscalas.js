@@ -12,6 +12,21 @@
 // necesita que el componente esté envuelto en <Suspense> más arriba
 // en el árbol. Si el build tira el warning de "should be wrapped in a
 // suspense boundary", envolver <AgendaEscalas /> en el page.js padre.
+//
+// CAMBIO: la pestaña "Aeronaves" (Gantt de 24 horas) se oculta en
+// mobile — esa visualización necesita ancho horizontal real, y la
+// vista "Lista" ya cubre bien la misma necesidad en pantalla angosta.
+//
+// FIX (2 rondas): los botones "Semana anterior"/"Semana siguiente" ya
+// no llevan texto en mobile (solo la flecha). Y la fila de cada vuelo
+// del día ahora tiene DOS layouts separados — uno para mobile
+// (apilado: hora+estado arriba, aeronave/ruta debajo, tripulación al
+// final) y uno para desktop (el original, en una sola línea). Antes
+// era un único flex con min-w-[92px] fijo + un badge shrink-0
+// whitespace-nowrap que no podían convivir en una pantalla angosta:
+// la suma de anchos mínimos obligatorios no entraba, y aunque no se
+// veía roto a simple vista, empujaba la página entera a un scroll
+// horizontal de unos pocos píxeles.
 
 import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
@@ -19,6 +34,7 @@ import Link from "next/link"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import GanttAeronavesDia from "./GanttAeronavesDia"
 import PanelDetalleEscala from "./PanelDetalleEscala"
+import { useDeviceType } from "@/hooks/useDeviceType"
 import {
   formatearFechaHoraCompacta,
   calcularVentanaEnElDia,
@@ -56,6 +72,7 @@ export default function AgendaEscalas({ puedeCrear }) {
   const searchParams = useSearchParams()
   const fechaParam   = searchParams.get("fecha")
   const escalaParam  = searchParams.get("escala")
+  const esMobile = useDeviceType()
 
   const hoy = new Date()
   const hoyISO = formatearISO(hoy)
@@ -110,6 +127,15 @@ export default function AgendaEscalas({ puedeCrear }) {
       setFechaSeleccionada(formatearISO(lunesMostrado))
     }
   }, [offsetSemanas]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Si la vista quedó en "Aeronaves" y la ventana se achica por debajo
+  // de 768px, se fuerza de vuelta a "Lista" — esa pestaña ya no tiene
+  // botón visible para elegirla, no puede quedar montada.
+  useEffect(() => {
+    if (esMobile === true && vista === "AERONAVES") {
+      setVista("LISTA")
+    }
+  }, [esMobile, vista])
 
   const cargarEscalasSemana = useCallback(async () => {
     setCargando(true)
@@ -193,10 +219,12 @@ export default function AgendaEscalas({ puedeCrear }) {
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => { setModoInicialUrl(false); setOffsetSemanas((o) => o - 1) }}
+            title="Semana anterior"
+            aria-label="Semana anterior"
             className="h-9 flex items-center gap-1 px-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
-            Semana anterior
+            <span className="hidden md:inline">Semana anterior</span>
           </button>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{etiquetaSemana}</span>
@@ -211,9 +239,11 @@ export default function AgendaEscalas({ puedeCrear }) {
           </div>
           <button
             onClick={() => { setModoInicialUrl(false); setOffsetSemanas((o) => o + 1) }}
+            title="Semana siguiente"
+            aria-label="Semana siguiente"
             className="h-9 flex items-center gap-1 px-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            Semana siguiente
+            <span className="hidden md:inline">Semana siguiente</span>
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -267,24 +297,29 @@ export default function AgendaEscalas({ puedeCrear }) {
               month: "long",
             })}
         </h2>
-        <div className="flex bg-gray-100 rounded-md p-0.5">
-          <button
-            onClick={() => setVista("LISTA")}
-            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-              vista === "LISTA" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-            }`}
-          >
-            Lista
-          </button>
-          <button
-            onClick={() => setVista("AERONAVES")}
-            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-              vista === "AERONAVES" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-            }`}
-          >
-            Aeronaves
-          </button>
-        </div>
+        {/* El botón "Aeronaves" solo se muestra en desktop — en mobile
+            esa vista no existe, así que tampoco tiene sentido ofrecer
+            el selector con una sola opción. */}
+        {esMobile !== true && (
+          <div className="flex bg-gray-100 rounded-md p-0.5">
+            <button
+              onClick={() => setVista("LISTA")}
+              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                vista === "LISTA" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+              }`}
+            >
+              Lista
+            </button>
+            <button
+              onClick={() => setVista("AERONAVES")}
+              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                vista === "AERONAVES" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+              }`}
+            >
+              Aeronaves
+            </button>
+          </div>
+        )}
       </div>
 
       {cargando ? (
@@ -321,12 +356,16 @@ export default function AgendaEscalas({ puedeCrear }) {
               const estado = estadoDetallado(e)
               const tooltipEstado = TOOLTIP_ESTADO_DETALLADO[estado.clave]
               const expandida = filaExpandidaId === e.id
+              const claseBadge = `px-2 py-1 text-xs rounded-full font-medium shrink-0 whitespace-nowrap ${
+                ESTADO_DETALLADO_CLASES[estado.clave] || "bg-gray-100 text-gray-600"
+              } ${tooltipEstado ? "cursor-help" : ""}`
 
               return (
                 <div key={e.id}>
+                  {/* ── Desktop: una sola línea, visible desde 768px ── */}
                   <button
                     onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
-                    className="w-full flex items-center gap-4 bg-white border border-gray-200 rounded-lg px-4 py-3 text-left hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                    className="hidden md:flex w-full items-center gap-4 bg-white border border-gray-200 rounded-lg px-4 py-3 text-left hover:bg-gray-50 hover:border-gray-300 transition-colors"
                   >
                     <div className="text-center min-w-[92px]">
                       <p className="text-sm font-bold text-gray-900">
@@ -342,14 +381,30 @@ export default function AgendaEscalas({ puedeCrear }) {
                         {tripulacionTexto} · {e.tipo_mision?.codigo || "Sin tipo de misión"}
                       </p>
                     </div>
-                    <span
-                      title={tooltipEstado}
-                      className={`px-2 py-1 text-xs rounded-full font-medium shrink-0 whitespace-nowrap ${
-                        ESTADO_DETALLADO_CLASES[estado.clave] || "bg-gray-100 text-gray-600"
-                      } ${tooltipEstado ? "cursor-help" : ""}`}
-                    >
+                    <span title={tooltipEstado} className={claseBadge}>
                       {estado.texto}
                     </span>
+                  </button>
+
+                  {/* ── Mobile: apilado, oculto desde 768px ── */}
+                  <button
+                    onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
+                    className="md:hidden w-full bg-white border border-gray-200 rounded-lg px-4 py-3 text-left hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-gray-900">
+                        {formatearFechaHoraCompacta(e.hora_despegue_estimada)}
+                      </p>
+                      <span title={tooltipEstado} className={claseBadge}>
+                        {estado.texto}
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-gray-900 mt-1.5 truncate">
+                      {e.aeronave?.matricula || "Sin aeronave"} · {ruta}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">
+                      {tripulacionTexto} · {e.tipo_mision?.codigo || "Sin tipo de misión"}
+                    </p>
                   </button>
 
                   {expandida && (

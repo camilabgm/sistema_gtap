@@ -1,5 +1,5 @@
 // Formulario inline para agregar o editar un ítem de carga. Mismo
-// patrón que FormularioPasajero.
+// patrón que FormularioPasajero, incluido el "seguir cargando" al crear.
 
 import { useState } from "react"
 import { validarCarga } from "@/lib/manifiesto"
@@ -7,6 +7,7 @@ import { validarCarga } from "@/lib/manifiesto"
 const CAMPOS_VACIOS = { tipo: "", descripcion: "", peso: "" }
 
 export default function FormularioCarga({ escalaId, carga, onCancelar, onGuardado }) {
+  const esCreacion = !carga
   const [datos, setDatos] = useState(
     carga ? { tipo: carga.tipo, descripcion: carga.descripcion ?? "", peso: carga.peso ?? "" } : CAMPOS_VACIOS
   )
@@ -38,7 +39,12 @@ export default function FormularioCarga({ escalaId, carga, onCancelar, onGuardad
         setError(data.error || "No se pudo guardar la carga")
         return
       }
+
       onGuardado()
+
+      if (esCreacion) {
+        setDatos(CAMPOS_VACIOS)
+      }
     } catch {
       setError("Error de conexión al guardar")
     } finally {
@@ -48,7 +54,7 @@ export default function FormularioCarga({ escalaId, carga, onCancelar, onGuardad
 
   return (
     <div className="mb-3 rounded-md border border-gray-200 bg-gray-50 p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
         <input
           placeholder="Tipo (ej. equipaje, correspondencia)"
           value={datos.tipo}

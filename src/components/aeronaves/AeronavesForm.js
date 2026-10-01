@@ -1,12 +1,8 @@
 "use client"
 // src/components/aeronaves/AeronavesForm.js
 //
-// CAMBIO: Estado y Motivo de no disponibilidad salieron de este
-// formulario — ya no le pertenecen. Ahora ese estado lo maneja SICEM
-// (Eventos) casi siempre, y el único caso que le queda a Aeronaves
-// ("Otro") tiene su propia acción chica en la tabla, separada de
-// editar los datos descriptivos de la aeronave. Este formulario ya
-// nunca toca disponibilidad.
+// FIX: la grilla de 10 campos (grid-cols-2 fijo) pasa a apilada en
+// mobile, en fila desde 768px — mismo estándar del resto del sistema.
 
 import { useState, useEffect } from "react"
 
@@ -88,7 +84,7 @@ export default function AeronavesForm({ aeronave, onGuardado, onCerrar }) {
           </div>
         )}
 
-        <div className="px-6 py-4 grid grid-cols-2 gap-4">
+        <div className="px-6 py-4 grid grid-cols-1 gap-4 md:grid-cols-2">
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

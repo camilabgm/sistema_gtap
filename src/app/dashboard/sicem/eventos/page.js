@@ -1,13 +1,10 @@
 // Destino: src/app/dashboard/sicem/eventos/page.js
-//
-// CAMBIO: se resuelven los nombres de quién creó/editó/cerró cada
-// evento — mismo patrón que el GET de post-vuelo (resolverNombresUsuarios),
-// para que el panel de "Ver" pueda mostrar la auditoría completa.
 
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import prisma from "@/lib/prisma"
 import SicemEventosTable from "@/components/sicem/SicemEventosTable"
+import SubNavSicem from "@/components/sicem/SubNavSicem"
 import { tienePermiso } from "@/lib/permisos"
 import SinPermisos from "@/components/shared/SinPermisos"
 import { resolverNombresUsuarios } from "@/lib/auditoria"
@@ -33,9 +30,6 @@ export default async function EventosSicemPage() {
       select: { id: true, matricula: true, estado: true, motivo_no_disponible: true, motivo_otro: true },
       orderBy: { matricula: "asc" },
     }),
-    // Para el selector de "componente afectado" en el formulario —
-    // se filtra por aeronave del lado del cliente, no hace falta un
-    // fetch nuevo cada vez que cambia la aeronave elegida.
     prisma.componenteMantenimiento.findMany({
       where: { deleted_at: null, activo: true },
       select: { id: true, aeronave_id: true, tipo: true },
@@ -59,11 +53,17 @@ export default async function EventosSicemPage() {
   const permisos = session?.user?.permisos?.SICEM
 
   return (
-    <SicemEventosTable
-      eventos={eventosConNombres}
-      aeronaves={aeronaves}
-      componentes={componentes}
-      permisos={permisos}
-    />
+    <>
+      <SubNavSicem
+        permisos={session.user.permisos}
+        esCargoDeCascada={session.user.esCargoDeCascada}
+      />
+      <SicemEventosTable
+        eventos={eventosConNombres}
+        aeronaves={aeronaves}
+        componentes={componentes}
+        permisos={permisos}
+      />
+    </>
   )
 }

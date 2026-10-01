@@ -1,6 +1,14 @@
 "use client"
 
+// CAMBIO: el layout lado a lado (selector de roles + tabla) se apila
+// en mobile — en una pantalla angosta, un selector de w-56 fijo al
+// costado de la tabla no deja espacio útil para nada. BotonVolverInicio
+// agregado arriba, oculto en desktop — esta pantalla se entra desde
+// "Más" → Administración, y no hay ningún ícono de "Inicio" fijo en la
+// barra inferior de mobile.
+
 import { useState } from "react"
+import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
 
 const MODULOS = [
   { key: "PERSONAS",       label: "Personas" },
@@ -93,10 +101,14 @@ export default function PermisosRolTable({ roles }) {
   }
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
+      <div className="md:hidden">
+        <BotonVolverInicio />
+      </div>
 
-      {/* Selector de roles */}
-      <div className="w-56 shrink-0">
+      {/* Selector de roles — ancho completo apilado en mobile, columna
+          fija al costado desde 768px */}
+      <div className="w-full md:w-56 md:shrink-0">
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <p className="text-xs font-semibold uppercase text-gray-400 mb-2 px-1">
             Roles
@@ -121,11 +133,12 @@ export default function PermisosRolTable({ roles }) {
       </div>
 
       {/* Tabla de permisos */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
 
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          {/* Header — flex-wrap para que el botón no se apriete contra
+              un nombre de rol largo en pantallas angostas */}
+          <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="font-semibold text-gray-900">{rolSeleccionado.nombre}</h2>
               <p className="text-xs text-gray-400 mt-0.5">{rolSeleccionado.descripcion}</p>
@@ -150,7 +163,11 @@ export default function PermisosRolTable({ roles }) {
             </div>
           )}
 
-          {/* Tabla */}
+          {/* Tabla — ya tiene su propio overflow-x-auto, así que en
+              mobile scrollea horizontal sin afectar el resto de la
+              pantalla (no necesita el patrón tabla→tarjetas: es
+              puramente checkboxes de lectura rápida, no filas con
+              acciones que haya que mantener siempre visibles). */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

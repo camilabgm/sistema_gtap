@@ -1,5 +1,12 @@
 "use client"
 // src/components/aeronaves/AeronavesTable.js
+//
+// CAMBIO: tabla→tarjetas en mobile, mismo patrón que HistorialEscalas
+// — las acciones se extraen a un componente compartido entre las dos
+// vistas, para no repetir la lógica de permisos. Se agrega
+// BotonVolverInicio arriba, oculto en desktop — Aeronaves es un
+// módulo de una sola pantalla, sin sub-menú, así que en mobile no
+// tenía ningún camino de vuelta al Dashboard.
 
 import { useState } from "react"
 import { Plus, Search, Pencil, Trash2, Eye, Ban, CircleCheck } from "lucide-react"
@@ -7,11 +14,31 @@ import AeronavesForm from "./AeronavesForm"
 import AeronaveDisponibilidadModal from "./AeronaveDisponibilidadModal"
 import PanelVerAeronave from "./PanelVerAeronave"
 import AccionIcono from "@/components/shared/AccionIcono"
+import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
 
 const MOTIVOS = {
   ACCIDENTADA:      "Accidentada",
   EN_MANTENIMIENTO: "En mantenimiento",
   OTRO:             "Otro",
+}
+
+function BadgeEstado({ aeronave }) {
+  if (aeronave.estado === "DISPONIBLE") {
+    return (
+      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 whitespace-nowrap">
+        Disponible
+      </span>
+    )
+  }
+  const motivo = aeronave.motivo_no_disponible
+  const texto  = motivo === "OTRO"
+    ? (aeronave.motivo_otro || "No disponible")
+    : (MOTIVOS[motivo] || "No disponible")
+  return (
+    <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap">
+      {texto}
+    </span>
+  )
 }
 
 export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) {
@@ -84,31 +111,10 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
     await recargarDatos()
   }
 
-  function renderEstado(aeronave) {
-    if (aeronave.estado === "DISPONIBLE") {
-      return (
-        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-          Disponible
-        </span>
-      )
-    }
-
-    const motivo = aeronave.motivo_no_disponible
-    const texto  = motivo === "OTRO"
-      ? (aeronave.motivo_otro || "No disponible")
-      : (MOTIVOS[motivo] || "No disponible")
-
-    return (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-        {texto}
-      </span>
-    )
-  }
-
   // Acción de disponibilidad — contextual según el estado actual.
   // Bloqueada del todo si SICEM tiene un Evento abierto: ahí la
   // disponibilidad se gestiona desde ese módulo, no desde acá.
-  function renderAccionDisponibilidad(aeronave) {
+  function accionDisponibilidad(aeronave) {
     if (aeronave.tiene_evento_abierto) {
       return (
         <AccionIcono
@@ -128,9 +134,6 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
         />
       )
     }
-    // No disponible sin evento abierto — puede ser "Otro" o un motivo
-    // de SICEM que ya se resolvió y quedó desactualizado; cualquiera
-    // de los dos casos se soluciona igual, devolviéndola a Disponible.
     return (
       <AccionIcono
         icono={CircleCheck}
@@ -142,8 +145,34 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
     )
   }
 
+  // Acciones — extraídas para no repetir la lógica de permisos entre
+  // la fila de tabla (desktop) y la tarjeta (mobile).
+  function AccionesAeronave({ aeronave }) {
+    return (
+      <div className="flex items-center justify-end gap-0.5">
+        <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setAeronaveVer(aeronave)} />
+        {permisos?.puede_editar && (
+          <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(aeronave)} color="primario" />
+        )}
+        {permisos?.puede_editar && accionDisponibilidad(aeronave)}
+        {permisos?.puede_eliminar && (
+          <AccionIcono
+            icono={Trash2}
+            etiqueta="Desactivar"
+            onClick={() => handleEliminar(aeronave.id)}
+            disabled={eliminando === aeronave.id}
+            color="peligro"
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="p-4">
+      <div className="md:hidden mb-2">
+        <BotonVolverInicio />
+      </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
         <div className="flex items-start justify-between mb-4">
@@ -195,7 +224,8 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* ── Desktop: tabla, visible desde 768px ── */}
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -233,28 +263,13 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    {renderEstado(aeronave)}
+                    <BadgeEstado aeronave={aeronave} />
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {aeronave.capacidad_pasajeros}
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    <div className="flex justify-end items-center gap-0.5">
-                      <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setAeronaveVer(aeronave)} />
-                      {permisos?.puede_editar && (
-                        <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(aeronave)} color="primario" />
-                      )}
-                      {permisos?.puede_editar && renderAccionDisponibilidad(aeronave)}
-                      {permisos?.puede_eliminar && (
-                        <AccionIcono
-                          icono={Trash2}
-                          etiqueta="Desactivar"
-                          onClick={() => handleEliminar(aeronave.id)}
-                          disabled={eliminando === aeronave.id}
-                          color="peligro"
-                        />
-                      )}
-                    </div>
+                    <AccionesAeronave aeronave={aeronave} />
                   </td>
                 </tr>
               ))
@@ -267,6 +282,45 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
             {aeronavesFiltradas.length} de {aeronaves.length} aeronaves
           </p>
         </div>
+      </div>
+
+      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
+      <div className="md:hidden space-y-2">
+        {aeronavesFiltradas.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
+            No se encontraron aeronaves
+          </div>
+        ) : (
+          aeronavesFiltradas.map((aeronave) => (
+            <div key={aeronave.id} className="bg-white rounded-lg border border-gray-200 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{aeronave.matricula}</p>
+                  <p className="text-xs text-gray-500">{aeronave.tipo} · {aeronave.fabricante}</p>
+                </div>
+                <BadgeEstado aeronave={aeronave} />
+              </div>
+
+              <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                <span className={`px-2 py-0.5 rounded-full font-medium ${
+                  aeronave.categoria === "PROPIA"
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-purple-100 text-purple-700"
+                }`}>
+                  {aeronave.categoria === "PROPIA" ? "Propia" : "Incautada"}
+                </span>
+                <span>{aeronave.capacidad_pasajeros} pasajeros</span>
+              </div>
+
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <AccionesAeronave aeronave={aeronave} />
+              </div>
+            </div>
+          ))
+        )}
+        <p className="text-xs text-gray-500 text-center py-2">
+          {aeronavesFiltradas.length} de {aeronaves.length} aeronaves
+        </p>
       </div>
 
       {modalAbierto && (

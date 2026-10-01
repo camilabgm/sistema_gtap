@@ -1,6 +1,12 @@
 // Formulario inline para agregar o editar un pasajero. Si recibe la
 // prop `pasajero`, edita (PUT); si no, crea (POST). Misma validación
 // que el servidor, para dar feedback antes de mandar la request.
+//
+// Al crear (no al editar), después de guardar el formulario se limpia
+// y queda abierto para cargar el siguiente pasajero — pensado para
+// carga rápida en campo, varios seguidos. "Cancelar" sigue siendo el
+// único botón para cerrarlo, en ambos casos — no hay un botón nuevo ni
+// una palabra distinta que pueda confundirse con "Cerrar manifiesto".
 
 import { useState } from "react"
 import { validarPasajero } from "@/lib/manifiesto"
@@ -8,6 +14,7 @@ import { validarPasajero } from "@/lib/manifiesto"
 const CAMPOS_VACIOS = { nro_documento: "", nombre: "", apellido: "", nacionalidad: "" }
 
 export default function FormularioPasajero({ escalaId, pasajero, onCancelar, onGuardado }) {
+  const esCreacion = !pasajero
   const [datos, setDatos] = useState(pasajero ? { ...pasajero } : CAMPOS_VACIOS)
   const [error, setError] = useState(null)
   const [guardando, setGuardando] = useState(false)
@@ -39,7 +46,15 @@ export default function FormularioPasajero({ escalaId, pasajero, onCancelar, onG
         setError(data.error || "No se pudo guardar el pasajero")
         return
       }
+
       onGuardado()
+
+      // Solo al crear: se limpia y queda abierto para el siguiente. Al
+      // editar, onGuardado ya se encarga de cerrar este formulario
+      // (ver PanelDetalle.js).
+      if (esCreacion) {
+        setDatos(CAMPOS_VACIOS)
+      }
     } catch {
       setError("Error de conexión al guardar")
     } finally {
@@ -49,7 +64,7 @@ export default function FormularioPasajero({ escalaId, pasajero, onCancelar, onG
 
   return (
     <div className="mb-3 rounded-md border border-blue-200 bg-blue-50/50 p-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
         <input
           placeholder="Nro. documento"
           value={datos.nro_documento}

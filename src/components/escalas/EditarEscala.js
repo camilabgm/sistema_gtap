@@ -10,6 +10,8 @@ import { parsearSubtipos } from "@/lib/tiposMision"
 import { puedeEditarAhora, motivoNoEditable } from "@/lib/escalas"
 import { fechaSoloDiaAInputValue } from "@/lib/fechaSoloDia"
 import { fechaUTCAInputParaguay } from "@/lib/fechaHora"
+// Import nuevo, arriba del archivo:
+import BotonVolver from "@/components/shared/BotonVolver"
 
 const ROLES_EN_VUELO = ["PILOTO", "COPILOTO", "TECNICO_DE_VUELO"]
 const CANALES = ["PDF", "IMAGEN", "WORD", "VERBAL"]
@@ -362,6 +364,7 @@ export default function EditarEscala({ escalaId }) {
 
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-6">
+      <BotonVolver />
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
           {esBorrador ? "Borrador de Escala" : `Edición de Escala N° ${escala.nro_orden || `#${escalaId}`}`}
@@ -395,7 +398,8 @@ export default function EditarEscala({ escalaId }) {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        {/* FIX: apilado en mobile, en fila desde 768px */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fecha de recepción <span className="text-red-500">*</span>
@@ -504,7 +508,8 @@ export default function EditarEscala({ escalaId }) {
           </label>
           <div className="space-y-2">
             {tramos.map((t, i) => (
-              <div key={i} className="grid grid-cols-5 gap-2 items-end bg-gray-50 p-2 rounded-md">
+              // FIX: apilado en mobile, en fila desde 768px
+              <div key={i} className="grid grid-cols-1 gap-2 items-end bg-gray-50 p-2 rounded-md md:grid-cols-5">
                 <div>
                   <label className="block text-xs text-gray-500 mb-0.5">Origen</label>
                   <input type="text" value={t.origen} onChange={(e) => actualizarTramo(i, "origen", e.target.value)} placeholder="SGAS" className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
@@ -581,7 +586,8 @@ export default function EditarEscala({ escalaId }) {
                       !idsYaElegidosEnOtrasFilas.includes(String(p.id))
                   )
                   return (
-                    <div key={i} className="flex gap-2 items-end bg-gray-50 p-2 rounded-md">
+                    // FIX: apilado en mobile, en fila desde 768px
+                    <div key={i} className="flex flex-col gap-2 bg-gray-50 p-2 rounded-md md:flex-row md:items-end">
                       <div className="flex-1 min-w-0">
                         <label className="block text-xs text-gray-500 mb-0.5">Persona</label>
                         <select
@@ -598,7 +604,7 @@ export default function EditarEscala({ escalaId }) {
                           <p className="text-xs text-amber-600 mt-1">Sin candidatos con este rol disponibles</p>
                         )}
                       </div>
-                      <div className="w-44 shrink-0">
+                      <div className="md:w-44 md:shrink-0">
                         <label className="block text-xs text-gray-500 mb-0.5">Rol</label>
                         <select
                           value={t.rol_en_vuelo}
@@ -614,7 +620,7 @@ export default function EditarEscala({ escalaId }) {
                         type="button"
                         onClick={() => quitarTripulante(i)}
                         disabled={tripulacion.length === 1}
-                        className="text-xs text-red-500 hover:text-red-700 disabled:opacity-30 pb-2 shrink-0"
+                        className="self-end text-xs text-red-500 hover:text-red-700 disabled:opacity-30 pb-2 shrink-0"
                       >
                         Quitar
                       </button>

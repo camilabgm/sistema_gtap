@@ -102,24 +102,28 @@ export default function SicemEstadisticasPanel({ eventos: datosIniciales }) {
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs text-gray-500">Desde</label>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-500">Desde</label>
           <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)}
             className="h-9 px-3 border border-gray-300 rounded-md text-sm" />
-          <label className="text-xs text-gray-500">Hasta</label>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-500">Hasta</label>
           <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)}
             className="h-9 px-3 border border-gray-300 rounded-md text-sm" />
-          {(desde || hasta) && (
-            <button onClick={() => { setDesde(""); setHasta("") }} className="text-xs text-blue-600 hover:underline">
-              Ver todo el historial
-            </button>
-          )}
         </div>
+        {(desde || hasta) && (
+          <button onClick={() => { setDesde(""); setHasta("") }} className="text-xs text-blue-600 hover:underline">
+            Ver todo el historial
+          </button>
+        )}
+     </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <div className="px-5 py-3 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-700">Eventos por tipo y aeronave</h2>
           </div>

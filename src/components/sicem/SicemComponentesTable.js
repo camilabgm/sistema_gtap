@@ -174,7 +174,7 @@ export default function SicemComponentesTable({ componentes: datosIniciales, aer
             <option value="APU">APU</option>
           </select>
 
-          <div className="w-px h-7 bg-gray-200" />
+          <div className="hidden md:block w-px h-7 bg-gray-200" />
           <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
             <input type="checkbox" checked={mostrarInactivos} onChange={toggleMostrarInactivos}
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />

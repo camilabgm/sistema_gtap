@@ -53,7 +53,7 @@ export default function PanelVerEvento({ evento, onCerrar }) {
 
           <div>
             <SeparadorSeccion texto="Datos del evento" />
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 gap-3 pt-2 md:grid-cols-2">
               <div>
                 <div className="text-xs uppercase text-gray-400">Aeronave</div>
                 <div className="text-sm font-medium text-gray-900">{ev.aeronave?.matricula}</div>
@@ -68,7 +68,7 @@ export default function PanelVerEvento({ evento, onCerrar }) {
                 <div className="text-xs uppercase text-gray-400">Lugar</div>
                 <div className="text-sm font-medium text-gray-900">{ev.lugar ? (ETIQUETAS_LUGAR[ev.lugar] || ev.lugar) : "Sin definir"}</div>
               </div>
-              <div className="col-span-2">
+              <div className="md:col-span-2">
                 <div className="text-xs uppercase text-gray-400">Observación</div>
                 <div className="text-sm text-gray-700">{ev.observacion || "—"}</div>
               </div>

@@ -6,6 +6,11 @@
 // UNA escala puntual, dejando bien claro a cuál pertenece. No toca ni
 // depende de PanelDetalleEscala — ningún cambio acá afecta Gestión ni
 // Agenda.
+//
+// CAMBIO: grillas de inputs (tramos, cierre) apiladas en mobile y en
+// fila desde 768px — mismo estándar que el resto de la rama de
+// responsive. Breakpoint de "Datos de la escala" alineado de sm: a
+// md: por la misma razón.
 
 import { useState, useEffect, useCallback } from "react"
 import { formatearFechaHoraCompacta } from "@/lib/escalas"
@@ -259,7 +264,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
       </div>
 
       {/* Datos de la escala */}
-      <div className="grid grid-cols-1 gap-3 border-b border-gray-100 py-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 border-b border-gray-100 py-4 md:grid-cols-3">
         <div>
           <div className="text-xs uppercase text-gray-400">Solicitante</div>
           <div className="text-sm font-medium text-gray-900">{e.solicitante || "—"}</div>
@@ -315,7 +320,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
               {pvData.escala.itinerarios.map((t) => (
                 <div key={t.id} className="rounded-md border border-gray-100 bg-gray-50 p-3">
                   <p className="mb-2 text-sm font-medium text-gray-700">{t.origen} → {t.destino}</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     <div>
                       <label className="mb-0.5 block text-[11px] text-gray-500">Salida real</label>
                       <input
@@ -488,7 +493,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                 <div>
                   <label className="mb-0.5 block text-[11px] text-gray-500">Aterrizajes</label>
                   <input
@@ -529,7 +534,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                   de Combustible o Supervisor de Semana, aparte, con su
                   propio candado de una sola vez (ver bloque de abajo). */}
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <div>
                   <label className="mb-0.5 block text-[11px] text-gray-500">Novedad</label>
                   <select

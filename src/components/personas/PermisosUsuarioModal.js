@@ -1,5 +1,11 @@
 "use client"
 
+// CAMBIO: la tabla de 7 columnas (Módulo + 5 acciones + Personalizar)
+// vive dentro de un modal, no de una página principal — no se
+// beneficia del min-w-0 de DashboardShell. Se envuelve en su propio
+// contenedor con overflow-x-auto para que tenga scroll horizontal
+// propio en pantallas angostas, en vez de desbordar el modal.
+
 import { useState, useEffect } from "react"
 
 const MODULOS = [
@@ -111,7 +117,7 @@ export default function PermisosUsuarioModal({ persona, onCerrar, onGuardado }) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
 
         {/* Header */}
@@ -153,63 +159,70 @@ export default function PermisosUsuarioModal({ persona, onCerrar, onGuardado }) 
                 </div>
               )}
 
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 font-medium text-gray-500">Módulo</th>
-                    {ACCIONES.map((a) => (
-                      <th key={a.key} className="text-center px-3 py-3 font-medium text-gray-500">
-                        {a.label}
-                      </th>
-                    ))}
-                    <th className="text-center px-3 py-3 font-medium text-gray-500">Personalizar</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {MODULOS.map((modulo) => {
-                    const s          = estado[modulo.key] || {}
-                    const esOverride = s.es_override
+              {/* FIX: contenedor propio con scroll horizontal — este
+                  modal no tiene el min-w-0 de DashboardShell, así que
+                  una tabla de 7 columnas necesita su propia salida
+                  para pantallas angostas, en vez de desbordar el
+                  modal o quedar recortada sin forma de verla. */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Módulo</th>
+                      {ACCIONES.map((a) => (
+                        <th key={a.key} className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">
+                          {a.label}
+                        </th>
+                      ))}
+                      <th className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">Personalizar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {MODULOS.map((modulo) => {
+                      const s          = estado[modulo.key] || {}
+                      const esOverride = s.es_override
 
-                    return (
-                      <tr
-                        key={modulo.key}
-                        className={`transition-colors ${
-                          esOverride ? "bg-blue-50" : "hover:bg-gray-50"
-                        }`}
-                      >
-                        <td className="px-4 py-3 font-medium text-gray-700">
-                          {modulo.label}
-                          {esOverride && (
-                            <span className="ml-2 text-xs text-blue-500 font-normal">
-                              personalizado
-                            </span>
-                          )}
-                        </td>
-                        {ACCIONES.map((accion) => (
-                          <td key={accion.key} className="text-center px-3 py-3">
+                      return (
+                        <tr
+                          key={modulo.key}
+                          className={`transition-colors ${
+                            esOverride ? "bg-blue-50" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <td className="px-4 py-3 font-medium text-gray-700 whitespace-nowrap">
+                            {modulo.label}
+                            {esOverride && (
+                              <span className="ml-2 text-xs text-blue-500 font-normal">
+                                personalizado
+                              </span>
+                            )}
+                          </td>
+                          {ACCIONES.map((accion) => (
+                            <td key={accion.key} className="text-center px-3 py-3">
+                              <input
+                                type="checkbox"
+                                checked={s[accion.key] ?? false}
+                                onChange={() => togglePermiso(modulo.key, accion.key)}
+                                disabled={!esOverride}
+                                className="w-4 h-4 accent-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                              />
+                            </td>
+                          ))}
+                          <td className="text-center px-3 py-3">
                             <input
                               type="checkbox"
-                              checked={s[accion.key] ?? false}
-                              onChange={() => togglePermiso(modulo.key, accion.key)}
-                              disabled={!esOverride}
-                              className="w-4 h-4 accent-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                              checked={esOverride}
+                              onChange={() => toggleOverride(modulo.key)}
+                              className="w-4 h-4 accent-purple-600 cursor-pointer"
+                              title="Activar para personalizar los permisos de este módulo"
                             />
                           </td>
-                        ))}
-                        <td className="text-center px-3 py-3">
-                          <input
-                            type="checkbox"
-                            checked={esOverride}
-                            onChange={() => toggleOverride(modulo.key)}
-                            className="w-4 h-4 accent-purple-600 cursor-pointer"
-                            title="Activar para personalizar los permisos de este módulo"
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </div>

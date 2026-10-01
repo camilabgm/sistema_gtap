@@ -1,5 +1,8 @@
 "use client"
 
+// CAMBIO: tabla→tarjetas en mobile, mismo patrón que el resto de
+// tablas de gestión del sistema.
+
 import { useState } from "react"
 import Link from "next/link"
 import { RefreshCw } from "lucide-react"
@@ -10,8 +13,6 @@ const ETIQUETAS_COMPONENTE = {
   APU: "APU",
 }
 
-// Igual que en las otras pantallas de SICEM — local a este archivo,
-// no compartido desde un lib.
 function formatearMinutos(min) {
   if (min === null || min === undefined) return "—"
   const negativo = min < 0
@@ -49,9 +50,6 @@ export default function SicemAlertasPanel({ alertas: datosIniciales }) {
     setCargando(true)
     const res = await fetch("/api/sicem/componentes?soloAlertas=true", { credentials: "include" })
     const datos = await res.json()
-    // El endpoint no ordena por urgencia (eso es criterio de esta
-    // pantalla, no del listado general de Componentes) — se ordena acá
-    // mismo, igual que hace el page.js en la carga inicial.
     const ordenadas = [...datos].sort((a, b) => {
       const aHoras = a.horas_disponibles_minutos
       const bHoras = b.horas_disponibles_minutos
@@ -95,7 +93,8 @@ export default function SicemAlertasPanel({ alertas: datosIniciales }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* ── Desktop: tabla, visible desde 768px ── */}
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -138,6 +137,44 @@ export default function SicemAlertasPanel({ alertas: datosIniciales }) {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
+      <div className="md:hidden space-y-2">
+        {alertas.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
+            Sin alertas — todos los componentes están dentro de rango
+          </div>
+        ) : (
+          alertas.map((c) => (
+            <div
+              key={c.id}
+              className={`rounded-lg border p-3 ${c.horas_disponibles_minutos < 0 ? "bg-red-50/40 border-red-200" : "bg-white border-gray-200"}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{c.aeronave.matricula}</p>
+                  <p className="text-xs text-gray-500">{ETIQUETAS_COMPONENTE[c.tipo] || c.tipo}</p>
+                </div>
+                <div className="flex gap-1">
+                  {(c.motivos_alerta || []).map((m) => badgeMotivo(m))}
+                </div>
+              </div>
+
+              <p className={`mt-2 text-lg font-bold ${c.horas_disponibles_minutos < 0 ? "text-red-700" : "text-gray-900"}`}>
+                {formatearMinutos(c.horas_disponibles_minutos)}
+              </p>
+              <p className="text-xs text-gray-400">disponibles</p>
+              <p className="mt-1 text-xs text-gray-500">Próx. inspección: {formatearFecha(c.fecha_proxima_inspeccion)}</p>
+
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <Link href="/dashboard/sicem/componentes" className="text-blue-600 hover:underline text-xs font-medium">
+                  Ver en Componentes
+                </Link>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

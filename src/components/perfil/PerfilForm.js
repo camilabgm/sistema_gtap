@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { validarContrasena } from "@/lib/validarContrasena"
+import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
 
 export default function PerfilForm() {
   const [form, setForm] = useState({
@@ -57,6 +58,9 @@ export default function PerfilForm() {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="md:hidden mb-2">
+              <BotonVolverInicio />
+      </div>
       <h2 className="text-base font-semibold text-gray-900 mb-4">
         Cambiar contraseña
       </h2>

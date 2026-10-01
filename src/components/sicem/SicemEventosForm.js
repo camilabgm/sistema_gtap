@@ -130,7 +130,7 @@ export default function SicemEventosForm({ evento, aeronaves, componentes, onGua
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Qué y dónde
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Aeronave <span className="text-red-500">*</span>

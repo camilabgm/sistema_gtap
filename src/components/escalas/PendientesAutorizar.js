@@ -217,7 +217,9 @@ export default function PendientesAutorizar() {
           {cargandoDerivacion ? (
             <p className="text-sm text-gray-400">Cargando estado de derivación...</p>
           ) : derivacion ? (
-            <div className="flex items-center justify-between">
+            // FIX: apilado en mobile, en fila desde 640px — texto y
+            // botón ya no se aprietan en una pantalla angosta.
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900">
                   Derivaste tu autorización desde las {formatearFechaHora(derivacion.desde)}
@@ -230,7 +232,7 @@ export default function PendientesAutorizar() {
               <button
                 onClick={handleYaVolvi}
                 disabled={enviandoDerivar}
-                className="flex items-center gap-1.5 bg-green-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 h-9 shrink-0"
+                className="flex items-center justify-center gap-1.5 bg-green-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 h-9 shrink-0"
               >
                 <Play className="h-3.5 w-3.5" />
                 {enviandoDerivar ? "..." : "Ya volví"}
@@ -241,7 +243,7 @@ export default function PendientesAutorizar() {
               {errorDerivar && (
                 <div className="p-2 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">{errorDerivar}</div>
               )}
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <select
                   value={motivoDerivar}
                   onChange={(e) => setMotivoDerivar(e.target.value)}
@@ -278,7 +280,8 @@ export default function PendientesAutorizar() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-4">
+            // FIX: apilado en mobile, en fila desde 640px
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-900">¿No podés autorizar hoy?</p>
                 <p className="text-xs text-gray-500 mt-0.5">
@@ -287,7 +290,7 @@ export default function PendientesAutorizar() {
               </div>
               <button
                 onClick={() => setMostrarFormDerivar(true)}
-                className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-3.5 rounded-md hover:bg-amber-100 transition-colors h-9 shrink-0"
+                className="flex items-center justify-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-3.5 rounded-md hover:bg-amber-100 transition-colors h-9 shrink-0"
               >
                 <Pause className="h-3.5 w-3.5" />
                 Derivar autorización
@@ -301,7 +304,8 @@ export default function PendientesAutorizar() {
             la lista de abajo. */}
         {!cargandoPendientes && pendientes && pendientes.escalas.length > 0 && (
           <div className="pt-4">
-            <div className="flex items-center justify-between gap-4">
+            {/* FIX: apilado en mobile, en fila desde 640px */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 {pendientes.podesActuar ? (
                   <>
@@ -335,7 +339,7 @@ export default function PendientesAutorizar() {
                 <button
                   onClick={handleAsumir}
                   disabled={asumiendo}
-                  className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-3.5 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50 h-9 shrink-0"
+                  className="flex items-center justify-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-sm font-medium px-3.5 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50 h-9 shrink-0"
                 >
                   <Pause className="h-3.5 w-3.5" />
                   {asumiendo ? "Asumiendo..." : "Asumir autorización"}

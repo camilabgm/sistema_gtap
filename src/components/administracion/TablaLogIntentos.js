@@ -1,7 +1,14 @@
 "use client"
+
+// CAMBIO: BotonVolverInicio agregado arriba, oculto en desktop —
+// mismo motivo que PermisosRolTable.js. El resto del archivo ya
+// estaba bien resuelto para mobile (filtros con flex-wrap, tabla con
+// su propio overflow-x-auto), no necesitó más ajustes.
+
 import { useState } from "react"
 import { Search } from "lucide-react"
 import { formatearFechaHora } from "@/lib/fechaHora"
+import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
 
 const COLORES_RESULTADO = {
   EXITOSO:               "bg-green-100 text-green-800",
@@ -33,6 +40,10 @@ export default function TablaLogIntentos({ intentos }) {
 
   return (
     <div>
+      <div className="md:hidden mb-2">
+        <BotonVolverInicio />
+      </div>
+
       <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-64">

@@ -60,6 +60,70 @@ function textoRuta(itinerarios) {
   return primero && ultimo ? `${primero.origen} → ${ultimo.destino}` : "—"
 }
 
+// Los 3 grupos de íconos de acciones — extraídos a su propia función
+// porque se usan idénticos en la fila de tabla (desktop) y en la
+// tarjeta (mobile). Evita mantener la misma lógica de puedeEditar/
+// abortada/etc. escrita dos veces.
+function AccionesEscala({ e, editable, motivo, puedeEditar, puedeEliminar, eliminandoId, onEliminar, cargarEscalas, expandida, onToggleExpandir }) {
+  const abortada = e.estado === "ABORTADA"
+  return (
+    <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center gap-0.5">
+        <AccionIcono
+          icono={Eye}
+          etiqueta={expandida ? "Ocultar" : "Ver"}
+          onClick={onToggleExpandir}
+        />
+
+        {puedeEditar && (
+          editable ? (
+            <AccionIcono
+              icono={Pencil}
+              etiqueta={e.es_borrador ? "Completar" : "Editar"}
+              href={`/dashboard/escalas/${e.id}/editar`}
+              color="primario"
+            />
+          ) : (
+            <AccionIcono icono={Pencil} etiqueta={motivo || "No editable"} disabled />
+          )
+        )}
+      </div>
+
+      <div className="flex items-center gap-0.5 border-l border-gray-100 pl-3">
+        <AccionIcono
+          icono={Users}
+          etiqueta={abortada ? "No disponible: la escala fue abortada" : "Manifiesto"}
+          href={abortada ? undefined : `/dashboard/manifiesto?escala=${e.id}`}
+          disabled={abortada}
+        />
+
+        <AccionIcono
+          icono={ClipboardCheck}
+          etiqueta={abortada ? "No disponible: la escala fue abortada" : "Post-vuelo"}
+          href={abortada ? undefined : `/dashboard/post-vuelo?escala=${e.id}`}
+          disabled={abortada}
+        />
+      </div>
+
+      <div className="flex items-center gap-0.5 border-l border-gray-100 pl-3">
+        {puedeEditar && <AbortarEscalaAccion escala={e} onAbortada={cargarEscalas} />}
+
+        {/* Eliminar depende únicamente del permiso ESCALAS.puede_eliminar
+            — sin importar el estado de la escala. */}
+        {puedeEliminar && (
+          <AccionIcono
+            icono={Trash2}
+            etiqueta="Eliminar"
+            onClick={() => onEliminar(e)}
+            disabled={eliminandoId === e.id}
+            color="peligro"
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
   const [escalas, setEscalas] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -227,7 +291,10 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
               {estadoAbierto && (
-                <div className="absolute z-10 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg p-2">
+                // max-w-[90vw] además del w-64 fijo — en una pantalla
+                // angosta, si el botón queda cerca del borde, esto
+                // evita que el popover se salga del viewport.
+                <div className="absolute z-10 mt-1 w-64 max-w-[90vw] bg-white border border-gray-200 rounded-md shadow-lg p-2">
                   {ESTADOS_FILTRABLES.map((op) => (
                     <label key={op.clave} className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-50 rounded cursor-pointer">
                       <input
@@ -275,23 +342,32 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
             </select>
           </div>
 
-          <div className="hidden sm:block w-px h-7 bg-gray-300" />
+          <div className="hidden md:block w-px h-7 bg-gray-300" />
 
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>Desde</span>
-            <input
-              type="date"
-              value={filtroFechaDesde}
-              onChange={(e) => setFiltroFechaDesde(e.target.value)}
-              className="h-9 px-2.5 rounded-md border border-gray-300 text-sm"
-            />
-            <span>Hasta</span>
-            <input
-              type="date"
-              value={filtroFechaHasta}
-              onChange={(e) => setFiltroFechaHasta(e.target.value)}
-              className="h-9 px-2.5 rounded-md border border-gray-300 text-sm"
-            />
+          {/* FIX: cada etiqueta+input agrupados en su propio div, así
+              el flex-wrap del contenedor mueve el PAR completo a la
+              línea siguiente en pantallas angostas — antes el wrap
+              partía "Hasta" (el texto) de un lado y su input del
+              otro, en vez de moverlos juntos. */}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+            <div className="flex items-center gap-1">
+              <span>Desde</span>
+              <input
+                type="date"
+                value={filtroFechaDesde}
+                onChange={(e) => setFiltroFechaDesde(e.target.value)}
+                className="h-9 px-2.5 rounded-md border border-gray-300 text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span>Hasta</span>
+              <input
+                type="date"
+                value={filtroFechaHasta}
+                onChange={(e) => setFiltroFechaHasta(e.target.value)}
+                className="h-9 px-2.5 rounded-md border border-gray-300 text-sm"
+              />
+            </div>
           </div>
 
           {hayFiltrosActivos && (
@@ -321,137 +397,167 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
           No se encontraron escalas{hayFiltrosActivos ? " con estos filtros" : ""}.
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-         <table className="w-full table-fixed divide-y divide-gray-200">
-            <colgroup>
-              <col className="w-[22%]" />
-              <col className="w-[22%]" />
-              <col className="w-[14%]" />
-              <col className="w-[16%]" />
-              <col className="w-[26%]" />
-            </colgroup>
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitante</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vuelo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salida</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filtradas.map((e) => {
-                const estado = estadoDetallado(e)
-                const editable = puedeEditarAhora(e)
-                const motivo = motivoNoEditable(e)
-                const expandida = filaExpandidaId === e.id
-                const tooltipEstado = TOOLTIP_ESTADO_DETALLADO[estado.clave]
-                const abortada = e.estado === "ABORTADA"
+        <>
+          {/* ── Desktop: tabla, visible desde 768px ───────────────── */}
+          <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+           <table className="w-full table-fixed divide-y divide-gray-200">
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[22%]" />
+                <col className="w-[14%]" />
+                <col className="w-[16%]" />
+                <col className="w-[26%]" />
+              </colgroup>
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitante</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vuelo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salida</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filtradas.map((e) => {
+                  const estado = estadoDetallado(e)
+                  const editable = puedeEditarAhora(e)
+                  const motivo = motivoNoEditable(e)
+                  const expandida = filaExpandidaId === e.id
+                  const tooltipEstado = TOOLTIP_ESTADO_DETALLADO[estado.clave]
 
-                return (
-                  <Fragment key={e.id}>
-                    <tr className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-sm truncate">
-                        <p className="text-gray-900 font-medium truncate">{e.solicitante || "—"}</p>
-                        <p className="text-xs text-gray-400 truncate">
-                          {formatearFechaSoloDia(e.fecha)}{e.nro_orden ? ` · Orden #${e.nro_orden}` : ""}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-sm truncate">
-                        <p className="text-gray-900 font-medium truncate">{e.aeronave?.matricula || "Sin aeronave"}</p>
-                        <p className="text-xs text-gray-500 truncate">{textoRuta(e.itinerarios)}</p>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatearFechaHoraCompacta(e.hora_despegue_estimada)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span
-                          title={tooltipEstado}
-                          className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-                            ESTADO_DETALLADO_CLASES[estado.clave] || "bg-gray-100 text-gray-600"
-                          } ${tooltipEstado ? "cursor-help" : ""}`}
-                        >
-                          {estado.texto}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="flex items-center justify-end gap-3">
-                          <div className="flex items-center gap-0.5">
-                            <AccionIcono
-                              icono={Eye}
-                              etiqueta={expandida ? "Ocultar" : "Ver"}
-                              onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
-                            />
-
-                            {puedeEditar && (
-                              editable ? (
-                                <AccionIcono
-                                  icono={Pencil}
-                                  etiqueta={e.es_borrador ? "Completar" : "Editar"}
-                                  href={`/dashboard/escalas/${e.id}/editar`}
-                                  color="primario"
-                                />
-                              ) : (
-                                <AccionIcono icono={Pencil} etiqueta={motivo || "No editable"} disabled />
-                              )
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-0.5 border-l border-gray-100 pl-3">
-                            <AccionIcono
-                              icono={Users}
-                              etiqueta={abortada ? "No disponible: la escala fue abortada" : "Manifiesto"}
-                              href={abortada ? undefined : `/dashboard/manifiesto?escala=${e.id}`}
-                              disabled={abortada}
-                            />
-
-                            <AccionIcono
-                              icono={ClipboardCheck}
-                              etiqueta={abortada ? "No disponible: la escala fue abortada" : "Post-vuelo"}
-                              href={abortada ? undefined : `/dashboard/post-vuelo?escala=${e.id}`}
-                              disabled={abortada}
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-0.5 border-l border-gray-100 pl-3">
-                            {puedeEditar && <AbortarEscalaAccion escala={e} onAbortada={cargarEscalas} />}
-
-                            {/* Eliminar depende únicamente del permiso
-                                ESCALAS.puede_eliminar — sin importar el
-                                estado de la escala. */}
-                            {puedeEliminar && (
-                              <AccionIcono
-                                icono={Trash2}
-                                etiqueta="Eliminar"
-                                onClick={() => handleEliminar(e)}
-                                disabled={eliminandoId === e.id}
-                                color="peligro"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                    {expandida && (
-                      <tr>
-                        <td colSpan={5} className="px-4 pb-4 bg-gray-50">
-                          <PanelDetalleEscala
-                            escala={e}
+                  return (
+                    <Fragment key={e.id}>
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 text-sm truncate">
+                          <p className="text-gray-900 font-medium truncate">{e.solicitante || "—"}</p>
+                          <p className="text-xs text-gray-400 truncate">
+                            {formatearFechaSoloDia(e.fecha)}{e.nro_orden ? ` · Orden #${e.nro_orden}` : ""}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-sm truncate">
+                          <p className="text-gray-900 font-medium truncate">{e.aeronave?.matricula || "Sin aeronave"}</p>
+                          <p className="text-xs text-gray-500 truncate">{textoRuta(e.itinerarios)}</p>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{formatearFechaHoraCompacta(e.hora_despegue_estimada)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            title={tooltipEstado}
+                            className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                              ESTADO_DETALLADO_CLASES[estado.clave] || "bg-gray-100 text-gray-600"
+                            } ${tooltipEstado ? "cursor-help" : ""}`}
+                          >
+                            {estado.texto}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <AccionesEscala
+                            e={e}
+                            editable={editable}
+                            motivo={motivo}
                             puedeEditar={puedeEditar}
-                            mostrarPostVuelo={true}
-                            onCerrar={() => setFilaExpandidaId(null)}
-                            onActualizada={cargarEscalas}
+                            puedeEliminar={puedeEliminar}
+                            eliminandoId={eliminandoId}
+                            onEliminar={handleEliminar}
+                            cargarEscalas={cargarEscalas}
+                            expandida={expandida}
+                            onToggleExpandir={() => setFilaExpandidaId(expandida ? null : e.id)}
                           />
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                )
-              })}
-            </tbody>
-          </table>
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-            <p className="text-xs text-gray-500">{filtradas.length} de {escalas.length} escalas</p>
+                      {expandida && (
+                        <tr>
+                          <td colSpan={5} className="px-4 pb-4 bg-gray-50">
+                            <PanelDetalleEscala
+                              escala={e}
+                              puedeEditar={puedeEditar}
+                              mostrarPostVuelo={true}
+                              onCerrar={() => setFilaExpandidaId(null)}
+                              onActualizada={cargarEscalas}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+              <p className="text-xs text-gray-500">{filtradas.length} de {escalas.length} escalas</p>
+            </div>
           </div>
-        </div>
+
+          {/* ── Mobile: tarjetas apiladas, ocultas desde 768px ────── */}
+          <div className="md:hidden space-y-2">
+            {filtradas.map((e) => {
+              const estado = estadoDetallado(e)
+              const editable = puedeEditarAhora(e)
+              const motivo = motivoNoEditable(e)
+              const expandida = filaExpandidaId === e.id
+              const tooltipEstado = TOOLTIP_ESTADO_DETALLADO[estado.clave]
+
+              return (
+                <div key={e.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{e.solicitante || "—"}</p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {formatearFechaSoloDia(e.fecha)}{e.nro_orden ? ` · Orden #${e.nro_orden}` : ""}
+                        </p>
+                      </div>
+                      <span
+                        title={tooltipEstado}
+                        className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap shrink-0 ${
+                          ESTADO_DETALLADO_CLASES[estado.clave] || "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {estado.texto}
+                      </span>
+                    </div>
+
+                    <div className="mt-2">
+                      <p className="text-sm font-medium text-gray-900">{e.aeronave?.matricula || "Sin aeronave"}</p>
+                      <p className="text-xs text-gray-500">{textoRuta(e.itinerarios)}</p>
+                    </div>
+
+                    <p className="mt-2 text-xs text-gray-500">
+                      Salida: {formatearFechaHoraCompacta(e.hora_despegue_estimada)}
+                    </p>
+
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <AccionesEscala
+                        e={e}
+                        editable={editable}
+                        motivo={motivo}
+                        puedeEditar={puedeEditar}
+                        puedeEliminar={puedeEliminar}
+                        eliminandoId={eliminandoId}
+                        onEliminar={handleEliminar}
+                        cargarEscalas={cargarEscalas}
+                        expandida={expandida}
+                        onToggleExpandir={() => setFilaExpandidaId(expandida ? null : e.id)}
+                      />
+                    </div>
+                  </div>
+
+                  {expandida && (
+                    <div className="px-3 pb-3 bg-gray-50">
+                      <PanelDetalleEscala
+                        escala={e}
+                        puedeEditar={puedeEditar}
+                        mostrarPostVuelo={true}
+                        onCerrar={() => setFilaExpandidaId(null)}
+                        onActualizada={cargarEscalas}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            <p className="text-xs text-gray-500 text-center py-2">{filtradas.length} de {escalas.length} escalas</p>
+          </div>
+        </>
       )}
     </div>
   )
