@@ -7,6 +7,13 @@
 // novedades/personal pasan de una sola línea forzada a apiladas en
 // pantallas muy angostas, mismo criterio que ya usamos en
 // PendientesAutorizar.
+//
+// CAMBIO (rama fix/accion-icono-mobile): AccionIcono ahora muestra la
+// etiqueta como texto en mobile. En cada novedad, el badge "No
+// disponible" + "Editar novedad" + "Quitar novedad" suman más ancho
+// que la tarjeta en un celular, y como el contenedor no tenía
+// flex-wrap, se salían por el costado derecho. Ahora ese contenedor
+// tiene flex-wrap: si no entran, los botones bajan a otra línea.
 
 import { useState } from "react"
 import { Plus, Pencil, Trash2, Search } from "lucide-react"
@@ -193,7 +200,7 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
                     <p className="text-xs text-gray-500 mt-0.5">{nov.observacion}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium mr-2">
                     No disponible
                   </span>

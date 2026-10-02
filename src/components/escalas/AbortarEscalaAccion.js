@@ -1,5 +1,7 @@
 "use client"
 
+// src/components/escalas/AbortarEscalaAccion.js
+//
 // Ícono de "Abortar escala" con popover propio — a diferencia de
 // AccionIcono (que ejecuta la acción directo al click), Abortar
 // necesita que la persona elija un motivo de los 6 códigos antes de
@@ -10,6 +12,13 @@
 // El popover se renderiza con un portal a document.body, mismo motivo
 // que AccionIcono: la tabla de Gestión de Escalas tiene overflow-x-auto
 // y lo recortaría si viviera adentro.
+//
+// CAMBIO (rama fix/accion-icono-mobile): el botón usa la misma forma
+// que AccionIcono — en mobile muestra "Abortar" como texto al lado del
+// ícono (ancho automático); desde 768px vuelve al cuadrado 32×32 de
+// siempre. Antes era el único botón de la fila de Gestión que en
+// mobile quedaba solo como ícono, sin texto. El popover y la lógica
+// de aborto no se tocaron.
 
 import { useState, useRef, useLayoutEffect } from "react"
 import { createPortal } from "react-dom"
@@ -17,6 +26,11 @@ import { Ban } from "lucide-react"
 import { ETIQUETAS_MOTIVO_ABORTO, puedeAbortarAhora, motivoNoAbortable } from "@/lib/escalas"
 
 const MOTIVOS_ABORTO = Object.keys(ETIQUETAS_MOTIVO_ABORTO)
+
+// Misma forma que AccionIcono — si algún día cambia allá, cambiar acá
+// también para que la fila de acciones siga viéndose pareja.
+const FORMA_BOTON =
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium md:w-8 md:gap-0 md:px-0"
 
 export default function AbortarEscalaAccion({ escala, onAbortada }) {
   const [abierto, setAbierto] = useState(false)
@@ -79,11 +93,12 @@ export default function AbortarEscalaAccion({ escala, onAbortada }) {
         disabled={!habilitado}
         title={habilitado ? "Abortar escala" : (motivoDeshabilitado || "No se puede abortar en este estado")}
         aria-label="Abortar escala"
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+        className={`${FORMA_BOTON} transition-colors ${
           habilitado ? "text-red-500 hover:text-red-700 hover:bg-red-50" : "cursor-not-allowed text-gray-300"
         }`}
       >
-        <Ban className="h-4 w-4" />
+        <Ban className="h-4 w-4 shrink-0" />
+        <span className="whitespace-nowrap md:hidden">Abortar</span>
       </button>
 
       {abierto && typeof document !== "undefined" &&

@@ -7,6 +7,17 @@
 // BotonVolverInicio arriba, oculto en desktop — Aeronaves es un
 // módulo de una sola pantalla, sin sub-menú, así que en mobile no
 // tenía ningún camino de vuelta al Dashboard.
+//
+// CAMBIO (rama fix/accion-icono-mobile): AccionIcono ahora muestra la
+// etiqueta como texto en mobile, así que:
+//   - Las acciones de disponibilidad pasan a una etiqueta corta, y la
+//     explicación larga va en la prop "tooltip" (lo que se sigue
+//     viendo al pasar el mouse en escritorio).
+//   - La fila de acciones puede saltar de renglón en mobile
+//     (flex-wrap). Sin esto, con justify-end, los botones que no
+//     entran se empujan hacia la izquierda fuera de la tarjeta, donde
+//     no hay scroll — mismo bug que tenía Gestión de Escalas. Desde
+//     md vuelve a flex-nowrap, igual que antes.
 
 import { useState } from "react"
 import { Plus, Search, Pencil, Trash2, Eye, Ban, CircleCheck } from "lucide-react"
@@ -114,12 +125,17 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
   // Acción de disponibilidad — contextual según el estado actual.
   // Bloqueada del todo si SICEM tiene un Evento abierto: ahí la
   // disponibilidad se gestiona desde ese módulo, no desde acá.
+  //
+  // etiqueta = nombre corto (lo que se lee en mobile).
+  // tooltip  = explicación completa (lo que se ve al pasar el mouse
+  //            en escritorio, igual que antes).
   function accionDisponibilidad(aeronave) {
     if (aeronave.tiene_evento_abierto) {
       return (
         <AccionIcono
           icono={Ban}
-          etiqueta="Gestionado por SICEM — cerrá el evento desde ahí"
+          etiqueta="Disponibilidad"
+          tooltip="Gestionado por SICEM — cerrá el evento desde ahí"
           onClick={() => {}}
           disabled
         />
@@ -129,7 +145,8 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
       return (
         <AccionIcono
           icono={Ban}
-          etiqueta="Marcar como no disponible (Otro)"
+          etiqueta="Marcar no disponible"
+          tooltip="Marcar como no disponible (Otro)"
           onClick={() => setModalDisponibilidad(aeronave)}
         />
       )
@@ -149,7 +166,7 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
   // la fila de tabla (desktop) y la tarjeta (mobile).
   function AccionesAeronave({ aeronave }) {
     return (
-      <div className="flex items-center justify-end gap-0.5">
+      <div className="flex flex-wrap items-center justify-end gap-1 md:flex-nowrap md:gap-0.5">
         <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setAeronaveVer(aeronave)} />
         {permisos?.puede_editar && (
           <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(aeronave)} color="primario" />

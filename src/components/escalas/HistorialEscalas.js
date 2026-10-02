@@ -64,11 +64,35 @@ function textoRuta(itinerarios) {
 // porque se usan idénticos en la fila de tabla (desktop) y en la
 // tarjeta (mobile). Evita mantener la misma lógica de puedeEditar/
 // abortada/etc. escrita dos veces.
+//
+// CAMBIO (rama fix/accion-icono-mobile): en mobile los botones ahora
+// muestran texto, así que los 6 ya no entran en una sola línea. Antes
+// el contenedor era "justify-end" SIN flex-wrap: cuando el contenido
+// era más ancho que la tarjeta, el navegador lo empujaba hacia la
+// IZQUIERDA, fuera de la zona visible, y por ese lado no hay scroll —
+// por eso se veía "…plida" cortado. Ahora:
+//
+//   - El contenedor tiene flex-wrap en mobile: si no entran, los
+//     botones bajan a una segunda línea, alineados a la derecha.
+//     Desde md vuelve a flex-nowrap, igual que antes, para que la
+//     celda de la tabla de escritorio se vea exactamente igual.
+//   - Los 3 grupos usan "contents" en mobile: el div del grupo
+//     desaparece de la maquetación y sus botones pasan a ser hijos
+//     directos de la fila, así se reparten de a uno (y no de a grupo
+//     entero, que dejaba tres líneas casi vacías). Como el div no
+//     se dibuja, las líneas separadoras verticales tampoco — en
+//     desktop vuelven con md:flex y md:border-l, como siempre.
+//   - Las acciones bloqueadas pasan la explicación larga por la prop
+//     "tooltip" de AccionIcono, y dejan en "etiqueta" solo el nombre
+//     corto ("Editar", "Manifiesto"). Antes la etiqueta era la oración
+//     entera ("No disponible: la escala fue abortada"), que en mobile
+//     se mostraba completa como texto del botón.
 function AccionesEscala({ e, editable, motivo, puedeEditar, puedeEliminar, eliminandoId, onEliminar, cargarEscalas, expandida, onToggleExpandir }) {
   const abortada = e.estado === "ABORTADA"
+  const textoAbortada = "No disponible: la escala fue abortada"
   return (
-    <div className="flex items-center justify-end gap-3">
-      <div className="flex items-center gap-0.5">
+    <div className="flex flex-wrap items-center justify-end gap-1 md:flex-nowrap md:gap-3">
+      <div className="contents md:flex md:items-center md:gap-0.5">
         <AccionIcono
           icono={Eye}
           etiqueta={expandida ? "Ocultar" : "Ver"}
@@ -84,28 +108,35 @@ function AccionesEscala({ e, editable, motivo, puedeEditar, puedeEliminar, elimi
               color="primario"
             />
           ) : (
-            <AccionIcono icono={Pencil} etiqueta={motivo || "No editable"} disabled />
+            <AccionIcono
+              icono={Pencil}
+              etiqueta={e.es_borrador ? "Completar" : "Editar"}
+              tooltip={motivo || "No editable"}
+              disabled
+            />
           )
         )}
       </div>
 
-      <div className="flex items-center gap-0.5 border-l border-gray-100 pl-3">
+      <div className="contents md:flex md:items-center md:gap-0.5 md:border-l md:border-gray-100 md:pl-3">
         <AccionIcono
           icono={Users}
-          etiqueta={abortada ? "No disponible: la escala fue abortada" : "Manifiesto"}
+          etiqueta="Manifiesto"
+          tooltip={abortada ? textoAbortada : undefined}
           href={abortada ? undefined : `/dashboard/manifiesto?escala=${e.id}`}
           disabled={abortada}
         />
 
         <AccionIcono
           icono={ClipboardCheck}
-          etiqueta={abortada ? "No disponible: la escala fue abortada" : "Post-vuelo"}
+          etiqueta="Post-vuelo"
+          tooltip={abortada ? textoAbortada : undefined}
           href={abortada ? undefined : `/dashboard/post-vuelo?escala=${e.id}`}
           disabled={abortada}
         />
       </div>
 
-      <div className="flex items-center gap-0.5 border-l border-gray-100 pl-3">
+      <div className="contents md:flex md:items-center md:gap-0.5 md:border-l md:border-gray-100 md:pl-3">
         {puedeEditar && <AbortarEscalaAccion escala={e} onAbortada={cargarEscalas} />}
 
         {/* Eliminar depende únicamente del permiso ESCALAS.puede_eliminar

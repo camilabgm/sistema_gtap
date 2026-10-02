@@ -5,6 +5,13 @@
 // más clara. El filtro de tipo (Motor/Hélice/APU) que vivía en Tabla
 // se suma acá — el de aeronave no hacía falta moverlo, ya cumplía ese
 // rol como el selector de "Por aeronave".
+//
+// CAMBIO (rama fix/accion-icono-mobile): la fila de acciones de cada
+// tarjeta pasa a flex-wrap. Debajo de 768px AccionIcono muestra la
+// etiqueta como texto, y entre 640px y 767px la grilla ya está en 3
+// columnas (sm:grid-cols-3) — cada tarjeta queda angosta, y "Editar"
+// + "Desactivar" con texto no entran en una línea. Sin flex-wrap se
+// salían por el costado derecho de la tarjeta.
 
 import { useState } from "react"
 import { Plus, Pencil, Trash2, RotateCcw, PowerOff } from "lucide-react"
@@ -220,7 +227,7 @@ export default function SicemComponentesTable({ componentes: datosIniciales, aer
                   {c.fecha_proxima_inspeccion && <p>Próx. inspección: {formatearFecha(c.fecha_proxima_inspeccion)}</p>}
                 </div>
 
-                <div className="flex items-center gap-1 pt-3 border-t border-gray-100">
+                <div className="flex flex-wrap items-center gap-1 pt-3 border-t border-gray-100">
                   {c.activo === false ? (
                     permisos?.puede_editar && (
                       <AccionIcono icono={RotateCcw} etiqueta="Reactivar" onClick={() => handleReactivar(c)} disabled={cambiandoEstado === c.id} color="primario" />
