@@ -51,3 +51,7 @@ node_modules/
 /playwright/.auth/
 
 commit-msg.txt
+# Lo saca del repo pero NO lo borra de tu carpeta
+git rm --cached commit.msg
+
+
