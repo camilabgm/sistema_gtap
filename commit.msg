@@ -1,40 +1,32 @@
-fix: maestro-detalle en tablet, formularios internos y fechas en 24 h
+fix: modales responsive con cáscara compartida (ModalBase)
 
-Manifiesto y Post-Vuelo mostraban lista y detalle mitad y mitad en
-768px: con el sidebar, el detalle quedaba con unos 300px. Además,
-las fechas en formato de 12 horas daban errores de hidratación.
+En celular varios modales eran más altos que la pantalla, sin scroll
+interno (los últimos campos y el botón Guardar quedaban afuera), o
+tenían grillas de columnas fijas que se cortaban a la derecha.
 
-Maestro-detalle (useVistaMobileMaestroDetalle + 2 pantallas):
-- Usa usePantallaCompacta (1024px) en vez de useDeviceType (768px):
-  en celular Y tablet se ve lista o detalle de a uno
-- Devuelve "esCompacta" en vez de "esMobile"
-- Desde 1024px lado a lado: lista 40% con máximo de 384px, el
-  detalle con todo el resto
-- "Volver a Inicio" solo en celular
+ModalBase (shared, nuevo):
+- Celular: pantalla completa, título y botones fijos, solo el
+  contenido se desplaza
+- Desde 640px: centrado, alto máximo 90%, ancho por modal
+- Esc cierra todos los modales
+- Tocar el fondo no cierra los formularios (sí los paneles de Ver)
+- Bloquea el scroll de la página de atrás
+- Portal a body con z-50
+- Error fuera del scroll, justo arriba de los botones
 
-Manifiesto:
-- PanelDetalle: celdas que no se pisan, botones alineados con el
-  título, acciones de pasajero/carga con flex-wrap
-- FormularioPasajero y FormularioCarga: etiqueta visible en cada
-  campo (antes solo placeholder, que se cortaba)
+Aplicado en 13 modales:
+- Aeronaves: AeronavesForm, AeronaveDisponibilidadModal,
+  PanelVerAeronave
+- Personas: PersonasForm, UsuarioModal, PermisosUsuarioModal,
+  HabilitacionesModal (solo la cáscara)
+- Tipos de Misión: TiposMisionesForm, PanelVerTipoMision
+- SICEM: SicemComponentesForm, SicemEventosForm, PanelVerEvento
+- Parte Diario: modal de novedad
 
-Post-Vuelo (PanelPostVuelo):
-- Datos de la escala en 2 columnas en celular
-- Corrección de combustible: el botón ya no se sale
-- Cierre: campos alineados, "Sugerido por el Manifiesto" debajo
+Grillas corregidas:
+- SicemComponentesForm: grid-cols-2/3 fijos -> 1 columna en celular
+- PersonasForm: datos institucionales a 1 columna en celular y
+  col-span-2 -> sm:col-span-2 (creaba una columna fantasma)
+- Parte Diario: lista del buscador de personas en el flujo normal
 
-Escala (FormularioEscala + EditarEscala):
-- Cartel de disponibilidad y su botón apilados en celular
-- Tramos del itinerario en 1/2/5 columnas
-- Padding de pantalla más chico en celular
-
-SICEM: SicemDatosGeneralesAeronave en 1/2/3 columnas.
-
-Fechas en 24 horas con el formateador compartido de fechaHora.js:
-- escalas.js (formatearHora, formatearFechaHoraCompacta),
-  PanelAuditoria, InformeVuelos
-- Corrige el error de hidratación por el espacio invisible antes
-  de "a. m." (Node y Chrome usan caracteres distintos)
-- ParteDiarioPage: fecha de hoy con hora de Paraguay explícita
-
-14 archivos modificados.
+14 archivos (1 nuevo).

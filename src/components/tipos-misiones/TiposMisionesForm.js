@@ -1,13 +1,14 @@
 "use client"
 // src/components/tipos-misiones/TiposMisionesForm.js
+//
+// CAMBIO (rama fix/responsive-modales): usa la cáscara compartida
+// ModalBase — pantalla completa en celular, botones siempre visibles
+// abajo, error arriba de los botones. Esc lo maneja ModalBase; acá
+// queda solo Enter para guardar. La ayuda "Presioná Enter / Esc" se
+// muestra solo desde 640px: en un celular no hay teclado físico.
 
 import { useState, useEffect } from "react"
-
-const ETIQUETAS_CLASIFICACION = {
-  OPERACIONAL: "Operacional",
-  TIPO_VUELO:  "Tipo de Vuelo",
-  LOGISTICA:   "Logística",
-}
+import ModalBase from "@/components/shared/ModalBase"
 
 export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) {
 
@@ -32,12 +33,11 @@ export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) 
 
   useEffect(() => {
     const manejarTecla = (e) => {
-      if (e.key === "Escape") onCerrar()
-      if (e.key === "Enter")  handleGuardar()
+      if (e.key === "Enter") handleGuardar()
     }
     document.addEventListener("keydown", manejarTecla)
     return () => document.removeEventListener("keydown", manejarTecla)
-  }, [codigo, nombre, clasificacion, descripcion, tieneSubtipo, subtipo])
+  }, [codigo, nombre, clasificacion, descripcion, tieneSubtipo, subtipo]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleGuardar() {
     if (cargando) return
@@ -74,164 +74,138 @@ export default function TiposMisionesForm({ tipoMision, onGuardado, onCerrar }) 
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      onClick={onCerrar}
+    <ModalBase
+      titulo={modoEdicion ? "Editar Tipo de Misión" : "Nuevo Tipo de Misión"}
+      onCerrar={onCerrar}
+      ancho="md"
+      error={error}
+      pie={<>
+        <button
+          onClick={onCerrar}
+          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={handleGuardar}
+          disabled={cargando}
+          className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+        >
+          {cargando ? "Guardando..." : "Guardar"}
+        </button>
+      </>}
     >
-      <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
+      {/* Código */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Código <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+          placeholder="Ej: AME, VMIL, FAP"
+          maxLength={10}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <p className="text-xs text-gray-400 mt-1">Se convierte a mayúsculas automáticamente</p>
+      </div>
 
-        {/* Encabezado */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold text-gray-800">
-            {modoEdicion ? "Editar Tipo de Misión" : "Nuevo Tipo de Misión"}
-          </h2>
-          <button
-            onClick={onCerrar}
-            className="text-gray-400 hover:text-gray-600 text-xl font-bold"
-          >
-            ✕
-          </button>
-        </div>
+      {/* Nombre */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Nombre <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          placeholder="Ej: Aeromédico"
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-            {error}
-          </div>
+      {/* Clasificación */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Clasificación <span className="text-red-500">*</span>
+        </label>
+        <select
+          value={clasificacion}
+          onChange={(e) => setClasificacion(e.target.value)}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Seleccionar clasificación</option>
+          <option value="OPERACIONAL">Operacional</option>
+          <option value="TIPO_VUELO">Tipo de Vuelo</option>
+          <option value="LOGISTICA">Logística</option>
+        </select>
+        {clasificacion && (
+          <p className="text-xs text-blue-600 mt-1">
+            {clasificacion === "OPERACIONAL" && "Define la naturaleza del vuelo: militar, institucional o arrendamiento."}
+            {clasificacion === "TIPO_VUELO"  && "Define el propósito específico del vuelo."}
+            {clasificacion === "LOGISTICA"   && "Define quién cubre los gastos de la operación."}
+          </p>
         )}
+      </div>
 
-        {/* Código */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Código <span className="text-red-500">*</span>
+      {/* Sub-tipo — solo si clasificación es TIPO_VUELO */}
+      {clasificacion === "TIPO_VUELO" && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-md border border-gray-200">
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={tieneSubtipo}
+              onChange={(e) => {
+                setTieneSubtipo(e.target.checked)
+                if (!e.target.checked) setSubtipo("")
+              }}
+              className="mt-0.5 w-4 h-4 shrink-0 text-blue-600 rounded"
+            />
+            <span className="text-sm font-medium text-gray-700">
+              ¿Este tipo de vuelo tiene sub-tipo?
+            </span>
           </label>
-          <input
-            type="text"
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-            placeholder="Ej: AME, VMIL, FAP"
-            maxLength={10}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-xs text-gray-400 mt-1">Se convierte a mayúsculas automáticamente</p>
-        </div>
 
-        {/* Nombre */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nombre <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: Aeromédico"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Clasificación */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Clasificación <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={clasificacion}
-            onChange={(e) => setClasificacion(e.target.value)}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Seleccionar clasificación</option>
-            <option value="OPERACIONAL">Operacional</option>
-            <option value="TIPO_VUELO">Tipo de Vuelo</option>
-            <option value="LOGISTICA">Logística</option>
-          </select>
-          {clasificacion && (
-            <p className="text-xs text-blue-600 mt-1">
-              {clasificacion === "OPERACIONAL" && "Define la naturaleza del vuelo: militar, institucional o arrendamiento."}
-              {clasificacion === "TIPO_VUELO"  && "Define el propósito específico del vuelo."}
-              {clasificacion === "LOGISTICA"   && "Define quién cubre los gastos de la operación."}
-            </p>
+          {tieneSubtipo && (
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sub-tipo <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={subtipo}
+                onChange={(e) => setSubtipo(e.target.value)}
+                placeholder="Ej: Traslado de paciente, Trasplante de órganos"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Describí los sub-tipos posibles separados por comas.
+              </p>
+            </div>
           )}
         </div>
+      )}
 
-        {/* Sub-tipo — solo si clasificación es TIPO_VUELO */}
-        {clasificacion === "TIPO_VUELO" && (
-          <div className="mb-4 p-3 bg-gray-50 rounded-md border border-gray-200">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={tieneSubtipo}
-                onChange={(e) => {
-                  setTieneSubtipo(e.target.checked)
-                  if (!e.target.checked) setSubtipo("")
-                }}
-                className="w-4 h-4 text-blue-600 rounded"
-              />
-              <span className="text-sm font-medium text-gray-700">
-                ¿Este tipo de vuelo tiene sub-tipo?
-              </span>
-            </label>
-
-            {tieneSubtipo && (
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sub-tipo <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={subtipo}
-                  onChange={(e) => setSubtipo(e.target.value)}
-                  placeholder="Ej: Traslado de paciente, Trasplante de órganos"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Describí los sub-tipos posibles separados por comas.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Descripción */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Descripción
-            <span className="text-gray-400 font-normal ml-1">(opcional)</span>
-          </label>
-          <textarea
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Descripción del tipo de misión..."
-            rows={3}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          />
-        </div>
-
-        {/* Botones */}
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onCerrar}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleGuardar}
-            disabled={cargando}
-            className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {cargando ? "Guardando..." : "Guardar"}
-          </button>
-        </div>
-
-        <p className="text-xs text-gray-400 text-center mt-4">
-          Presioná <kbd className="bg-gray-100 px-1 rounded">Enter</kbd> para guardar
-          o <kbd className="bg-gray-100 px-1 rounded">Esc</kbd> para cancelar
-        </p>
-
+      {/* Descripción */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Descripción
+          <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+        </label>
+        <textarea
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          placeholder="Descripción del tipo de misión..."
+          rows={3}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        />
       </div>
-    </div>
+
+      <p className="hidden sm:block text-xs text-gray-400 text-center mt-4">
+        Presioná <kbd className="bg-gray-100 px-1 rounded">Enter</kbd> para guardar
+        o <kbd className="bg-gray-100 px-1 rounded">Esc</kbd> para cancelar
+      </p>
+    </ModalBase>
   )
 }

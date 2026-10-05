@@ -1,8 +1,17 @@
 "use client"
 // src/components/personas/HabilitacionesModal.js
+//
+// CAMBIO (rama fix/responsive-modales): SOLO la cáscara — usa
+// ModalBase (pantalla completa en celular, "Cerrar" siempre visible
+// abajo, Esc lo maneja ModalBase) y el formulario de período pasa de
+// md:grid-cols-3 a sm:grid-cols-3. La lógica no se toca: este modal se
+// reescribe en la rama de habilitaciones unificadas. Antes se cerraba
+// al tocar el fondo; ahora no, porque tiene un formulario adentro (el
+// de cargar período) y un toque accidental perdía lo cargado.
 
 import { useState, useEffect } from "react"
 import { normalizarFechaSoloDia, formatearFechaSoloDia } from "@/lib/fechaSoloDia"
+import ModalBase from "@/components/shared/ModalBase"
 
 // Calcula la fecha de vencimiento según período y año de inicio
 function calcularVencimiento(periodo, anio) {
@@ -44,13 +53,7 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
 
   useEffect(() => {
     cargarHabilitaciones()
-  }, [])
-
-  useEffect(() => {
-    const manejarTecla = (e) => { if (e.key === "Escape") onCerrar() }
-    document.addEventListener("keydown", manejarTecla)
-    return () => document.removeEventListener("keydown", manejarTecla)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function cargarHabilitaciones() {
     setCargandoDatos(true)
@@ -114,155 +117,149 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
   const vencimientoCalculado = calcularVencimiento(nuevoPeriodo, nuevoAnio)
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={onCerrar}
+    <ModalBase
+      titulo="Control de Habilitaciones"
+      subtitulo={`${persona.grado} ${persona.apellido}, ${persona.nombre}`}
+      onCerrar={onCerrar}
+      ancho="2xl"
+      pie={
+        <button onClick={onCerrar}
+          className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+          Cerrar
+        </button>
+      }
     >
-      <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800">Control de Habilitaciones</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {persona.grado} {persona.apellido}, {persona.nombre}
+      <div className="space-y-6">
+
+        {!esAdministrador && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-xs text-gray-500">
+              Solo el Jefe de Operaciones y el Comandante pueden cargar períodos o modificar habilitaciones. Podés ver el historial, pero no editarlo.
             </p>
           </div>
-          <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
-        </div>
+        )}
 
-        <div className="px-6 py-5 space-y-6">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            Habilitación médica
+          </h3>
 
-          {!esAdministrador && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-              <p className="text-xs text-gray-500">
-                Solo el Jefe de Operaciones y el Comandante pueden cargar períodos o modificar habilitaciones. Podés ver el historial, pero no editarlo.
-              </p>
+          <div className="border border-gray-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <p className="text-sm font-medium text-gray-700">Semestral</p>
+              {esAdministrador && !mostrarFormSemestral && (
+                <button
+                  onClick={() => setMostrarFormSemestral(true)}
+                  className="shrink-0 text-xs text-blue-600 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50 transition-colors"
+                >
+                  + Cargar período
+                </button>
+              )}
             </div>
-          )}
 
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-              Habilitación médica
-            </h3>
-
-            <div className="border border-gray-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-gray-700">Semestral</p>
-                {esAdministrador && !mostrarFormSemestral && (
-                  <button
-                    onClick={() => setMostrarFormSemestral(true)}
-                    className="text-xs text-blue-600 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50 transition-colors"
-                  >
-                    + Cargar período
-                  </button>
+            {esAdministrador && mostrarFormSemestral && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                {errorSemestral && (
+                  <p className="text-xs text-red-600 mb-3">{errorSemestral}</p>
                 )}
+                <div className="grid grid-cols-1 gap-3 mb-3 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Período <span className="text-red-500">*</span>
+                    </label>
+                    <select value={nuevoPeriodo}
+                      onChange={(e) => setNuevoPeriodo(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Seleccionar</option>
+                      <option value="1P">1P — abr. a sep.</option>
+                      <option value="2P">2P — oct. a mar.</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Año <span className="text-red-500">*</span>
+                    </label>
+                    <input type="number" value={nuevoAnio}
+                      onChange={(e) => setNuevoAnio(e.target.value)}
+                      placeholder="2026" min={2020} max={2099}
+                      className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Fecha examen <span className="text-red-500">*</span>
+                    </label>
+                    <input type="date" value={nuevaFechaExamen}
+                      onChange={(e) => setNuevaFechaExamen(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+                {vencimientoCalculado && (
+                  <p className="text-xs text-blue-600 mb-3">
+                    Vencimiento: <strong>{formatFecha(vencimientoCalculado)}</strong>
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={handleGuardarSemestral} disabled={guardandoSemestral}
+                    className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    {guardandoSemestral ? "Guardando..." : "Guardar período"}
+                  </button>
+                  <button onClick={() => { setMostrarFormSemestral(false); setErrorSemestral("") }}
+                    className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+                    Cancelar
+                  </button>
+                </div>
               </div>
+            )}
 
-              {esAdministrador && mostrarFormSemestral && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  {errorSemestral && (
-                    <p className="text-xs text-red-600 mb-3">{errorSemestral}</p>
-                  )}
-                  <div className="grid grid-cols-1 gap-3 mb-3 md:grid-cols-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Período <span className="text-red-500">*</span>
-                      </label>
-                      <select value={nuevoPeriodo}
-                        onChange={(e) => setNuevoPeriodo(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Seleccionar</option>
-                        <option value="1P">1P — abr. a sep.</option>
-                        <option value="2P">2P — oct. a mar.</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Año <span className="text-red-500">*</span>
-                      </label>
-                      <input type="number" value={nuevoAnio}
-                        onChange={(e) => setNuevoAnio(e.target.value)}
-                        placeholder="2026" min={2020} max={2099}
-                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Fecha examen <span className="text-red-500">*</span>
-                      </label>
-                      <input type="date" value={nuevaFechaExamen}
-                        onChange={(e) => setNuevaFechaExamen(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                  </div>
-                  {vencimientoCalculado && (
-                    <p className="text-xs text-blue-600 mb-3">
-                      Vencimiento: <strong>{formatFecha(vencimientoCalculado)}</strong>
-                    </p>
-                  )}
-                  <div className="flex gap-2">
-                    <button onClick={handleGuardarSemestral} disabled={guardandoSemestral}
-                      className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                      {guardandoSemestral ? "Guardando..." : "Guardar período"}
-                    </button>
-                    <button onClick={() => { setMostrarFormSemestral(false); setErrorSemestral("") }}
-                      className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {cargandoDatos ? (
-                <p className="text-xs text-gray-400 py-2">Cargando historial...</p>
-              ) : habilitaciones.length === 0 ? (
-                <p className="text-xs text-gray-400 py-2">Sin períodos registrados.</p>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {habilitaciones.map((h) => {
-                    const badge = badgeVencimiento(h.vence)
-                    return (
-                      <div key={h.id} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="font-mono text-sm font-medium text-gray-900">
-                            {h.periodo}/{h.anio}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            Examen: {formatFecha(h.fecha_examen)}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            Vence: {formatFecha(h.vence)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {badge && (
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
-                              {badge.label}
-                            </span>
-                          )}
-                          {esAdministrador && (
-                            <button
-                              onClick={() => handleEliminarSemestral(h.id)}
-                              className="text-xs text-gray-300 hover:text-red-500 transition-colors"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
+            {cargandoDatos ? (
+              <p className="text-xs text-gray-400 py-2">Cargando historial...</p>
+            ) : habilitaciones.length === 0 ? (
+              <p className="text-xs text-gray-400 py-2">Sin períodos registrados.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {habilitaciones.map((h) => {
+                  const badge = badgeVencimiento(h.vence)
+                  return (
+                    <div key={h.id} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="font-mono text-sm font-medium text-gray-900">
+                          {h.periodo}/{h.anio}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          Examen: {formatFecha(h.fecha_examen)}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          Vence: {formatFecha(h.vence)}
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+                      <div className="flex items-center gap-2">
+                        {badge && (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
+                            {badge.label}
+                          </span>
+                        )}
+                        {esAdministrador && (
+                          <button
+                            onClick={() => handleEliminarSemestral(h.id)}
+                            className="text-xs text-gray-300 hover:text-red-500 transition-colors"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
-            <div className="border border-gray-200 rounded-lg p-4">
-              <label className={`flex items-center gap-3 ${esAdministrador ? "cursor-pointer" : "cursor-not-allowed"}`}>
-                <input type="checkbox"
-                  checked={anualHabilitada}
-                  disabled={guardandoCheck || !esAdministrador}
-                  onChange={(e) => {
+          <div className="border border-gray-200 rounded-lg p-4">
+            <label className={`flex items-start gap-3 ${esAdministrador ? "cursor-pointer" : "cursor-not-allowed"}`}>
+              <input type="checkbox"
+                checked={anualHabilitada}
+                disabled={guardandoCheck || !esAdministrador}
+                onChange={(e) => {
                   const nuevoValor = e.target.checked
                   const accion = nuevoValor ? "habilitar" : "quitar la habilitación de"
                   const confirmar = window.confirm(
@@ -272,27 +269,27 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
                   setAnualHabilitada(nuevoValor)
                   handleToggleCheck("hab_anual_habilitada", nuevoValor)
                 }}
-                  className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
-                <div>
-                  <span className="text-sm font-medium text-gray-700">Anual — habilitado por Operaciones</span>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Operaciones confirma la habilitación médica anual del tripulante.
-                  </p>
-                </div>
-              </label>
-            </div>
+                className="mt-0.5 w-4 h-4 shrink-0 text-blue-600 rounded disabled:opacity-50" />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Anual — habilitado por Operaciones</span>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Operaciones confirma la habilitación médica anual del tripulante.
+                </p>
+              </div>
+            </label>
           </div>
+        </div>
 
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-              Habilitación operacional
-            </h3>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <label className={`flex items-center gap-3 ${esAdministrador ? "cursor-pointer" : "cursor-not-allowed"}`}>
-                <input type="checkbox"
-                  checked={operacionalHabilitada}
-                  disabled={guardandoCheck || !esAdministrador}
-                  onChange={(e) => {
+        <div>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            Habilitación operacional
+          </h3>
+          <div className="border border-gray-200 rounded-lg p-4">
+            <label className={`flex items-start gap-3 ${esAdministrador ? "cursor-pointer" : "cursor-not-allowed"}`}>
+              <input type="checkbox"
+                checked={operacionalHabilitada}
+                disabled={guardandoCheck || !esAdministrador}
+                onChange={(e) => {
                   const nuevoValor = e.target.checked
                   const accion = nuevoValor ? "habilitar operacionalmente" : "quitar la habilitación operacional de"
                   const confirmar = window.confirm(
@@ -302,26 +299,18 @@ export default function HabilitacionesModal({ persona, onCerrar, esAdministrador
                   setOperacionalHabilitada(nuevoValor)
                   handleToggleCheck("nivel_operacional_habilitado", nuevoValor)
                 }}
-                  className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
-                <div>
-                  <span className="text-sm font-medium text-gray-700">Habilitado por Operaciones</span>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    El Jefe de Operaciones confirma que el tripulante está habilitado operacionalmente para volar.
-                  </p>
-                </div>
-              </label>
-            </div>
+                className="mt-0.5 w-4 h-4 shrink-0 text-blue-600 rounded disabled:opacity-50" />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Habilitado por Operaciones</span>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  El Jefe de Operaciones confirma que el tripulante está habilitado operacionalmente para volar.
+                </p>
+              </div>
+            </label>
           </div>
-
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
-          <button onClick={onCerrar}
-            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-            Cerrar
-          </button>
-        </div>
       </div>
-    </div>
+    </ModalBase>
   )
 }

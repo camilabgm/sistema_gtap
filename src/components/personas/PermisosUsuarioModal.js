@@ -1,12 +1,20 @@
 "use client"
 
-// CAMBIO: la tabla de 7 columnas (Módulo + 5 acciones + Personalizar)
-// vive dentro de un modal, no de una página principal — no se
-// beneficia del min-w-0 de DashboardShell. Se envuelve en su propio
-// contenedor con overflow-x-auto para que tenga scroll horizontal
-// propio en pantallas angostas, en vez de desbordar el modal.
+// src/components/personas/PermisosUsuarioModal.js
+//
+// La tabla de 7 columnas (Módulo + 5 acciones + Personalizar) vive
+// dentro de un modal: tiene su propio contenedor con overflow-x-auto
+// para deslizarse de costado en pantallas angostas.
+//
+// CAMBIO (rama fix/responsive-modales): usa la cáscara compartida
+// ModalBase — pantalla completa en celular, "Cancelar" y "Guardar
+// permisos" siempre visibles abajo. Este modal no tenía Esc: ahora lo
+// tiene, como todos. El mensaje de éxito/error sigue dentro del
+// contenido, arriba de la tabla, porque también muestra el aviso verde
+// de "Permisos guardados".
 
 import { useState, useEffect } from "react"
+import ModalBase from "@/components/shared/ModalBase"
 
 const MODULOS = [
   { key: "PERSONAS",            label: "Personas" },
@@ -117,134 +125,119 @@ export default function PermisosUsuarioModal({ persona, onCerrar, onGuardado }) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Permisos individuales
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {persona.apellido}, {persona.nombre}
-              {datos && (
-                <span className="ml-2 text-xs text-blue-600">
-                  Rol base: {datos.rol_nombre}
-                </span>
-              )}
-            </p>
-          </div>
-          <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-        </div>
-
-        {/* Contenido */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {cargando ? (
-            <p className="text-center text-gray-400 py-8">Cargando permisos...</p>
-          ) : (
-            <>
-              <p className="text-xs text-gray-500 mb-4">
-                Las filas marcadas como <strong>Personalizar</strong> reemplazan los permisos del rol para este usuario.
-                Las filas sin personalizar usan los permisos del rol base.
-              </p>
-
-              {mensaje && (
-                <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
-                  mensaje.tipo === "ok"
-                    ? "bg-green-50 text-green-700"
-                    : "bg-red-50 text-red-700"
-                }`}>
-                  {mensaje.texto}
-                </div>
-              )}
-
-              {/* FIX: contenedor propio con scroll horizontal — este
-                  modal no tiene el min-w-0 de DashboardShell, así que
-                  una tabla de 7 columnas necesita su propia salida
-                  para pantallas angostas, en vez de desbordar el
-                  modal o quedar recortada sin forma de verla. */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Módulo</th>
-                      {ACCIONES.map((a) => (
-                        <th key={a.key} className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">
-                          {a.label}
-                        </th>
-                      ))}
-                      <th className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">Personalizar</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {MODULOS.map((modulo) => {
-                      const s          = estado[modulo.key] || {}
-                      const esOverride = s.es_override
-
-                      return (
-                        <tr
-                          key={modulo.key}
-                          className={`transition-colors ${
-                            esOverride ? "bg-blue-50" : "hover:bg-gray-50"
-                          }`}
-                        >
-                          <td className="px-4 py-3 font-medium text-gray-700 whitespace-nowrap">
-                            {modulo.label}
-                            {esOverride && (
-                              <span className="ml-2 text-xs text-blue-500 font-normal">
-                                personalizado
-                              </span>
-                            )}
-                          </td>
-                          {ACCIONES.map((accion) => (
-                            <td key={accion.key} className="text-center px-3 py-3">
-                              <input
-                                type="checkbox"
-                                checked={s[accion.key] ?? false}
-                                onChange={() => togglePermiso(modulo.key, accion.key)}
-                                disabled={!esOverride}
-                                className="w-4 h-4 accent-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-                              />
-                            </td>
-                          ))}
-                          <td className="text-center px-3 py-3">
-                            <input
-                              type="checkbox"
-                              checked={esOverride}
-                              onChange={() => toggleOverride(modulo.key)}
-                              className="w-4 h-4 accent-purple-600 cursor-pointer"
-                              title="Activar para personalizar los permisos de este módulo"
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
+    <ModalBase
+      titulo="Permisos individuales"
+      subtitulo={
+        <>
+          {persona.apellido}, {persona.nombre}
+          {datos && (
+            <span className="ml-2 text-xs text-blue-600">
+              Rol base: {datos.rol_nombre}
+            </span>
           )}
-        </div>
+        </>
+      }
+      onCerrar={onCerrar}
+      ancho="4xl"
+      pie={<>
+        <button
+          onClick={onCerrar}
+          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={guardar}
+          disabled={guardando || cargando}
+          className="px-4 py-2 text-sm bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {guardando ? "Guardando..." : "Guardar permisos"}
+        </button>
+      </>}
+    >
+      {cargando ? (
+        <p className="text-center text-gray-400 py-8">Cargando permisos...</p>
+      ) : (
+        <>
+          <p className="text-xs text-gray-500 mb-4">
+            Las filas marcadas como <strong>Personalizar</strong> reemplazan los permisos del rol para este usuario.
+            Las filas sin personalizar usan los permisos del rol base.
+          </p>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-          <button
-            onClick={onCerrar}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={guardar}
-            disabled={guardando || cargando}
-            className="px-4 py-2 text-sm bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {guardando ? "Guardando..." : "Guardar permisos"}
-          </button>
-        </div>
+          {mensaje && (
+            <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
+              mensaje.tipo === "ok"
+                ? "bg-green-50 text-green-700"
+                : "bg-red-50 text-red-700"
+            }`}>
+              {mensaje.texto}
+            </div>
+          )}
 
-      </div>
-    </div>
+          {/* Contenedor propio con scroll horizontal — una tabla de 7
+              columnas necesita su propia salida en pantallas angostas,
+              en vez de desbordar el modal. */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Módulo</th>
+                  {ACCIONES.map((a) => (
+                    <th key={a.key} className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">
+                      {a.label}
+                    </th>
+                  ))}
+                  <th className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">Personalizar</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {MODULOS.map((modulo) => {
+                  const s          = estado[modulo.key] || {}
+                  const esOverride = s.es_override
+
+                  return (
+                    <tr
+                      key={modulo.key}
+                      className={`transition-colors ${
+                        esOverride ? "bg-blue-50" : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-medium text-gray-700 whitespace-nowrap">
+                        {modulo.label}
+                        {esOverride && (
+                          <span className="ml-2 text-xs text-blue-500 font-normal">
+                            personalizado
+                          </span>
+                        )}
+                      </td>
+                      {ACCIONES.map((accion) => (
+                        <td key={accion.key} className="text-center px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={s[accion.key] ?? false}
+                            onChange={() => togglePermiso(modulo.key, accion.key)}
+                            disabled={!esOverride}
+                            className="w-4 h-4 accent-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          />
+                        </td>
+                      ))}
+                      <td className="text-center px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={esOverride}
+                          onChange={() => toggleOverride(modulo.key)}
+                          className="w-4 h-4 accent-purple-600 cursor-pointer"
+                          title="Activar para personalizar los permisos de este módulo"
+                        />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </ModalBase>
   )
 }

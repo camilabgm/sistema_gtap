@@ -13,11 +13,19 @@
 //
 // CAMBIO (rama fix/responsive-maestro-detalle): la fecha de hoy del
 // encabezado se calcula con timeZone "America/Asuncion" explícito.
+//
+// CAMBIO (rama fix/responsive-modales): el modal de agregar/editar
+// novedad usa la cáscara compartida ModalBase (pantalla completa en
+// celular, botones siempre visibles, Esc para cerrar, tocar afuera no
+// cierra). La lista de resultados del buscador de personas pasa de
+// flotante a estar en el flujo normal, para que no la recorte el
+// contenido con scroll del modal.
 
 import { useState } from "react"
 import { Plus, Pencil, Trash2, Search } from "lucide-react"
 import AccionIcono from "@/components/shared/AccionIcono"
 import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
+import ModalBase from "@/components/shared/ModalBase"
 import { normalizarParaBusqueda as normalizarTexto } from "@/lib/texto"
 
 const ETIQUETAS_ESCUADRON = {
@@ -253,86 +261,80 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
       </div>
 
       {modalAbierto && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={handleCerrarModal}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
-            onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-lg font-semibold text-gray-800">
-                {novedadEditando ? "Editar novedad" : "Agregar novedad"}
-              </h3>
-              <button onClick={handleCerrarModal}
-                className="text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
-            </div>
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-                {error}
-              </div>
-            )}
-            <div className="mb-4 relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Persona <span className="text-red-500">*</span>
-              </label>
-              {novedadEditando ? (
-                <p className="w-full border border-gray-200 bg-gray-50 rounded-md px-3 py-2 text-sm text-gray-700">
-                  {novedadEditando.persona.grado} {novedadEditando.persona.apellido}, {novedadEditando.persona.nombre}
-                </p>
-              ) : (
-                <>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={textoPersona}
-                      onChange={(e) => handleCambiarTexto(e.target.value)}
-                      onFocus={() => setDropdownAbierto(true)}
-                      placeholder="Buscar persona por nombre o apellido..."
-                      className="w-full h-10 pl-9 pr-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+        <ModalBase
+          titulo={novedadEditando ? "Editar novedad" : "Agregar novedad"}
+          onCerrar={handleCerrarModal}
+          ancho="md"
+          error={error}
+          pie={<>
+            <button onClick={handleCerrarModal}
+              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">
+              Cancelar
+            </button>
+            <button onClick={handleGuardar} disabled={cargando}
+              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
+              {cargando ? "Guardando..." : "Guardar novedad"}
+            </button>
+          </>}
+        >
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Persona <span className="text-red-500">*</span>
+            </label>
+            {novedadEditando ? (
+              <p className="w-full border border-gray-200 bg-gray-50 rounded-md px-3 py-2 text-sm text-gray-700">
+                {novedadEditando.persona.grado} {novedadEditando.persona.apellido}, {novedadEditando.persona.nombre}
+              </p>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={textoPersona}
+                    onChange={(e) => handleCambiarTexto(e.target.value)}
+                    onFocus={() => setDropdownAbierto(true)}
+                    placeholder="Buscar persona por nombre o apellido..."
+                    className="w-full h-10 pl-9 pr-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-                  {dropdownAbierto && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {personasFiltradas.length === 0 ? (
-                        <p className="px-3 py-3 text-sm text-gray-400 text-center">Sin resultados</p>
-                      ) : (
-                        personasFiltradas.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onMouseDown={() => handleSeleccionarPersona(p)}
-                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                          >
-                            {nombreCompleto(p)}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observación <span className="text-gray-400 font-normal">(opcional)</span>
-              </label>
-              <input type="text" value={observacion}
-                onChange={(e) => setObservacion(e.target.value)}
-                placeholder="Ej: permiso médico, comisión IBA..."
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="flex justify-end gap-3">
-              <button onClick={handleCerrarModal}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">
-                Cancelar
-              </button>
-              <button onClick={handleGuardar} disabled={cargando}
-                className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {cargando ? "Guardando..." : "Guardar novedad"}
-              </button>
-            </div>
+                {/* La lista de resultados va en el flujo normal (no
+                    flotando con absolute): dentro de un modal con
+                    scroll, una lista flotante queda recortada por el
+                    borde del contenido. Así empuja hacia abajo lo que
+                    sigue y siempre se ve completa. */}
+                {dropdownAbierto && (
+                  <div className="mt-1 w-full bg-white border border-gray-200 rounded-md shadow-sm max-h-48 overflow-y-auto">
+                    {personasFiltradas.length === 0 ? (
+                      <p className="px-3 py-3 text-sm text-gray-400 text-center">Sin resultados</p>
+                    ) : (
+                      personasFiltradas.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onMouseDown={() => handleSeleccionarPersona(p)}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          {nombreCompleto(p)}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Observación <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <input type="text" value={observacion}
+              onChange={(e) => setObservacion(e.target.value)}
+              placeholder="Ej: permiso médico, comisión IBA..."
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </ModalBase>
       )}
 
     </div>
