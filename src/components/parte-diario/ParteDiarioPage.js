@@ -1,24 +1,20 @@
 "use client"
 // src/components/parte-diario/ParteDiarioPage.js
 //
-// CAMBIO: BotonVolverInicio arriba (oculto en desktop) — Parte Diario
-// es un módulo de una sola pantalla, sin sub-menú, así que en mobile
-// no tenía ningún camino de vuelta al Dashboard. Las filas de
-// novedades/personal pasan de una sola línea forzada a apiladas en
-// pantallas muy angostas, mismo criterio que ya usamos en
-// PendientesAutorizar.
+// Las filas de novedades/personal se apilan en pantallas muy
+// angostas; la fila de acciones de cada novedad tiene flex-wrap.
 //
-// CAMBIO (rama fix/accion-icono-mobile): AccionIcono ahora muestra la
-// etiqueta como texto en mobile. En cada novedad, el badge "No
-// disponible" + "Editar novedad" + "Quitar novedad" suman más ancho
-// que la tarjeta en un celular, y como el contenedor no tenía
-// flex-wrap, se salían por el costado derecho. Ahora ese contenedor
-// tiene flex-wrap: si no entran, los botones bajan a otra línea.
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina (incluye
+//     el "Volver a Inicio" de celular). Antes "Agregar novedad" se
+//     salía de la tarjeta en un celular angosto.
+//   - Los tres contadores (Total / Disponibles / Con novedad) usan
+//     gap-4 en celular (gap-8 desde 640px), así entran en 320px.
 
 import { useState } from "react"
 import { Plus, Pencil, Trash2, Search } from "lucide-react"
 import AccionIcono from "@/components/shared/AccionIcono"
-import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 import { normalizarParaBusqueda as normalizarTexto } from "@/lib/texto"
 
 const ETIQUETAS_ESCUADRON = {
@@ -141,28 +137,21 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
-      <div className="md:hidden mb-2">
-        <BotonVolverInicio />
-      </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Parte de Novedades</h1>
-            <p className="text-sm text-gray-500 mt-1 capitalize">{fechaHoy}</p>
-          </div>
-          {permisos?.puede_crear && (
-            <button
-              onClick={handleAbrirCrear}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0"
-            >
-              <Plus className="h-4 w-4" />
-              Agregar novedad
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center justify-center gap-8 pb-1">
+      <EncabezadoPagina
+        volverAInicio
+        titulo="Parte de Novedades"
+        subtitulo={<span className="capitalize">{fechaHoy}</span>}
+        acciones={permisos?.puede_crear && (
+          <button
+            onClick={handleAbrirCrear}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9"
+          >
+            <Plus className="h-4 w-4" />
+            Agregar novedad
+          </button>
+        )}
+      >
+        <div className="flex items-center justify-center gap-4 sm:gap-8 pb-1">
           <div className="text-center">
             <p className="text-2xl font-bold text-gray-900">{personas.length}</p>
             <p className="text-xs text-gray-500 mt-0.5">Total personal</p>
@@ -178,7 +167,7 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
             <p className="text-xs text-gray-500 mt-0.5">Con novedad</p>
           </div>
         </div>
-      </div>
+      </EncabezadoPagina>
 
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">

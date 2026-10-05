@@ -2,31 +2,26 @@
 
 // src/components/escalas/AgendaEscalas.js
 //
-// Agregado: soporte para ?fecha=YYYY-MM-DD&escala=ID en la URL — salta
-// directo a esa semana/día y abre esa escala ya expandida, en vez de
-// arrancar siempre en "hoy" como hacía antes. Lo usa la tarjeta de
-// "Acuses de recibo" del dashboard, para llevarte a la escala puntual
-// que falta acusar, no solo a la Agenda en general.
+// Soporte para ?fecha=YYYY-MM-DD&escala=ID en la URL — salta directo a
+// esa semana/día y abre esa escala ya expandida. Lo usa la tarjeta de
+// "Acuses de recibo" del dashboard.
 //
 // IMPORTANTE: usa useSearchParams(), que en el App Router de Next
 // necesita que el componente esté envuelto en <Suspense> más arriba
-// en el árbol. Si el build tira el warning de "should be wrapped in a
-// suspense boundary", envolver <AgendaEscalas /> en el page.js padre.
+// en el árbol.
 //
-// CAMBIO: la pestaña "Aeronaves" (Gantt de 24 horas) se oculta en
-// mobile — esa visualización necesita ancho horizontal real, y la
-// vista "Lista" ya cubre bien la misma necesidad en pantalla angosta.
+// La pestaña "Aeronaves" (Gantt de 24 horas) se oculta en celular —
+// esa visualización necesita ancho horizontal real. Cada vuelo del día
+// tiene DOS layouts: apilado (celular) y en una sola línea (desde 768px).
 //
-// FIX (2 rondas): los botones "Semana anterior"/"Semana siguiente" ya
-// no llevan texto en mobile (solo la flecha). Y la fila de cada vuelo
-// del día ahora tiene DOS layouts separados — uno para mobile
-// (apilado: hora+estado arriba, aeronave/ruta debajo, tripulación al
-// final) y uno para desktop (el original, en una sola línea). Antes
-// era un único flex con min-w-[92px] fijo + un badge shrink-0
-// whitespace-nowrap que no podían convivir en una pantalla angosta:
-// la suma de anchos mínimos obligatorios no entraba, y aunque no se
-// veía roto a simple vista, empujaba la página entera a un scroll
-// horizontal de unos pocos píxeles.
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina. Antes
+//     "Nueva escala" se salía de la tarjeta en un celular angosto. No
+//     usa volverAInicio: en celular, SubNavEscalas ya trae el "Volver".
+//   - Los 7 días de la semana pasan de flex a una grilla de 7 columnas
+//     iguales (grid-cols-7), con gap-1 en celular. Antes, en 320px, los
+//     7 botones con su padding no entraban y se salían de la tarjeta.
+//   - Los dos contadores (día / semana) usan gap-4 en celular.
 
 import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
@@ -34,6 +29,7 @@ import Link from "next/link"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import GanttAeronavesDia from "./GanttAeronavesDia"
 import PanelDetalleEscala from "./PanelDetalleEscala"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 import { useDeviceType } from "@/hooks/useDeviceType"
 import {
   formatearFechaHoraCompacta,
@@ -92,9 +88,7 @@ export default function AgendaEscalas({ puedeCrear }) {
   const [vista, setVista] = useState("LISTA")
   const [filaExpandidaId, setFilaExpandidaId] = useState(escalaParam ? Number(escalaParam) : null)
   // Mientras esto sea true, el efecto de "resetear a hoy" (más abajo)
-  // se queda quieto — se apaga apenas el usuario navega a mano
-  // (flechas de semana, o clickea un día), para no pisar la fecha que
-  // vino por URL antes de que el usuario haga nada.
+  // se queda quieto — se apaga apenas el usuario navega a mano.
   const [modoInicialUrl, setModoInicialUrl] = useState(!!fechaParam)
 
   const lunesMostrado = new Date(lunesActual)
@@ -107,10 +101,7 @@ export default function AgendaEscalas({ puedeCrear }) {
   })
   const domingoMostrado = diasSemana[6]
 
-  // Sincroniza fechaSeleccionada con la URL apenas esté disponible —
-  // en un efecto aparte del valor inicial de useState, por si
-  // useSearchParams() todavía no tenía el valor listo en el primerísimo
-  // render (evita depender de timing frágil).
+  // Sincroniza fechaSeleccionada con la URL apenas esté disponible.
   useEffect(() => {
     if (modoInicialUrl && fechaParam) {
       setFechaSeleccionada(fechaParam)
@@ -118,8 +109,6 @@ export default function AgendaEscalas({ puedeCrear }) {
   }, [fechaParam, modoInicialUrl])
 
   useEffect(() => {
-    // Mientras estemos en modo inicial por URL, este efecto no toca
-    // nada — la fecha la maneja el efecto de arriba.
     if (modoInicialUrl) return
     if (offsetSemanas === 0) {
       setFechaSeleccionada(hoyISO)
@@ -129,8 +118,7 @@ export default function AgendaEscalas({ puedeCrear }) {
   }, [offsetSemanas]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Si la vista quedó en "Aeronaves" y la ventana se achica por debajo
-  // de 768px, se fuerza de vuelta a "Lista" — esa pestaña ya no tiene
-  // botón visible para elegirla, no puede quedar montada.
+  // de 768px, se fuerza de vuelta a "Lista".
   useEffect(() => {
     if (esMobile === true && vista === "AERONAVES") {
       setVista("LISTA")
@@ -187,30 +175,26 @@ export default function AgendaEscalas({ puedeCrear }) {
   return (
     <div className="p-4 max-w-4xl mx-auto">
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
-            <p className="text-sm text-gray-500 mt-1">Qué vuela, cuándo — solo escalas ya publicadas y con horario cargado</p>
-          </div>
-          {puedeCrear && (
-            <Link
-              href="/dashboard/escalas/nueva"
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0"
-            >
-              <Plus className="h-4 w-4" />
-              Nueva escala
-            </Link>
-          )}
-        </div>
-
-         <div className="flex items-center justify-center gap-8 pb-4 mb-4 border-b border-gray-100">
-          <div>
+      <EncabezadoPagina
+        titulo="Agenda"
+        subtitulo="Qué vuela, cuándo — solo escalas ya publicadas y con horario cargado"
+        acciones={puedeCrear && (
+          <Link
+            href="/dashboard/escalas/nueva"
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva escala
+          </Link>
+        )}
+      >
+        <div className="flex items-center justify-center gap-4 sm:gap-8 pb-4 mb-4 border-b border-gray-100">
+          <div className="text-center">
             <p className="text-xs text-gray-500">Vuelos del día seleccionado</p>
             <p className="text-2xl font-bold text-gray-900 mt-0.5">{escalasDelDia.length}</p>
           </div>
           <div className="w-px h-9 bg-gray-200" />
-          <div>
+          <div className="text-center">
             <p className="text-xs text-gray-500">Vuelos en esta semana</p>
             <p className="text-2xl font-bold text-gray-900 mt-0.5">{escalasSemanaReal.length}</p>
           </div>
@@ -248,7 +232,10 @@ export default function AgendaEscalas({ puedeCrear }) {
           </button>
         </div>
 
-        <div className="flex gap-2">
+        {/* Grilla de 7 columnas iguales: siempre entran los 7 días,
+            sin importar el ancho — cada uno se achica lo que haga falta
+            (min-w-0) en vez de empujar a los demás afuera. */}
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {diasSemana.map((d) => {
             const iso = formatearISO(d)
             const esSeleccionado = iso === fechaSeleccionada
@@ -259,13 +246,13 @@ export default function AgendaEscalas({ puedeCrear }) {
               <button
                 key={iso}
                 onClick={() => { setModoInicialUrl(false); setFechaSeleccionada(iso); setFilaExpandidaId(null) }}
-                className={`flex-1 text-center py-2 px-1 rounded-md border transition-colors ${
+                className={`min-w-0 text-center py-2 rounded-md border transition-colors ${
                   esSeleccionado
                     ? "bg-blue-600 border-blue-600 text-white"
                     : "bg-white border-gray-200 hover:bg-gray-50 text-gray-700"
                 }`}
               >
-                <p className={`text-xs ${esSeleccionado ? "text-blue-100" : "text-gray-400"}`}>
+                <p className={`text-[11px] sm:text-xs ${esSeleccionado ? "text-blue-100" : "text-gray-400"}`}>
                   {NOMBRES_DIA[d.getDay()]}
                 </p>
                 <p className="text-sm font-medium mt-0.5">
@@ -286,7 +273,7 @@ export default function AgendaEscalas({ puedeCrear }) {
             )
           })}
         </div>
-      </div>
+      </EncabezadoPagina>
 
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
@@ -297,9 +284,8 @@ export default function AgendaEscalas({ puedeCrear }) {
               month: "long",
             })}
         </h2>
-        {/* El botón "Aeronaves" solo se muestra en desktop — en mobile
-            esa vista no existe, así que tampoco tiene sentido ofrecer
-            el selector con una sola opción. */}
+        {/* El botón "Aeronaves" solo se muestra desde 768px — en
+            celular esa vista no existe. */}
         {esMobile !== true && (
           <div className="flex bg-gray-100 rounded-md p-0.5">
             <button
@@ -362,7 +348,7 @@ export default function AgendaEscalas({ puedeCrear }) {
 
               return (
                 <div key={e.id}>
-                  {/* ── Desktop: una sola línea, visible desde 768px ── */}
+                  {/* ── Desde 768px: una sola línea ── */}
                   <button
                     onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
                     className="hidden md:flex w-full items-center gap-4 bg-white border border-gray-200 rounded-lg px-4 py-3 text-left hover:bg-gray-50 hover:border-gray-300 transition-colors"
@@ -386,7 +372,7 @@ export default function AgendaEscalas({ puedeCrear }) {
                     </span>
                   </button>
 
-                  {/* ── Mobile: apilado, oculto desde 768px ── */}
+                  {/* ── Celular: apilado, oculto desde 768px ── */}
                   <button
                     onClick={() => setFilaExpandidaId(expandida ? null : e.id)}
                     className="md:hidden w-full bg-white border border-gray-200 rounded-lg px-4 py-3 text-left hover:bg-gray-50 hover:border-gray-300 transition-colors"

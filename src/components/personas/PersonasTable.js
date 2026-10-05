@@ -1,21 +1,26 @@
 "use client"
 
-// CAMBIO: tabla→tarjetas en mobile, mismo patrón que AeronavesTable/
-// TiposMisionesTable/HistorialEscalas — acciones extraídas a un
-// componente compartido. BotonVolverInicio arriba, oculto en desktop.
+// src/components/personas/PersonasTable.js
 //
-// FIX (definitivo): la tabla de escritorio pasa a table-fixed con
-// colgroup de anchos explícitos — mismo patrón que HistorialEscalas.
-// Sin esto, el layout automático calculaba el ancho de columnas como
-// "Rol en el sistema" o "Especialidades" según su texto SIN wrappear
-// (ej. "Comandante del Escuadrón de Mantenimiento"), empujando el
-// ancho total de la tabla más allá del contenedor disponible — de ahí
-// el scroll horizontal que aparecía con el sidebar expandido. Con
-// anchos fijos, el texto largo se envuelve DENTRO de su columna en
-// vez de estirarla, y la tabla nunca excede el 100% del contenedor:
-// no hace falta scroll ni sticky, todas las columnas y acciones
-// quedan visibles siempre, igual que ya pasaba en Aeronaves (que
-// nunca tuvo este problema por tener columnas de texto corto).
+// Tabla→tarjetas, mismo patrón que AeronavesTable/TiposMisionesTable/
+// HistorialEscalas — acciones extraídas a un componente compartido.
+// La tabla de escritorio usa table-fixed con anchos explícitos: el
+// texto largo se envuelve DENTRO de su columna en vez de estirarla.
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina (antes
+//     título y botón en la misma fila: en celular el botón se salía).
+//   - Tabla desde 1024px (antes desde 768px); tarjetas por debajo. En
+//     tablet la tabla de 9 columnas no entraba y se superponían
+//     encabezados y badges.
+//   - Entre 1024 y 1279px, "Especialidades" y "Escuadrón" no tienen
+//     columna propia: se muestran en chico debajo del nombre, como el
+//     documento. Desde 1280px vuelven a sus columnas. Sin esto, en una
+//     notebook de 1024 las 9 columnas quedaban tan angostas que
+//     "ESPECIALIDADES" (una sola palabra, no se puede partir) se pisaba
+//     con la columna de al lado.
+//   - Los anchos pasan del colgroup a cada <th>: con columnas que
+//     aparecen y desaparecen según el ancho, un colgroup fijo no sirve.
 
 import { useState } from "react"
 import { Plus, Search, Pencil, ShieldCheck, KeyRound, Lock, UserX, UserCheck, Trash2, RotateCcw } from "lucide-react"
@@ -24,7 +29,7 @@ import UsuarioModal from "./UsuarioModal"
 import PermisosUsuarioModal from "./PermisosUsuarioModal"
 import HabilitacionesModal from "./HabilitacionesModal"
 import AccionIcono from "@/components/shared/AccionIcono"
-import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 import { normalizarParaBusqueda as normalizarTexto } from "@/lib/texto"
 
 const ETIQUETAS_ESCUADRON = {
@@ -42,6 +47,8 @@ const ETIQUETAS_ESPECIALIDAD = {
   ADMINISTRATIVO:   "Administrativo",
   OTRO:             "Otro",
 }
+
+const CLASE_TH = "px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 
 export default function PersonasTable({ personas: datosIniciales, permisos, esAdministrador }) {
 
@@ -159,11 +166,9 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
   // HabilitacionesModal.js, para no tener dos definiciones de "por
   // vencer" dando vueltas por el sistema.
   //
-  // Corrección clave: entre las habilitaciones TODAVÍA vigentes, se
-  // elige la que vence MÁS PRONTO (no la que vence más lejos). Si hay
-  // dos períodos vigentes a la vez (ej. el actual y el próximo ya
-  // cargado de antemano), lo que importa mostrar acá es cuál vence
-  // primero — es lo que determina si hay que preocuparse ya.
+  // Entre las habilitaciones TODAVÍA vigentes, se elige la que vence
+  // MÁS PRONTO (no la que vence más lejos) — es lo que determina si hay
+  // que preocuparse ya.
   function badgeMedica(persona) {
     const habs = persona.habilitaciones_medicas || []
     const hoy  = new Date()
@@ -234,7 +239,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
   }
 
   // Acciones — extraídas para no repetir la lógica de permisos entre
-  // la fila de tabla (desktop) y la tarjeta (mobile).
+  // la fila de tabla (escritorio) y la tarjeta (celular y tablet).
   function AccionesPersona({ persona }) {
     if (persona.activo === false) {
       return permisos?.puede_editar ? (
@@ -300,25 +305,18 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
 
   return (
     <div className="p-4">
-      <div className="md:hidden mb-2">
-        <BotonVolverInicio />
-      </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Personas</h1>
-            <p className="text-sm text-gray-500 mt-1">Personal de la FAP registrado en el sistema</p>
-          </div>
-          {permisos?.puede_crear && (
-            <button onClick={handleNuevo}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0">
-              <Plus className="h-4 w-4" />
-              Nueva persona
-            </button>
-          )}
-        </div>
-
+      <EncabezadoPagina
+        volverAInicio
+        titulo="Personas"
+        subtitulo="Personal de la FAP registrado en el sistema"
+        acciones={permisos?.puede_crear && (
+          <button onClick={handleNuevo}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9">
+            <Plus className="h-4 w-4" />
+            Nueva persona
+          </button>
+        )}
+      >
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
           <input type="text"
@@ -367,35 +365,23 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
             </>
           )}
         </div>
-      </div>
+      </EncabezadoPagina>
 
-      {/* ── Desktop: tabla, visible desde 768px — table-fixed con
-          anchos explícitos, para que el texto largo se envuelva en
-          vez de estirar la tabla más allá del contenedor. ── */}
-      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+      {/* ── Escritorio: tabla, visible desde 1024px. Especialidades y
+          Escuadrón tienen columna propia recién desde 1280px. ── */}
+      <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="w-full table-fixed divide-y divide-gray-200">
-         <colgroup>
-            <col className="w-[13%]" />
-            <col className="w-[7%]" />
-            <col className="w-[12%]" />
-            <col className="w-[11%]" />
-            <col className="w-[13%]" />
-            <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[11%]" />
-            <col className="w-[13%]" />
-          </colgroup>
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grado</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Especialidades</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Escuadrón</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol en el sistema</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hab. médica</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hab. operacional</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acceso</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              <th className={`${CLASE_TH} w-[13%]`}>Nombre</th>
+              <th className={`${CLASE_TH} w-[7%]`}>Grado</th>
+              <th className={`${CLASE_TH} w-[12%] hidden xl:table-cell`}>Especialidades</th>
+              <th className={`${CLASE_TH} w-[11%] hidden xl:table-cell`}>Escuadrón</th>
+              <th className={`${CLASE_TH} w-[13%]`}>Rol en el sistema</th>
+              <th className={`${CLASE_TH} w-[11%]`}>Hab. médica</th>
+              <th className={`${CLASE_TH} w-[11%]`}>Hab. operacional</th>
+              <th className={`${CLASE_TH} w-[10%]`}>Acceso</th>
+              <th className={`${CLASE_TH} w-[12%] text-right`}>Acciones</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -406,7 +392,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
             ) : (
               personasFiltradas.map((persona) => (
                 <tr key={persona.id} className={`transition-colors ${persona.activo === false ? "bg-gray-50 opacity-70" : "hover:bg-gray-50"}`}>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-3 py-3 text-sm">
                     <p className="font-medium text-gray-900">
                       {persona.apellido}, {persona.nombre}
                       {persona.activo === false && (
@@ -416,13 +402,19 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
                       )}
                     </p>
                     <p className="text-xs text-gray-400">{persona.nro_documento}</p>
+                    {/* Entre 1024 y 1279px estas dos columnas no existen:
+                        se muestran acá, en chico, debajo del nombre. */}
+                    <p className="xl:hidden text-xs text-gray-500 mt-0.5">
+                      {ETIQUETAS_ESCUADRON[persona.escuadron] || persona.escuadron}
+                      {textoEspecialidades(persona) !== "—" && ` · ${textoEspecialidades(persona)}`}
+                    </p>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{persona.grado}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{textoEspecialidades(persona)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
+                  <td className="px-3 py-3 text-sm text-gray-700">{persona.grado}</td>
+                  <td className="hidden xl:table-cell px-3 py-3 text-sm text-gray-700">{textoEspecialidades(persona)}</td>
+                  <td className="hidden xl:table-cell px-3 py-3 text-sm text-gray-700">
                     {ETIQUETAS_ESCUADRON[persona.escuadron] || persona.escuadron}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
+                  <td className="px-3 py-3 text-sm text-gray-700">
                     {persona.usuario?.rol?.nombre || "—"}
                     {persona.usuario?.rol_secundario && (
                       <span className="block mt-0.5 text-xs font-medium text-purple-600">
@@ -433,10 +425,10 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm">{badgeMedica(persona)}</td>
-                  <td className="px-4 py-3 text-sm">{badgeOperacional(persona.nivel_operacional_habilitado)}</td>
-                  <td className="px-4 py-3 text-sm">{badgeAcceso(persona)}</td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-3 py-3 text-sm">{badgeMedica(persona)}</td>
+                  <td className="px-3 py-3 text-sm">{badgeOperacional(persona.nivel_operacional_habilitado)}</td>
+                  <td className="px-3 py-3 text-sm">{badgeAcceso(persona)}</td>
+                  <td className="px-3 py-3 text-sm">
                     <div className="flex flex-wrap justify-end items-center gap-0.5">
                       <AccionesPersona persona={persona} />
                     </div>
@@ -454,8 +446,8 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
         </div>
       </div>
 
-      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
-      <div className="md:hidden space-y-2">
+      {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ── */}
+      <div className="lg:hidden space-y-2">
         {personasFiltradas.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
             No se encontraron personas
@@ -501,7 +493,7 @@ export default function PersonasTable({ personas: datosIniciales, permisos, esAd
                 {badgeAcceso(persona)}
               </div>
 
-              <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap justify-end items-center gap-0.5">
+              <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap justify-end items-center gap-1">
                 <AccionesPersona persona={persona} />
               </div>
             </div>

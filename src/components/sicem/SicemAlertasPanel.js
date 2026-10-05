@@ -1,11 +1,19 @@
 "use client"
 
-// CAMBIO: tabla→tarjetas en mobile, mismo patrón que el resto de
-// tablas de gestión del sistema.
+// src/components/sicem/SicemAlertasPanel.js
+//
+// Tabla→tarjetas, mismo patrón que el resto de tablas de gestión.
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina. Antes
+//     "Actualizar" se salía de la tarjeta en un celular angosto. No usa
+//     volverAInicio: en celular, SubNavSicem ya trae el "Volver".
+//   - Tabla desde 1024px (antes desde 768px); tarjetas por debajo.
 
 import { useState } from "react"
 import Link from "next/link"
 import { RefreshCw } from "lucide-react"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 const ETIQUETAS_COMPONENTE = {
   MOTOR: "Motor",
@@ -68,19 +76,17 @@ export default function SicemAlertasPanel({ alertas: datosIniciales }) {
   return (
     <div className="p-4">
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Alertas y próximas inspecciones</h1>
-            <p className="text-sm text-gray-500 mt-1">Componentes que se acercan o ya superaron su umbral, por horas o por calendario</p>
-          </div>
+      <EncabezadoPagina
+        titulo="Alertas y próximas inspecciones"
+        subtitulo="Componentes que se acercan o ya superaron su umbral, por horas o por calendario"
+        acciones={
           <button onClick={recargar} disabled={cargando}
-            className="flex items-center gap-1.5 border border-gray-300 text-gray-600 px-3.5 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors h-9 shrink-0 disabled:opacity-50">
+            className="flex items-center gap-1.5 border border-gray-300 text-gray-600 px-3.5 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors h-9 disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
             Actualizar
           </button>
-        </div>
-
+        }
+      >
         <div className="flex flex-wrap gap-3">
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2">
             <p className="text-2xl font-bold text-red-700">{superados}</p>
@@ -91,10 +97,10 @@ export default function SicemAlertasPanel({ alertas: datosIniciales }) {
             <p className="text-xs text-amber-600">Por vencer</p>
           </div>
         </div>
-      </div>
+      </EncabezadoPagina>
 
-      {/* ── Desktop: tabla, visible desde 768px ── */}
-      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+      {/* ── Escritorio: tabla, visible desde 1024px ── */}
+      <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -139,8 +145,8 @@ export default function SicemAlertasPanel({ alertas: datosIniciales }) {
         </table>
       </div>
 
-      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
-      <div className="md:hidden space-y-2">
+      {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ── */}
+      <div className="lg:hidden space-y-2">
         {alertas.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
             Sin alertas — todos los componentes están dentro de rango

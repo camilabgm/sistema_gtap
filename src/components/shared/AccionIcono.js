@@ -9,44 +9,36 @@
 // El tooltip se renderiza con un portal directo a document.body, en
 // posición fixed calculada a partir del ícono. Esto es intencional:
 // si lo dejábamos como hijo normal, cualquier contenedor padre con
-// scroll (overflow-y-auto) lo recorta por el costado — CSS obliga a
-// que overflow-x se comporte igual que overflow-y en ese caso, así
-// que un tooltip centrado sobre un ícono pegado al borde derecho
-// quedaba cortado. Con el portal, el tooltip vive fuera de ese
-// contenedor y nunca se recorta.
+// scroll (overflow-y-auto) lo recorta por el costado. Con el portal,
+// el tooltip vive fuera de ese contenedor y nunca se recorta.
 //
 // Cuando está deshabilitado, NO se renderiza como <button disabled> —
 // los navegadores no disparan onMouseEnter sobre un elemento con
-// pointer-events:none (que es lo que agrega la clase disabled: de
-// Tailwind), así que el tooltip nunca llegaba a mostrarse. Usa un
-// <span> inerte, igual que la rama de href.
+// pointer-events:none, así que el tooltip nunca llegaba a mostrarse.
+// Usa un <span> inerte, igual que la rama de href.
 //
-// CAMBIO (rama fix/accion-icono-mobile): en pantallas táctiles el
-// tooltip no servía — "tocar" dispara a la vez el onFocus (que abría
-// el tooltip) y el onClick (que ejecuta la acción), así que el globo
-// aparecía flotando justo cuando la acción ya estaba en marcha. Ahora:
-//
-//   - Debajo de 768px (mismo breakpoint "md" que todo el sistema), el
-//     botón muestra el ícono + la etiqueta como texto visible, y pasa
-//     de 32×32 fijo a ancho automático para que entre el texto.
-//   - Desde 768px queda exactamente igual que antes: solo ícono, con
-//     el tooltip al pasar el mouse.
+// Etiqueta visible vs. tooltip:
+//   - Debajo de 1024px (celular y tablet): el botón muestra ícono +
+//     etiqueta como texto visible, con ancho automático. Tocar en una
+//     pantalla táctil no tiene "pasar el mouse", así que el tooltip no
+//     serviría.
+//   - Desde 1024px: solo el ícono (cuadrado 32×32), con el tooltip al
+//     pasar el mouse.
 //   - El tooltip solo se abre si el dispositivo tiene un puntero real
-//     (mouse/trackpad) Y la pantalla es de 768px o más — o sea, solo
+//     (mouse/trackpad) Y la pantalla es de 1024px o más — o sea, solo
 //     cuando la etiqueta NO está a la vista.
 //
-// CAMBIO v2 — prop opcional "tooltip": algunos módulos usaban la
-// etiqueta para explicar POR QUÉ una acción está bloqueada (ej. "No
-// disponible: la escala fue abortada"). Como tooltip de escritorio eso
-// estaba perfecto, pero ahora la etiqueta también se ve como texto en
-// mobile, y una oración entera no entra en una fila de botones. Se
-// separan las dos cosas:
+// CAMBIO (rama fix/responsive-listados): el corte pasa de 768px (md:)
+// a 1024px (lg:). En tablet los listados ahora se ven como tarjetas,
+// igual que en celular, y una tablet es táctil — las etiquetas
+// visibles le sirven más que un tooltip que no puede abrir.
 //
-//   - etiqueta: nombre CORTO de la acción ("Editar", "Manifiesto").
-//     Es lo que se lee en mobile.
-//   - tooltip (opcional): texto LARGO para el globo de escritorio y
-//     para lectores de pantalla. Si no se pasa, se usa la etiqueta —
-//     así todos los módulos que no lo usan siguen igual que siempre.
+// Props:
+//   etiqueta → nombre CORTO de la acción ("Editar", "Manifiesto"). Es
+//              lo que se lee debajo de 1024px.
+//   tooltip  → opcional: texto LARGO para el globo de escritorio y
+//              para lectores de pantalla (ej. por qué está bloqueada).
+//              Si no se pasa, se usa la etiqueta.
 
 import { useState, useRef, useLayoutEffect } from "react"
 import { createPortal } from "react-dom"
@@ -59,9 +51,9 @@ const COLORES = {
 
 // Media query única para decidir si tiene sentido mostrar el tooltip:
 // - (hover: hover) and (pointer: fine): hay mouse/trackpad, no solo dedo.
-// - (min-width: 768px): la etiqueta de texto está oculta (md:hidden),
+// - (min-width: 1024px): la etiqueta de texto está oculta (lg:hidden),
 //   así que el tooltip es la única forma de saber qué hace el ícono.
-const MEDIA_TOOLTIP = "(hover: hover) and (pointer: fine) and (min-width: 768px)"
+const MEDIA_TOOLTIP = "(hover: hover) and (pointer: fine) and (min-width: 1024px)"
 
 // Se consulta en el momento del evento (no se guarda en un estado al
 // montar), así si alguien achica o agranda la ventana del navegador
@@ -90,11 +82,11 @@ export default function AccionIcono({ icono: Icono, etiqueta, tooltip, onClick, 
   }, [mostrarTooltip])
 
   // Forma del botón:
-  // - mobile: alto 32px, ancho automático, ícono + texto chico.
-  // - desde md: vuelve al cuadrado 32×32 de siempre, sin padding ni gap
-  //   (el texto queda oculto con md:hidden, así que solo queda el ícono).
+  // - debajo de 1024px: alto 32px, ancho automático, ícono + texto chico.
+  // - desde lg: vuelve al cuadrado 32×32 de siempre, sin padding ni gap
+  //   (el texto queda oculto con lg:hidden, así que solo queda el ícono).
   const forma =
-    "relative inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium md:w-8 md:gap-0 md:px-0"
+    "relative inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium lg:w-8 lg:gap-0 lg:px-0"
 
   const clases = `${forma} transition-colors ${COLORES[color]}`
   const clasesDeshabilitado = `${forma} text-gray-300 cursor-not-allowed`
@@ -107,13 +99,13 @@ export default function AccionIcono({ icono: Icono, etiqueta, tooltip, onClick, 
   }
 
   // Contenido interno, igual para las 4 variantes (botón, link, y sus
-  // dos versiones deshabilitadas): ícono + etiqueta corta visible solo
-  // en mobile + tooltip con el texto completo (que ya decide solo si
-  // se muestra o no).
+  // dos versiones deshabilitadas): ícono + etiqueta corta visible
+  // debajo de 1024px + tooltip con el texto completo (que ya decide
+  // solo si se muestra o no).
   const contenido = (
     <>
       <Icono className="h-4 w-4 shrink-0" />
-      <span className="whitespace-nowrap md:hidden">{etiqueta}</span>
+      <span className="whitespace-nowrap lg:hidden">{etiqueta}</span>
       {mostrarTooltip && posicion && typeof document !== "undefined"
         ? createPortal(
             <span

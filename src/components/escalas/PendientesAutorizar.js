@@ -1,9 +1,22 @@
 "use client"
 
+// src/components/escalas/PendientesAutorizar.js
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina (mismo
+//     padding y tamaño de título que el resto de los módulos). No usa
+//     volverAInicio: en celular, SubNavEscalas ya trae el "Volver".
+//   - Cada escala pendiente: en celular el botón "Autorizar" baja
+//     debajo de los datos, en vez de apretar el texto a una columna
+//     angosta. Desde 640px vuelve a la derecha, como antes.
+//   - La línea "aeronave · solicitante · misión · orden" + el badge
+//     "Vencida" pueden partirse en dos renglones (flex-wrap).
+
 import { useState, useEffect } from "react"
 import { Pause, Play } from "lucide-react"
 import { yaPasoLaHora } from "@/lib/escalas"
 import { formatearFechaHora as formatearFechaHoraBase } from "@/lib/fechaHora"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 // Formato corto (día/mes/hora/minuto, sin año ni segundos) — el que ya
 // usaba esta pantalla. En vez de duplicar la función acá, se envuelve
@@ -209,16 +222,12 @@ export default function PendientesAutorizar() {
   return (
     <div className="p-4 max-w-4xl mx-auto">
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Autorización de Escalas</h1>
-
+      <EncabezadoPagina titulo="Autorización de Escalas">
         {/* Derivar / Ya volví — acción general, no por escala */}
         <div className="pb-4 border-b border-gray-100">
           {cargandoDerivacion ? (
             <p className="text-sm text-gray-400">Cargando estado de derivación...</p>
           ) : derivacion ? (
-            // FIX: apilado en mobile, en fila desde 640px — texto y
-            // botón ya no se aprietan en una pantalla angosta.
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900">
@@ -263,7 +272,7 @@ export default function PendientesAutorizar() {
                   />
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleDerivar}
                   disabled={enviandoDerivar}
@@ -280,7 +289,6 @@ export default function PendientesAutorizar() {
               </div>
             </div>
           ) : (
-            // FIX: apilado en mobile, en fila desde 640px
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-900">¿No podés autorizar hoy?</p>
@@ -299,12 +307,10 @@ export default function PendientesAutorizar() {
           )}
         </div>
 
-        {/* "Quién autoriza ahora" — mismo bloque de info general de la
-            pantalla, separado por línea fina, no dentro del panel de
-            la lista de abajo. */}
+        {/* "Quién autoriza ahora" — info general de la pantalla,
+            separada por línea fina, no dentro de la lista de abajo. */}
         {!cargandoPendientes && pendientes && pendientes.escalas.length > 0 && (
           <div className="pt-4">
-            {/* FIX: apilado en mobile, en fila desde 640px */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 {pendientes.podesActuar ? (
@@ -357,7 +363,7 @@ export default function PendientesAutorizar() {
             )}
           </div>
         )}
-      </div>
+      </EncabezadoPagina>
 
       {avisoRecalculo && (
         <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-md text-sm mb-4">
@@ -365,10 +371,8 @@ export default function PendientesAutorizar() {
         </div>
       )}
 
-      {/* Panel único con las tabs por dentro — el contenido (lista de
-          escalas) vive como filas dentro de este mismo borde. Mismo
-          patrón que la tabla de Gestión: encabezado gris, cuerpo
-          blanco. */}
+      {/* Panel único con las tabs por dentro — mismo patrón que la tabla
+          de Gestión: encabezado gris, cuerpo blanco. */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="flex bg-gray-50 border-b border-gray-200 p-1.5 gap-1">
           <button
@@ -411,15 +415,14 @@ export default function PendientesAutorizar() {
                     const fechaSolicitud = e.solicitudes?.[0]?.fecha_recepcion
                     // Ya pasó la hora estimada de despegue y nunca se
                     // autorizó — el endpoint de autorizar la rechaza
-                    // igual, así que no tiene sentido mostrar el botón
-                    // para esta fila puntual.
+                    // igual, así que no se muestra el botón.
                     const vencida = yaPasoLaHora(e.hora_despegue_estimada)
 
                     return (
                       <div key={e.id} className="p-4 hover:bg-gray-50 transition-colors">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium text-gray-900">
                                 {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
                                 {e.nro_orden && ` · Orden #${e.nro_orden}`}
@@ -450,7 +453,7 @@ export default function PendientesAutorizar() {
                             <button
                               onClick={() => handleAutorizar(e.id)}
                               disabled={accionando === e.id}
-                              className="h-9 px-3.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50 shrink-0"
+                              className="self-start h-9 px-3.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50 shrink-0"
                             >
                               {accionando === e.id ? "..." : "Autorizar"}
                             </button>
@@ -471,7 +474,7 @@ export default function PendientesAutorizar() {
           <div className="divide-y divide-gray-100">
             {autorizadas.map((e) => (
               <div key={e.id} className="p-4 flex items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">
                     {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
                     {e.nro_orden && ` · Orden #${e.nro_orden}`}

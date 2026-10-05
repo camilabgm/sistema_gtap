@@ -1,10 +1,25 @@
 "use client"
 
-// Destino: src/components/informes/InformeVuelos.js
+// src/components/informes/InformeVuelos.js
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina (solo
+//     subtítulo: el título "Informes" ya está arriba de las pestañas).
+//     Antes "Exportar PDF" se salía de la tarjeta en un celular angosto.
+//   - Filtros: 1 columna en celular, 2 desde 640px, 5 desde 1024px
+//     (antes saltaba de 1 a 5 en 768px, y en tablet cada filtro quedaba
+//     tan angosto que no se leía la fecha completa).
+//   - Tabla desde 1024px; debajo, tarjetas (nuevas — antes había solo
+//     tabla, y en celular y tablet había que deslizar de costado para
+//     ver la mitad de los datos).
+//   - En la tabla, Aeronave·Ruta y Misión·Solicitante ya no tienen
+//     whitespace-nowrap: se parten en dos renglones si hace falta, en
+//     vez de obligar a la tabla a ser más ancha que la pantalla.
 
 import { useState, useEffect, useCallback } from "react"
 import { Download } from "lucide-react"
 import { exportarInformeVuelosPDF } from "@/lib/exportarInformeVuelosPDF"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 function primerDiaDelMes() {
   const hoy = new Date()
@@ -23,6 +38,12 @@ function formatearFechaHora(iso) {
   return new Date(iso).toLocaleString("es-PY", {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
   })
+}
+
+function textoPaxCarga(f) {
+  return f.pasajeros != null || f.carga_kg != null
+    ? `${f.pasajeros ?? 0} pax · ${f.carga_kg ?? 0} kg`
+    : "—"
 }
 
 export default function InformeVuelos({ aeronaves, tiposMision }) {
@@ -74,20 +95,20 @@ export default function InformeVuelos({ aeronaves, tiposMision }) {
 
   return (
     <div>
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <p className="text-sm text-gray-500">Vuelos completados, filtrables por aeronave, tipo de misión e institución</p>
+      <EncabezadoPagina
+        subtitulo="Vuelos completados, filtrables por aeronave, tipo de misión e institución"
+        acciones={
           <button
             onClick={handleExportarPDF}
             disabled={filas.length === 0}
-            className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors h-9 shrink-0 disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors h-9 disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
             Exportar PDF
           </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+        }
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
             <input
@@ -147,7 +168,7 @@ export default function InformeVuelos({ aeronaves, tiposMision }) {
         >
           {cargando ? "Buscando..." : "Buscar"}
         </button>
-      </div>
+      </EncabezadoPagina>
 
       {error ? (
         <p className="text-sm text-red-600">{error}</p>
@@ -158,49 +179,84 @@ export default function InformeVuelos({ aeronaves, tiposMision }) {
           Sin vuelos que coincidan con estos filtros.
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha/Hora</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aeronave · Ruta</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Misión · Solicitante</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tripulación</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Horas de vuelo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Combustible</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pax · Carga</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filas.map((f) => (
-                <tr key={f.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                    {formatearFechaHora(f.hora_despegue_estimada)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 font-medium whitespace-nowrap">
-                    {f.aeronave_matricula} · {f.ruta}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                    {f.tipo_mision_codigo} · {f.solicitante}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{f.tripulacion || "—"}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{f.horas_vuelo_texto}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                    {f.combustible_litros != null ? `${f.combustible_litros} L` : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                    {f.pasajeros != null || f.carga_kg != null
-                      ? `${f.pasajeros ?? 0} pax · ${f.carga_kg ?? 0} kg`
-                      : "—"}
-                  </td>
+        <>
+          {/* ── Escritorio: tabla, visible desde 1024px ── */}
+          <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha/Hora</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aeronave · Ruta</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Misión · Solicitante</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tripulación</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Horas de vuelo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Combustible</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pax · Carga</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-            <p className="text-xs text-gray-500">{filas.length} vuelos en el período seleccionado</p>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filas.map((f) => (
+                  <tr key={f.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                      {formatearFechaHora(f.hora_despegue_estimada)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                      {f.aeronave_matricula} · {f.ruta}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {f.tipo_mision_codigo} · {f.solicitante}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{f.tripulacion || "—"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{f.horas_vuelo_texto}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                      {f.combustible_litros != null ? `${f.combustible_litros} L` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{textoPaxCarga(f)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+              <p className="text-xs text-gray-500">{filas.length} vuelos en el período seleccionado</p>
+            </div>
           </div>
-        </div>
+
+          {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ── */}
+          <div className="lg:hidden space-y-2">
+            {filas.map((f) => (
+              <div key={f.id} className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-900 min-w-0">
+                    {f.aeronave_matricula} · {f.ruta}
+                  </p>
+                  <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">
+                    {formatearFechaHora(f.hora_despegue_estimada)}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-600">{f.tipo_mision_codigo} · {f.solicitante}</p>
+                <p className="mt-1 text-xs text-gray-500">{f.tripulacion || "Sin tripulación"}</p>
+
+                <div className="mt-2 pt-2 border-t border-gray-100 grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="text-gray-400">Horas</p>
+                    <p className="font-medium text-gray-900">{f.horas_vuelo_texto}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Combustible</p>
+                    <p className="font-medium text-gray-900">
+                      {f.combustible_litros != null ? `${f.combustible_litros} L` : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Pax · Carga</p>
+                    <p className="font-medium text-gray-900">{textoPaxCarga(f)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <p className="text-xs text-gray-500 text-center py-2">{filas.length} vuelos en el período seleccionado</p>
+          </div>
+        </>
       )}
     </div>
   )

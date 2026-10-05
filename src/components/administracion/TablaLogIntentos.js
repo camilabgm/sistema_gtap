@@ -1,14 +1,22 @@
 "use client"
 
-// CAMBIO: BotonVolverInicio agregado arriba, oculto en desktop —
-// mismo motivo que PermisosRolTable.js. El resto del archivo ya
-// estaba bien resuelto para mobile (filtros con flex-wrap, tabla con
-// su propio overflow-x-auto), no necesitó más ajustes.
+// src/components/administracion/TablaLogIntentos.js
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - El título y el subtítulo se mudan de page.js a este componente,
+//     dentro del EncabezadoPagina compartido. Antes page.js dibujaba el
+//     título y este componente dibujaba el "Volver a Inicio" DEBAJO, así
+//     que en celular quedaba al revés que en el resto de los módulos
+//     (título arriba, "Volver" abajo). Ahora el orden es el de siempre.
+//   - El buscador ocupa todo el ancho en celular (antes tenía w-64 fijo,
+//     256px, que en una pantalla de 320 dejaba el select colgando).
+//   - La tabla mantiene su desplazamiento horizontal propio
+//     (overflow-x-auto): 4 columnas que se deslizan dentro de su tarjeta.
 
 import { useState } from "react"
 import { Search } from "lucide-react"
 import { formatearFechaHora } from "@/lib/fechaHora"
-import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 const COLORES_RESULTADO = {
   EXITOSO:               "bg-green-100 text-green-800",
@@ -40,13 +48,13 @@ export default function TablaLogIntentos({ intentos }) {
 
   return (
     <div>
-      <div className="md:hidden mb-2">
-        <BotonVolverInicio />
-      </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+      <EncabezadoPagina
+        volverAInicio
+        titulo="Registro de Intentos de Login"
+        subtitulo="Historial de los últimos 200 intentos de acceso al sistema"
+      >
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
@@ -70,7 +78,7 @@ export default function TablaLogIntentos({ intentos }) {
             <option value="CUENTA_INACTIVA">Cuenta inactiva</option>
           </select>
         </div>
-      </div>
+      </EncabezadoPagina>
 
       <p className="text-sm text-gray-500 mb-2">
         Mostrando {intentosFiltrados.length} de {intentos.length} registros
@@ -80,7 +88,7 @@ export default function TablaLogIntentos({ intentos }) {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs">
+              <th className="text-left px-4 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs whitespace-nowrap">
                 Fecha y hora
               </th>
               <th className="text-left px-4 py-3 font-medium text-gray-500 uppercase tracking-wider text-xs">
@@ -97,7 +105,7 @@ export default function TablaLogIntentos({ intentos }) {
           <tbody className="divide-y divide-gray-100">
             {intentosFiltrados.map((intento) => (
               <tr key={intento.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-600">
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                   {formatearFechaHora(intento.created_at)}
                 </td>
                 <td className="px-4 py-3 font-medium text-gray-800">
@@ -105,7 +113,7 @@ export default function TablaLogIntentos({ intentos }) {
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${COLORES_RESULTADO[intento.resultado]}`}
+                    className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${COLORES_RESULTADO[intento.resultado]}`}
                   >
                     {ETIQUETAS_RESULTADO[intento.resultado]}
                   </span>

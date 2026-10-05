@@ -1,6 +1,18 @@
 "use client"
 
+// src/components/sicem/SicemEstadisticasPanel.js
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina. Antes
+//     "Actualizar" se salía de la tarjeta en un celular angosto. No usa
+//     volverAInicio: en celular, SubNavSicem ya trae el "Volver".
+//   - La tabla "Tiempo promedio No disponible" pasa de overflow-hidden
+//     a overflow-x-auto, igual que la de "Eventos por tipo": si no
+//     entran sus columnas, se desliza de costado DENTRO de su tarjeta
+//     en vez de recortarse sin aviso.
+
 import { useState, useMemo } from "react"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 const ETIQUETAS_TIPO = {
   PROGRAMADO: "Programado",
@@ -90,36 +102,34 @@ export default function SicemEstadisticasPanel({ eventos: datosIniciales }) {
   return (
     <div className="p-4">
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Estadística de mantenimiento</h1>
-            <p className="text-sm text-gray-500 mt-1">Cantidad de eventos, tiempo No disponible, y lugar de mantenimiento — sobre el historial de Eventos</p>
-          </div>
+      <EncabezadoPagina
+        titulo="Estadística de mantenimiento"
+        subtitulo="Cantidad de eventos, tiempo No disponible, y lugar de mantenimiento — sobre el historial de Eventos"
+        acciones={
           <button onClick={recargar} disabled={cargando}
             className="text-xs text-gray-500 border border-gray-300 rounded-md px-3 h-9 hover:bg-gray-50 transition-colors disabled:opacity-50">
             {cargando ? "Actualizando..." : "Actualizar"}
           </button>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-500">Desde</label>
+            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)}
+              className="h-9 px-3 border border-gray-300 rounded-md text-sm" />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-500">Hasta</label>
+            <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)}
+              className="h-9 px-3 border border-gray-300 rounded-md text-sm" />
+          </div>
+          {(desde || hasta) && (
+            <button onClick={() => { setDesde(""); setHasta("") }} className="text-xs text-blue-600 hover:underline">
+              Ver todo el historial
+            </button>
+          )}
         </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-500">Desde</label>
-          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)}
-            className="h-9 px-3 border border-gray-300 rounded-md text-sm" />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-500">Hasta</label>
-          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)}
-            className="h-9 px-3 border border-gray-300 rounded-md text-sm" />
-        </div>
-        {(desde || hasta) && (
-          <button onClick={() => { setDesde(""); setHasta("") }} className="text-xs text-blue-600 hover:underline">
-            Ver todo el historial
-          </button>
-        )}
-     </div>
-      </div>
+      </EncabezadoPagina>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
@@ -166,7 +176,7 @@ export default function SicemEstadisticasPanel({ eventos: datosIniciales }) {
           </table>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <div className="px-5 py-3 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-700">Tiempo promedio No disponible</h2>
             <p className="text-xs text-gray-400 mt-0.5">Solo eventos ya cerrados — uno abierto no tiene una duración definida todavía</p>
@@ -195,7 +205,7 @@ export default function SicemEstadisticasPanel({ eventos: datosIniciales }) {
 
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Lugar de mantenimiento</h2>
         <div className="flex flex-wrap gap-3">
           <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2">

@@ -1,23 +1,24 @@
 "use client"
 // src/components/aeronaves/AeronavesTable.js
 //
-// CAMBIO: tabla→tarjetas en mobile, mismo patrón que HistorialEscalas
-// — las acciones se extraen a un componente compartido entre las dos
-// vistas, para no repetir la lógica de permisos. Se agrega
-// BotonVolverInicio arriba, oculto en desktop — Aeronaves es un
-// módulo de una sola pantalla, sin sub-menú, así que en mobile no
-// tenía ningún camino de vuelta al Dashboard.
+// Tabla→tarjetas, mismo patrón que HistorialEscalas — las acciones se
+// extraen a un componente compartido entre las dos vistas, para no
+// repetir la lógica de permisos.
 //
-// CAMBIO (rama fix/accion-icono-mobile): AccionIcono ahora muestra la
-// etiqueta como texto en mobile, así que:
-//   - Las acciones de disponibilidad pasan a una etiqueta corta, y la
-//     explicación larga va en la prop "tooltip" (lo que se sigue
-//     viendo al pasar el mouse en escritorio).
-//   - La fila de acciones puede saltar de renglón en mobile
-//     (flex-wrap). Sin esto, con justify-end, los botones que no
-//     entran se empujan hacia la izquierda fuera de la tarjeta, donde
-//     no hay scroll — mismo bug que tenía Gestión de Escalas. Desde
-//     md vuelve a flex-nowrap, igual que antes.
+// Etiquetas de disponibilidad: nombre corto en "etiqueta" (lo que se
+// lee debajo de 1024px) y la explicación completa en "tooltip" (el
+// globo de escritorio).
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina.
+//   - Tabla desde 1024px (antes desde 768px); tarjetas por debajo.
+//   - El contenedor de la tabla pasa de overflow-hidden a
+//     overflow-x-auto: con overflow-hidden, si la tabla no entraba, la
+//     columna de Acciones (la última) se RECORTABA sin aviso — por eso
+//     no aparecían Ver/Editar/Desactivar en 1024. Ahora, en el peor
+//     caso, la tabla se desliza de costado dentro de su tarjeta.
+//   - Filtros con flex-wrap: los dos selects juntos medían más que un
+//     celular y empujaban la página entera a un scroll horizontal.
 
 import { useState } from "react"
 import { Plus, Search, Pencil, Trash2, Eye, Ban, CircleCheck } from "lucide-react"
@@ -25,7 +26,7 @@ import AeronavesForm from "./AeronavesForm"
 import AeronaveDisponibilidadModal from "./AeronaveDisponibilidadModal"
 import PanelVerAeronave from "./PanelVerAeronave"
 import AccionIcono from "@/components/shared/AccionIcono"
-import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 const MOTIVOS = {
   ACCIDENTADA:      "Accidentada",
@@ -125,10 +126,6 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
   // Acción de disponibilidad — contextual según el estado actual.
   // Bloqueada del todo si SICEM tiene un Evento abierto: ahí la
   // disponibilidad se gestiona desde ese módulo, no desde acá.
-  //
-  // etiqueta = nombre corto (lo que se lee en mobile).
-  // tooltip  = explicación completa (lo que se ve al pasar el mouse
-  //            en escritorio, igual que antes).
   function accionDisponibilidad(aeronave) {
     if (aeronave.tiene_evento_abierto) {
       return (
@@ -163,10 +160,12 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
   }
 
   // Acciones — extraídas para no repetir la lógica de permisos entre
-  // la fila de tabla (desktop) y la tarjeta (mobile).
+  // la fila de tabla (escritorio) y la tarjeta (celular y tablet).
+  // flex-wrap debajo de 1024px: con texto en cada botón, si no entran
+  // en una línea bajan a la siguiente en vez de salirse de la tarjeta.
   function AccionesAeronave({ aeronave }) {
     return (
-      <div className="flex flex-wrap items-center justify-end gap-1 md:flex-nowrap md:gap-0.5">
+      <div className="flex flex-wrap items-center justify-end gap-1 lg:flex-nowrap lg:gap-0.5">
         <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setAeronaveVer(aeronave)} />
         {permisos?.puede_editar && (
           <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(aeronave)} color="primario" />
@@ -187,27 +186,20 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
 
   return (
     <div className="p-4">
-      <div className="md:hidden mb-2">
-        <BotonVolverInicio />
-      </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Aeronaves</h1>
-            <p className="text-sm text-gray-500 mt-1">Gestión de aeronaves del GTAP</p>
-          </div>
-          {permisos?.puede_crear && (
-            <button
-              onClick={handleNuevo}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0"
-            >
-              <Plus className="h-4 w-4" />
-              Nueva aeronave
-            </button>
-          )}
-        </div>
-
+      <EncabezadoPagina
+        volverAInicio
+        titulo="Aeronaves"
+        subtitulo="Gestión de aeronaves del GTAP"
+        acciones={permisos?.puede_crear && (
+          <button
+            onClick={handleNuevo}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva aeronave
+          </button>
+        )}
+      >
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
           <input
@@ -219,7 +211,7 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <select
             value={filtroCategoria}
             onChange={(e) => setFiltroCategoria(e.target.value)}
@@ -239,20 +231,20 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
             <option value="NO_DISPONIBLE">No disponibles</option>
           </select>
         </div>
-      </div>
+      </EncabezadoPagina>
 
-      {/* ── Desktop: tabla, visible desde 768px ── */}
-      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* ── Escritorio: tabla, visible desde 1024px ── */}
+      <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matrícula</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fabricante</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pasajeros</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matrícula</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fabricante</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pasajeros</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -265,12 +257,12 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
             ) : (
               aeronavesFiltradas.map((aeronave) => (
                 <tr key={aeronave.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                  <td className="px-4 py-4 text-sm font-medium text-gray-900">
                     {aeronave.matricula}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{aeronave.tipo}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{aeronave.fabricante}</td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px-4 py-4 text-sm text-gray-700">{aeronave.tipo}</td>
+                  <td className="px-4 py-4 text-sm text-gray-700">{aeronave.fabricante}</td>
+                  <td className="px-4 py-4 text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       aeronave.categoria === "PROPIA"
                         ? "bg-blue-100 text-blue-700"
@@ -279,13 +271,13 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
                       {aeronave.categoria === "PROPIA" ? "Propia" : "Incautada"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px-4 py-4 text-sm">
                     <BadgeEstado aeronave={aeronave} />
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-700">
+                  <td className="px-4 py-4 text-sm text-gray-700">
                     {aeronave.capacidad_pasajeros}
                   </td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px-4 py-4 text-sm">
                     <AccionesAeronave aeronave={aeronave} />
                   </td>
                 </tr>
@@ -294,15 +286,15 @@ export default function AeronavesTable({ aeronaves: datosIniciales, permisos }) 
           </tbody>
         </table>
 
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
           <p className="text-xs text-gray-500">
             {aeronavesFiltradas.length} de {aeronaves.length} aeronaves
           </p>
         </div>
       </div>
 
-      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
-      <div className="md:hidden space-y-2">
+      {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ── */}
+      <div className="lg:hidden space-y-2">
         {aeronavesFiltradas.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
             No se encontraron aeronaves

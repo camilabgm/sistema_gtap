@@ -1,23 +1,30 @@
 "use client"
 
-// CAMBIO: tabla→tarjetas en mobile (8 columnas), mismo patrón que
-// HistorialEscalas/PersonasTable — acciones extraídas a un componente
-// compartido.
+// src/components/sicem/SicemEventosTable.js
 //
-// FIX: la tabla de escritorio pasa a table-fixed con colgroup de
-// anchos explícitos — mismo problema y misma solución que en
-// PersonasTable. Con layout automático, la columna "Observación"
-// (con su propio truncate) más las otras 7 empujaban el ancho total
-// más allá del contenedor disponible cuando el sidebar estaba
-// expandido, recortando la columna de Acciones sin aviso — con el
-// sidebar colapsado (más espacio libre) sí entraba. Con anchos fijos,
-// cada columna tiene su espacio garantizado y Acciones nunca se pierde.
+// Tabla→tarjetas (8 columnas), mismo patrón que HistorialEscalas/
+// PersonasTable — acciones extraídas a un componente compartido. La
+// tabla de escritorio usa table-fixed con anchos explícitos, para que
+// la columna de Acciones nunca se pierda.
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina. No usa
+//     volverAInicio: en celular, SubNavSicem ya trae el "Volver".
+//   - Tabla desde 1024px (antes desde 768px); tarjetas por debajo.
+//   - Entre 1024 y 1279px, "Componente" y "Lugar" no tienen columna
+//     propia: se muestran en chico debajo de la matrícula. Desde 1280px
+//     vuelven a sus columnas. Sin esto, en 1024 los encabezados de 8
+//     columnas angostas se pisaban entre sí ("AERONAVETIPO",
+//     "COMPONENTELUGAR") y los badges de Tipo se salían de su celda.
+//   - Los anchos pasan del colgroup a cada <th>: con columnas que
+//     aparecen y desaparecen según el ancho, un colgroup fijo no sirve.
 
 import { useState } from "react"
 import { Plus, CheckCircle2, Pencil, Trash2, Eye } from "lucide-react"
 import SicemEventosForm from "./SicemEventosForm"
 import PanelVerEvento from "./PanelVerEvento"
 import AccionIcono from "@/components/shared/AccionIcono"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 import { formatearFechaHoraCompacta } from "@/lib/escalas"
 
 const ETIQUETAS_TIPO = {
@@ -36,6 +43,8 @@ const ETIQUETAS_LUGAR = {
   INTERNO: "Interno",
   TERCERIZADO: "Tercerizado",
 }
+
+const CLASE_TH = "px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 
 function badgeTipo(tipo) {
   const colores = {
@@ -121,11 +130,10 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
   }
 
   // Acciones — extraídas para no repetir la lógica de permisos entre
-  // la fila de tabla (desktop) y la tarjeta (mobile). flex-wrap por
-  // si alguien tiene los 4 íconos completos en una columna angosta.
+  // la fila de tabla (escritorio) y la tarjeta (celular y tablet).
   function AccionesEvento({ ev }) {
     return (
-      <div className="flex flex-wrap justify-end items-center gap-0.5">
+      <div className="flex flex-wrap justify-end items-center gap-1 lg:gap-0.5">
         <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setEventoVer(ev)} />
         {permisos?.puede_editar && (
           <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(ev)} color="primario" />
@@ -154,21 +162,17 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
   return (
     <div className="p-4">
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Eventos de mantenimiento</h1>
-            <p className="text-sm text-gray-500 mt-1">Programados, no programados y por calendario — historial completo, nada se oculta al cerrarse</p>
-          </div>
-          {permisos?.puede_crear && (
-            <button onClick={handleNuevo}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0">
-              <Plus className="h-4 w-4" />
-              Nuevo evento
-            </button>
-          )}
-        </div>
-
+      <EncabezadoPagina
+        titulo="Eventos de mantenimiento"
+        subtitulo="Programados, no programados y por calendario — historial completo, nada se oculta al cerrarse"
+        acciones={permisos?.puede_crear && (
+          <button onClick={handleNuevo}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9">
+            <Plus className="h-4 w-4" />
+            Nuevo evento
+          </button>
+        )}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <select value={filtroAeronave}
             onChange={(e) => setFiltroAeronave(e.target.value)}
@@ -186,32 +190,22 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
             <option value="CERRADOS">Solo cerrados</option>
           </select>
         </div>
-      </div>
+      </EncabezadoPagina>
 
-      {/* ── Desktop: tabla, visible desde 768px — table-fixed con
-          anchos explícitos, mismo patrón que PersonasTable ── */}
-      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+      {/* ── Escritorio: tabla, visible desde 1024px. Componente y Lugar
+          tienen columna propia recién desde 1280px. ── */}
+      <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="w-full table-fixed divide-y divide-gray-200">
-          <colgroup>
-            <col className="w-[10%]" />
-            <col className="w-[11%]" />
-            <col className="w-[10%]" />
-            <col className="w-[9%]" />
-            <col className="w-[24%]" />
-            <col className="w-[12%]" />
-            <col className="w-[10%]" />
-            <col className="w-[14%]" />
-          </colgroup>
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aeronave</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Componente</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lugar</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observación</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Abierto el</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              <th className={`${CLASE_TH} w-[10%]`}>Aeronave</th>
+              <th className={`${CLASE_TH} w-[12%]`}>Tipo</th>
+              <th className={`${CLASE_TH} w-[9%] hidden xl:table-cell`}>Componente</th>
+              <th className={`${CLASE_TH} w-[9%] hidden xl:table-cell`}>Lugar</th>
+              <th className={`${CLASE_TH} w-[22%]`}>Observación</th>
+              <th className={`${CLASE_TH} w-[12%]`}>Abierto el</th>
+              <th className={`${CLASE_TH} w-[11%]`}>Estado</th>
+              <th className={`${CLASE_TH} w-[15%] text-right`}>Acciones</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -222,20 +216,28 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
             ) : (
               eventosFiltrados.map((ev) => (
                 <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-4 text-sm font-medium text-gray-900">{ev.aeronave.matricula}</td>
-                  <td className="px-4 py-4 text-sm">{badgeTipo(ev.tipo)}</td>
-                  <td className="px-4 py-4 text-sm text-gray-700">
+                  <td className="px-3 py-4 text-sm">
+                    <p className="font-medium text-gray-900">{ev.aeronave.matricula}</p>
+                    {/* Entre 1024 y 1279px estas dos columnas no existen:
+                        se muestran acá, en chico, debajo de la matrícula. */}
+                    <p className="xl:hidden text-xs text-gray-500 mt-0.5">
+                      {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "Sin componente"}
+                      {ev.lugar ? ` · ${ETIQUETAS_LUGAR[ev.lugar]}` : ""}
+                    </p>
+                  </td>
+                  <td className="px-3 py-4 text-sm">{badgeTipo(ev.tipo)}</td>
+                  <td className="hidden xl:table-cell px-3 py-4 text-sm text-gray-700">
                     {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "—"}
                   </td>
-                  <td className="px-4 py-4 text-sm text-gray-700">{ev.lugar ? ETIQUETAS_LUGAR[ev.lugar] : "—"}</td>
-                  <td className="px-4 py-4 text-sm text-gray-700">
+                  <td className="hidden xl:table-cell px-3 py-4 text-sm text-gray-700">{ev.lugar ? ETIQUETAS_LUGAR[ev.lugar] : "—"}</td>
+                  <td className="px-3 py-4 text-sm text-gray-700">
                     <span className="block truncate" title={ev.observacion || ""}>
                       {ev.observacion || "—"}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-sm text-gray-700">{formatearFechaHoraCompacta(ev.created_at)}</td>
-                  <td className="px-4 py-4 text-sm">{badgeEstado(ev.cerrado)}</td>
-                  <td className="px-4 py-4 text-sm">
+                  <td className="px-3 py-4 text-sm text-gray-700">{formatearFechaHoraCompacta(ev.created_at)}</td>
+                  <td className="px-3 py-4 text-sm">{badgeEstado(ev.cerrado)}</td>
+                  <td className="px-3 py-4 text-sm">
                     <AccionesEvento ev={ev} />
                   </td>
                 </tr>
@@ -248,8 +250,8 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
         </div>
       </div>
 
-      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
-      <div className="md:hidden space-y-2">
+      {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ── */}
+      <div className="lg:hidden space-y-2">
         {eventosFiltrados.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
             No se encontraron eventos

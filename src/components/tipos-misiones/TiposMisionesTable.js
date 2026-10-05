@@ -1,15 +1,23 @@
 "use client"
 // src/components/tipos-misiones/TiposMisionesTable.js
 //
-// CAMBIO: tabla→tarjetas en mobile, mismo patrón que AeronavesTable y
-// HistorialEscalas. BotonVolverInicio arriba, oculto en desktop.
+// Tabla→tarjetas, mismo patrón que AeronavesTable y HistorialEscalas.
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina (incluye
+//     el "Volver a Inicio" de celular que antes iba suelto arriba).
+//   - Tabla desde 1024px (antes desde 768px); tarjetas por debajo.
+//   - overflow-hidden → overflow-x-auto en el contenedor de la tabla:
+//     con el sidebar abierto en 768, la columna de Acciones quedaba
+//     recortada sin forma de llegar a ella.
+//   - Fila de acciones con flex-wrap debajo de 1024px.
 
 import { useState } from "react"
 import { Plus, Search, Eye, Pencil, Trash2 } from "lucide-react"
 import TiposMisionesForm from "./TiposMisionesForm"
 import PanelVerTipoMision from "./PanelVerTipoMision"
 import AccionIcono from "@/components/shared/AccionIcono"
-import BotonVolverInicio from "@/components/shared/BotonVolverInicio"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 const ETIQUETAS_CLASIFICACION = {
   OPERACIONAL: { label: "Operacional", color: "bg-blue-100 text-blue-700" },
@@ -72,7 +80,7 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
 
   function AccionesTipo({ tipo }) {
     return (
-      <div className="flex justify-end items-center gap-0.5">
+      <div className="flex flex-wrap justify-end items-center gap-1 lg:flex-nowrap lg:gap-0.5">
         <AccionIcono icono={Eye} etiqueta="Ver" onClick={() => setTipoVer(tipo)} />
         {permisos?.puede_editar && (
           <AccionIcono icono={Pencil} etiqueta="Editar" onClick={() => handleEditar(tipo)} color="primario" />
@@ -92,29 +100,20 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
 
   return (
     <div className="p-4">
-      <div className="md:hidden mb-2">
-        <BotonVolverInicio />
-      </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tipos de Misión</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Catálogo operacional según OG COMFAER 2026
-            </p>
-          </div>
-          {permisos?.puede_crear && (
-            <button
-              onClick={handleNuevo}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0"
-            >
-              <Plus className="h-4 w-4" />
-              Nuevo tipo
-            </button>
-          )}
-        </div>
-
+      <EncabezadoPagina
+        volverAInicio
+        titulo="Tipos de Misión"
+        subtitulo="Catálogo operacional según OG COMFAER 2026"
+        acciones={permisos?.puede_crear && (
+          <button
+            onClick={handleNuevo}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo tipo
+          </button>
+        )}
+      >
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
           <input
@@ -136,10 +135,10 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
           <option value="TIPO_VUELO">Tipo de Vuelo</option>
           <option value="LOGISTICA">Logística</option>
         </select>
-      </div>
+      </EncabezadoPagina>
 
-      {/* ── Desktop: tabla, visible desde 768px ── */}
-      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* ── Escritorio: tabla, visible desde 1024px ── */}
+      <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -174,7 +173,7 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${clasi.color}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${clasi.color}`}>
                         {clasi.label}
                       </span>
                     </td>
@@ -201,8 +200,8 @@ export default function TiposMisionesTable({ tiposMisiones: datosIniciales, perm
         </div>
       </div>
 
-      {/* ── Mobile: tarjetas, ocultas desde 768px ── */}
-      <div className="md:hidden space-y-2">
+      {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ── */}
+      <div className="lg:hidden space-y-2">
         {tiposFiltrados.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
             No se encontraron tipos de misión

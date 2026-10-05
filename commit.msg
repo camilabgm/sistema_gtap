@@ -1,28 +1,32 @@
-fix: base responsive en tres zonas (celular, tablet, computadora)
+fix: listados responsive en tres zonas + encabezado compartido
 
-La tablet heredaba el layout de escritorio, y en 768-1279px las
-tablas quedaban con menos de 500px con el sidebar abierto. Esta rama
-arma la estructura para tres zonas, sin tocar todavía los listados.
+Los listados cambiaban de tarjetas a tabla en 768px, pero en tablet
+(y en notebooks de 1024 con el sidebar) las tablas no entraban: se
+pisaban encabezados, badges y acciones, o la columna de Acciones
+quedaba recortada sin aviso.
 
-useDeviceType (hooks):
-- useMediaQuery interno, compartido por tres hooks
-- useDeviceType: sin cambios para quien ya lo usa (<768)
-- usePantallaCompacta (<1024) y useMenuFlotante (<1280), nuevos
-- Cortes alineados con Tailwind (md 768, lg 1024, xl 1280)
+EncabezadoPagina (shared, nuevo):
+- Título, subtítulo, acciones y contenido de la tarjeta superior
+- En celular el botón baja debajo del subtítulo (antes se salía)
+- Prop volverAInicio para el "Volver" de celular, siempre arriba
+- Aplicado en 15 módulos
 
-Sidebar (Navbar + DashboardShell):
-- Cerrado: 80px con ícono + nombre corto debajo (Misiones,
-  Pendientes, Cargos, Permisos, Accesos, Clave, Salir)
-- 768-1279px: arranca cerrado y, al abrirlo, flota encima de la
-  página con fondo gris; se cierra al tocar el fondo o al navegar
-- 1280px o más: sin cambios, abierto y empujando
-- Sin parpadeo: el estado por defecto se calcula en el mismo render
+Tablas desde 1024px, tarjetas por debajo:
+- Personas, Aeronaves, Tipos de Misión, Gestión de Escalas, SICEM
+  Eventos y Alertas, Informe de Vuelos (tarjetas nuevas)
+- AccionIcono y AbortarEscalaAccion: etiquetas visibles hasta 1024px
+- Personas y SICEM Eventos: entre 1024 y 1279px las columnas menos
+  importantes se pliegan debajo del nombre/matrícula
+- Gestión de Escalas: columna Acciones 26% -> 30%
+- overflow-hidden -> overflow-x-auto en tablas que recortaban la
+  última columna (Aeronaves, Tipos, Estadística SICEM, Totales)
 
-SubItemEscalas (shared): ícono + nombre con el sidebar cerrado.
-SeparadorSeccion (shared): el texto se parte en dos renglones en vez
-de salirse en paneles angostos.
-DashboardShell: padding de main p-2 en celular (antes p-6).
-Login: margen externo y padding más chico en celular.
+Ajustes puntuales:
+- Agenda: semana en grilla de 7 columnas iguales
+- Informe Totales: pestañas deslizables de costado
+- SICEM Componentes: grilla 1/2/3 columnas
+- Pendientes de Autorizar: botón Autorizar debajo en celular
+- Registro de Accesos: título dentro del componente, "Volver" arriba
+- Filtros con flex-wrap donde faltaba
 
-Barra inferior de mobile sin cambios.
-6 archivos modificados.
+18 archivos (1 nuevo).

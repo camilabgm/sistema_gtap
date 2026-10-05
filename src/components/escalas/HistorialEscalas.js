@@ -1,5 +1,18 @@
 "use client"
 
+// src/components/escalas/HistorialEscalas.js
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina. Antes
+//     "Descargar PDF" se salía de la tarjeta en un celular angosto. No
+//     usa volverAInicio: en celular, SubNavEscalas ya trae el "Volver".
+//   - Tabla desde 1024px (antes desde 768px); tarjetas por debajo.
+//   - Columnas de la tabla rebalanceadas (Acciones 26% → 30%): en una
+//     notebook de 1024 con el menú cerrado, los 6 íconos no entraban
+//     en el 26% y se metían encima de la columna Estado.
+//   - Todo lo de AccionesEscala que antes cambiaba en 768 (md:) ahora
+//     cambia en 1024 (lg:), igual que AccionIcono.
+
 import { useState, useEffect, Fragment } from "react"
 import { Eye, Pencil, Trash2, Users, ClipboardCheck, Search, Download, ChevronDown, X } from "lucide-react"
 import {
@@ -15,6 +28,7 @@ import { exportarGestionEscalasPDF } from "@/lib/exportarGestionEscalasPDF"
 import PanelDetalleEscala from "./PanelDetalleEscala"
 import AbortarEscalaAccion from "./AbortarEscalaAccion"
 import AccionIcono from "@/components/shared/AccionIcono"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 const ESTADOS_FILTRABLES = [
   { clave: "PENDIENTE", texto: "Programada · Pendiente" },
@@ -61,38 +75,25 @@ function textoRuta(itinerarios) {
 }
 
 // Los 3 grupos de íconos de acciones — extraídos a su propia función
-// porque se usan idénticos en la fila de tabla (desktop) y en la
-// tarjeta (mobile). Evita mantener la misma lógica de puedeEditar/
-// abortada/etc. escrita dos veces.
+// porque se usan idénticos en la fila de tabla (escritorio) y en la
+// tarjeta (celular y tablet).
 //
-// CAMBIO (rama fix/accion-icono-mobile): en mobile los botones ahora
-// muestran texto, así que los 6 ya no entran en una sola línea. Antes
-// el contenedor era "justify-end" SIN flex-wrap: cuando el contenido
-// era más ancho que la tarjeta, el navegador lo empujaba hacia la
-// IZQUIERDA, fuera de la zona visible, y por ese lado no hay scroll —
-// por eso se veía "…plida" cortado. Ahora:
-//
-//   - El contenedor tiene flex-wrap en mobile: si no entran, los
-//     botones bajan a una segunda línea, alineados a la derecha.
-//     Desde md vuelve a flex-nowrap, igual que antes, para que la
-//     celda de la tabla de escritorio se vea exactamente igual.
-//   - Los 3 grupos usan "contents" en mobile: el div del grupo
-//     desaparece de la maquetación y sus botones pasan a ser hijos
-//     directos de la fila, así se reparten de a uno (y no de a grupo
-//     entero, que dejaba tres líneas casi vacías). Como el div no
-//     se dibuja, las líneas separadoras verticales tampoco — en
-//     desktop vuelven con md:flex y md:border-l, como siempre.
-//   - Las acciones bloqueadas pasan la explicación larga por la prop
-//     "tooltip" de AccionIcono, y dejan en "etiqueta" solo el nombre
-//     corto ("Editar", "Manifiesto"). Antes la etiqueta era la oración
-//     entera ("No disponible: la escala fue abortada"), que en mobile
-//     se mostraba completa como texto del botón.
+// Debajo de 1024px los botones muestran texto, así que no entran los 6
+// en una línea:
+//   - El contenedor tiene flex-wrap: si no entran, bajan a otra línea,
+//     alineados a la derecha. Desde lg vuelve a flex-nowrap.
+//   - Los 3 grupos usan "contents": el div del grupo desaparece de la
+//     maquetación y sus botones se reparten de a uno (y no de a grupo
+//     entero). Como el div no se dibuja, las líneas separadoras
+//     tampoco — desde lg vuelven con lg:flex y lg:border-l.
+//   - Las acciones bloqueadas pasan la explicación larga por "tooltip"
+//     y dejan en "etiqueta" solo el nombre corto.
 function AccionesEscala({ e, editable, motivo, puedeEditar, puedeEliminar, eliminandoId, onEliminar, cargarEscalas, expandida, onToggleExpandir }) {
   const abortada = e.estado === "ABORTADA"
   const textoAbortada = "No disponible: la escala fue abortada"
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1 md:flex-nowrap md:gap-3">
-      <div className="contents md:flex md:items-center md:gap-0.5">
+    <div className="flex flex-wrap items-center justify-end gap-1 lg:flex-nowrap lg:gap-3">
+      <div className="contents lg:flex lg:items-center lg:gap-0.5">
         <AccionIcono
           icono={Eye}
           etiqueta={expandida ? "Ocultar" : "Ver"}
@@ -118,7 +119,7 @@ function AccionesEscala({ e, editable, motivo, puedeEditar, puedeEliminar, elimi
         )}
       </div>
 
-      <div className="contents md:flex md:items-center md:gap-0.5 md:border-l md:border-gray-100 md:pl-3">
+      <div className="contents lg:flex lg:items-center lg:gap-0.5 lg:border-l lg:border-gray-100 lg:pl-3">
         <AccionIcono
           icono={Users}
           etiqueta="Manifiesto"
@@ -136,7 +137,7 @@ function AccionesEscala({ e, editable, motivo, puedeEditar, puedeEliminar, elimi
         />
       </div>
 
-      <div className="contents md:flex md:items-center md:gap-0.5 md:border-l md:border-gray-100 md:pl-3">
+      <div className="contents lg:flex lg:items-center lg:gap-0.5 lg:border-l lg:border-gray-100 lg:pl-3">
         {puedeEditar && <AbortarEscalaAccion escala={e} onAbortada={cargarEscalas} />}
 
         {/* Eliminar depende únicamente del permiso ESCALAS.puede_eliminar
@@ -262,26 +263,22 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
   return (
     <div className="p-4">
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-1">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Gestión de Escalas</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Todas las escalas del sistema — ver detalle, editar, eliminar o abortar según corresponda
-            </p>
-          </div>
+      <EncabezadoPagina
+        titulo="Gestión de Escalas"
+        subtitulo="Todas las escalas del sistema — ver detalle, editar, eliminar o abortar según corresponda"
+        acciones={
           <button
             onClick={descargarPDF}
             disabled={filtradas.length === 0}
-            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 h-9 shrink-0"
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 h-9"
           >
             <Download className="h-4 w-4" />
             Descargar PDF
           </button>
-        </div>
-
+        }
+      >
         {/* Contadores generales — sobre el total, sin importar filtros */}
-        <div className="flex flex-wrap items-center gap-4 mt-4 pb-4 border-b border-gray-100 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pb-4 border-b border-gray-100 text-sm">
           {Object.entries({ PROGRAMADA: "Programada", EN_DESARROLLO: "En vuelo", CUMPLIDA: "Completada", ABORTADA: "Abortada" }).map(
             ([clave, etiqueta]) => (
               <span key={clave} className="flex items-center gap-1.5 text-gray-600">
@@ -308,7 +305,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
         {/* Filtros — agrupados, con separador y misma altura entre todos */}
         <div className="flex flex-wrap items-center gap-4">
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <button
                 onClick={() => setEstadoAbierto((v) => !v)}
@@ -375,11 +372,9 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
 
           <div className="hidden md:block w-px h-7 bg-gray-300" />
 
-          {/* FIX: cada etiqueta+input agrupados en su propio div, así
-              el flex-wrap del contenedor mueve el PAR completo a la
-              línea siguiente en pantallas angostas — antes el wrap
-              partía "Hasta" (el texto) de un lado y su input del
-              otro, en vez de moverlos juntos. */}
+          {/* Cada etiqueta+input agrupados en su propio div, así el
+              flex-wrap del contenedor mueve el PAR completo a la línea
+              siguiente en pantallas angostas. */}
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
             <div className="flex items-center gap-1">
               <span>Desde</span>
@@ -411,7 +406,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
             </button>
           )}
         </div>
-      </div>
+      </EncabezadoPagina>
 
       {errorEliminar && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
@@ -429,15 +424,15 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
         </div>
       ) : (
         <>
-          {/* ── Desktop: tabla, visible desde 768px ───────────────── */}
-          <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+          {/* ── Escritorio: tabla, visible desde 1024px ───────────── */}
+          <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
            <table className="w-full table-fixed divide-y divide-gray-200">
               <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[22%]" />
-                <col className="w-[14%]" />
-                <col className="w-[16%]" />
-                <col className="w-[26%]" />
+                <col className="w-[20%]" />
+                <col className="w-[20%]" />
+                <col className="w-[13%]" />
+                <col className="w-[17%]" />
+                <col className="w-[30%]" />
               </colgroup>
               <thead className="bg-gray-50">
                 <tr>
@@ -473,7 +468,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                         <td className="px-4 py-3 text-sm">
                           <span
                             title={tooltipEstado}
-                            className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
                               ESTADO_DETALLADO_CLASES[estado.clave] || "bg-gray-100 text-gray-600"
                             } ${tooltipEstado ? "cursor-help" : ""}`}
                           >
@@ -518,8 +513,8 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
             </div>
           </div>
 
-          {/* ── Mobile: tarjetas apiladas, ocultas desde 768px ────── */}
-          <div className="md:hidden space-y-2">
+          {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ──── */}
+          <div className="lg:hidden space-y-2">
             {filtradas.map((e) => {
               const estado = estadoDetallado(e)
               const editable = puedeEditarAhora(e)

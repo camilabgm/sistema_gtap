@@ -1,28 +1,26 @@
 "use client"
 
-// Destino: src/components/informes/InformeTotales.js
+// src/components/informes/InformeTotales.js
 //
-// Grupo 2 — totales agregados: por tripulante, por aeronave, por tipo
-// de misión (combustible), y por institución solicitante. Mismo
-// filtro de fecha para las 4.
+// Totales agregados: por tripulante, por aeronave, por tipo de misión
+// (combustible), y por institución solicitante. Mismo filtro de fecha
+// para las 4. Cada pestaña tiene su propio selector "Todos / específico";
+// las opciones específicas se arman a partir de lo que trajo la búsqueda.
 //
-// Cada pestaña tiene su propio selector "Todos / específico":
-// - Por tripulante: Todos los roles (suma horas de todos los roles que
-//   voló esa persona) o un rol puntual (Piloto/Copiloto/Técnico).
-// - Por aeronave: todas las aeronaves del período, o una puntual.
-// - Combustible: todos los tipos de misión, o uno puntual.
-// - Por institución solicitante: todas, o una puntual.
-// Las opciones específicas de aeronave, tipo de misión e institución
-// se arman solas a partir de lo que trajo la búsqueda (no tiene
-// sentido ofrecer una opción que no voló nada en el período).
-//
-// CAMBIO: se agrega la 4ta pestaña, "Por institución solicitante" —
-// mismas 3 columnas que Tripulante/Aeronave (vuelos + horas de vuelo,
-// no combustible como Tipo de Misión).
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina (solo
+//     subtítulo: el título "Informes" ya está arriba de las pestañas).
+//     Antes "Exportar PDF" se salía de la tarjeta en un celular angosto.
+//   - Las 4 pestañas no entran en un celular: ahora la fila de
+//     pestañas se desliza de costado (overflow-x-auto), cada pestaña en
+//     una sola línea — el mismo patrón que usan las apps de celular
+//     para muchas pestañas. Antes empujaban la página entera.
+//   - La tabla pasa de overflow-hidden a overflow-x-auto.
 
 import { useState, useEffect, useCallback } from "react"
 import { Download } from "lucide-react"
 import { exportarInformeTotalesPDF } from "@/lib/exportarInformeTotalesPDF"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 function primerDiaDelMes() {
   const hoy = new Date()
@@ -89,8 +87,7 @@ export default function InformeTotales() {
       if (res.ok) {
         setDatos(data)
         // Al traer datos nuevos, los selectores de específico vuelven a
-        // "Todos" — la opción puntual anterior puede ya no existir en
-        // este nuevo período.
+        // "Todos" — la opción puntual anterior puede ya no existir.
         setFiltroAeronave("TODOS")
         setFiltroTipoMision("TODOS")
         setFiltroSolicitante("TODOS")
@@ -150,20 +147,20 @@ export default function InformeTotales() {
 
   return (
     <div>
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-1">
-          <p className="text-sm text-gray-500">Totales agregados por tripulante, aeronave, combustible por tipo de misión e institución solicitante</p>
+      <EncabezadoPagina
+        subtitulo="Totales agregados por tripulante, aeronave, combustible por tipo de misión e institución solicitante"
+        acciones={
           <button
             onClick={handleExportarPDF}
             disabled={filas.length === 0}
-            className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors h-9 shrink-0 disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors h-9 disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
             Exportar PDF
           </button>
-        </div>
-
-        <div className="flex flex-wrap items-end gap-3 mt-3">
+        }
+      >
+        <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
             <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)}
@@ -180,10 +177,13 @@ export default function InformeTotales() {
           </button>
         </div>
 
-        <div className="flex gap-1 mt-4 border-b border-gray-200">
+        {/* Pestañas: si no entran las 4, la fila se desliza de costado
+            DENTRO de la tarjeta (overflow-x-auto) — cada pestaña queda
+            en una sola línea (whitespace-nowrap) y no se achica. */}
+        <div className="flex gap-1 mt-4 border-b border-gray-200 overflow-x-auto">
           {PESTANAS.map((p) => (
             <button key={p.key} onClick={() => setPestana(p.key)}
-              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 pestana === p.key ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
               }`}>
               {p.label}
@@ -217,7 +217,7 @@ export default function InformeTotales() {
           <div className="mt-3">
             <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de misión</label>
             <select value={filtroTipoMision} onChange={(e) => setFiltroTipoMision(e.target.value)}
-              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+              className="max-w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
               <option value="TODOS">Todos</option>
               {opcionesTipoMision.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
@@ -228,13 +228,13 @@ export default function InformeTotales() {
           <div className="mt-3">
             <label className="block text-xs font-medium text-gray-600 mb-1">Institución solicitante</label>
             <select value={filtroSolicitante} onChange={(e) => setFiltroSolicitante(e.target.value)}
-              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+              className="max-w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
               <option value="TODOS">Todas</option>
               {opcionesSolicitante.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </div>
         )}
-      </div>
+      </EncabezadoPagina>
 
       {error ? (
         <p className="text-sm text-red-600">{error}</p>
@@ -247,7 +247,7 @@ export default function InformeTotales() {
             : "Sin datos para este período."}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -273,7 +273,7 @@ export default function InformeTotales() {
                     {f.nombre ?? f.matricula}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 text-right">{f.vuelos}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 text-right">
+                  <td className="px-4 py-3 text-sm text-gray-700 text-right whitespace-nowrap">
                     {pestana === "por_tipo_mision" ? `${f.litros} L` : f.horas_texto}
                   </td>
                 </tr>

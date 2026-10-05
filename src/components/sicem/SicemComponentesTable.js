@@ -1,23 +1,26 @@
 "use client"
 
-// CAMBIO: se saca la vista de Tabla — con máximo 3 componentes por
-// aeronave, la vista de tarjetas "Por aeronave" ya alcanza sola y es
-// más clara. El filtro de tipo (Motor/Hélice/APU) que vivía en Tabla
-// se suma acá — el de aeronave no hacía falta moverlo, ya cumplía ese
-// rol como el selector de "Por aeronave".
+// src/components/sicem/SicemComponentesTable.js
 //
-// CAMBIO (rama fix/accion-icono-mobile): la fila de acciones de cada
-// tarjeta pasa a flex-wrap. Debajo de 768px AccionIcono muestra la
-// etiqueta como texto, y entre 640px y 767px la grilla ya está en 3
-// columnas (sm:grid-cols-3) — cada tarjeta queda angosta, y "Editar"
-// + "Desactivar" con texto no entran en una línea. Sin flex-wrap se
-// salían por el costado derecho de la tarjeta.
+// Solo vista de tarjetas "Por aeronave" — con máximo 3 componentes por
+// aeronave alcanza y es más clara que una tabla. La fila de acciones de
+// cada tarjeta tiene flex-wrap.
+//
+// CAMBIO (rama fix/responsive-listados):
+//   - Encabezado con el componente compartido EncabezadoPagina. Antes
+//     "Nuevo componente" se salía de la tarjeta en celular y también
+//     en 1200px. No usa volverAInicio: en celular, SubNavSicem ya trae
+//     el "Volver".
+//   - Grilla de tarjetas: 1 columna en celular, 2 desde 640px y 3 desde
+//     1024px. Antes saltaba directo a 3 columnas en 640px, y en tablet
+//     cada tarjeta quedaba tan angosta que sus botones se salían.
 
 import { useState } from "react"
 import { Plus, Pencil, Trash2, RotateCcw, PowerOff } from "lucide-react"
 import SicemComponentesForm from "./SicemComponentesForm"
 import SicemDatosGeneralesAeronave from "./SicemDatosGeneralesAeronave"
 import AccionIcono from "@/components/shared/AccionIcono"
+import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
 
 const ETIQUETAS_TIPO = {
   MOTOR: "Motor",
@@ -148,21 +151,17 @@ export default function SicemComponentesTable({ componentes: datosIniciales, aer
   return (
     <div className="p-4">
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Componentes de mantenimiento</h1>
-            <p className="text-sm text-gray-500 mt-1">Umbrales y horas acumuladas por motor, hélice y APU de cada aeronave</p>
-          </div>
-          {permisos?.puede_crear && (
-            <button onClick={handleNuevo}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9 shrink-0">
-              <Plus className="h-4 w-4" />
-              Nuevo componente
-            </button>
-          )}
-        </div>
-
+      <EncabezadoPagina
+        titulo="Componentes de mantenimiento"
+        subtitulo="Umbrales y horas acumuladas por motor, hélice y APU de cada aeronave"
+        acciones={permisos?.puede_crear && (
+          <button onClick={handleNuevo}
+            className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors h-9">
+            <Plus className="h-4 w-4" />
+            Nuevo componente
+          </button>
+        )}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <select value={aeronaveElegidaId ?? ""}
             onChange={(e) => setAeronaveElegidaId(Number(e.target.value))}
@@ -188,7 +187,7 @@ export default function SicemComponentesTable({ componentes: datosIniciales, aer
             Mostrar inactivos
           </label>
         </div>
-      </div>
+      </EncabezadoPagina>
 
       {aeronaveElegida && (
         <SicemDatosGeneralesAeronave key={aeronaveElegida.id} aeronave={aeronaveElegida} onGuardado={handleGuardadoDatosGenerales} permisos={permisos} />
@@ -201,7 +200,7 @@ export default function SicemComponentesTable({ componentes: datosIniciales, aer
             : `Esta aeronave no tiene un componente ${ETIQUETAS_TIPO[filtroTipo]} configurado.`}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {componentesDeAeronave.map((c) => {
             const estado = estadoComponente(c)
             const pct = c.umbral_horas_minutos
@@ -209,7 +208,7 @@ export default function SicemComponentesTable({ componentes: datosIniciales, aer
               : 0
             return (
               <div key={c.id} className={`bg-white rounded-lg border border-gray-200 p-5 ${c.activo === false ? "opacity-60" : ""}`}>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between gap-2 mb-3">
                   <span className="text-sm font-semibold text-gray-900">{ETIQUETAS_TIPO[c.tipo] || c.tipo}</span>
                   {badgeAlerta(c)}
                 </div>

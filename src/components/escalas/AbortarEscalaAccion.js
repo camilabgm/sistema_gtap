@@ -6,19 +6,19 @@
 // AccionIcono (que ejecuta la acción directo al click), Abortar
 // necesita que la persona elija un motivo de los 6 códigos antes de
 // confirmar, así que el click abre un popover en vez de disparar la
-// acción. Mismo endpoint que ya usaba PanelDetalleEscala.js — solo se
-// mudó la UI de ahí para acá.
+// acción.
 //
 // El popover se renderiza con un portal a document.body, mismo motivo
 // que AccionIcono: la tabla de Gestión de Escalas tiene overflow-x-auto
 // y lo recortaría si viviera adentro.
 //
-// CAMBIO (rama fix/accion-icono-mobile): el botón usa la misma forma
-// que AccionIcono — en mobile muestra "Abortar" como texto al lado del
-// ícono (ancho automático); desde 768px vuelve al cuadrado 32×32 de
-// siempre. Antes era el único botón de la fila de Gestión que en
-// mobile quedaba solo como ícono, sin texto. El popover y la lógica
-// de aborto no se tocaron.
+// El botón usa la misma forma que AccionIcono: debajo de 1024px
+// muestra "Abortar" como texto al lado del ícono (ancho automático);
+// desde 1024px vuelve al cuadrado 32×32.
+//
+// CAMBIO (rama fix/responsive-listados): corte de 768px (md:) a 1024px
+// (lg:), igual que AccionIcono — si no, en tablet la fila de acciones
+// de Gestión mezclaría botones con texto y uno solo de ícono.
 
 import { useState, useRef, useLayoutEffect } from "react"
 import { createPortal } from "react-dom"
@@ -30,7 +30,7 @@ const MOTIVOS_ABORTO = Object.keys(ETIQUETAS_MOTIVO_ABORTO)
 // Misma forma que AccionIcono — si algún día cambia allá, cambiar acá
 // también para que la fila de acciones siga viéndose pareja.
 const FORMA_BOTON =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium md:w-8 md:gap-0 md:px-0"
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium lg:w-8 lg:gap-0 lg:px-0"
 
 export default function AbortarEscalaAccion({ escala, onAbortada }) {
   const [abierto, setAbierto] = useState(false)
@@ -98,7 +98,7 @@ export default function AbortarEscalaAccion({ escala, onAbortada }) {
         }`}
       >
         <Ban className="h-4 w-4 shrink-0" />
-        <span className="whitespace-nowrap md:hidden">Abortar</span>
+        <span className="whitespace-nowrap lg:hidden">Abortar</span>
       </button>
 
       {abierto && typeof document !== "undefined" &&

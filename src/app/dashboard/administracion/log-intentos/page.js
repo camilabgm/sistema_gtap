@@ -1,11 +1,18 @@
+// src/app/dashboard/administracion/log-intentos/page.js
+//
+// CAMBIO (rama fix/responsive-listados): el título y el subtítulo se
+// mudan a TablaLogIntentos, dentro del EncabezadoPagina compartido —
+// así el "Volver a Inicio" de celular queda arriba del título, como en
+// el resto de los módulos. El contenedor pasa de p-6 a p-4, igual que
+// las demás páginas (el padding general ya lo pone DashboardShell).
+
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
 import { esAdministrador } from "@/lib/autorizacion"
 import SinPermisos from "@/components/shared/SinPermisos"
-import TablaLogIntentos from  "@/components/administracion/TablaLogIntentos"
-
+import TablaLogIntentos from "@/components/administracion/TablaLogIntentos"
 
 export default async function LogIntentosPage() {
   // Verificar que el usuario esté logueado
@@ -19,7 +26,7 @@ export default async function LogIntentosPage() {
 
   // Traer los últimos 200 intentos de login, del más reciente al más viejo
   const intentos = await prisma.logIntentoLogin.findMany({
-    orderBy: { created_at: 'desc' },
+    orderBy: { created_at: "desc" },
     take: 200,
   })
 
@@ -35,15 +42,7 @@ export default async function LogIntentosPage() {
   }))
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Registro de Intentos de Login
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Historial de los últimos 200 intentos de acceso al sistema
-        </p>
-      </div>
+    <div className="p-4">
       <TablaLogIntentos intentos={intentosSerializados} />
     </div>
   )
