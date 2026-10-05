@@ -1,4 +1,18 @@
 "use client"
+
+// src/components/sicem/SicemDatosGeneralesAeronave.js
+//
+// Recibe permisos y lo respeta de verdad: sin puede_editar, los inputs
+// quedan deshabilitados y no se muestra el botón de Guardar.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle):
+//   - Padding de la tarjeta: 16px en celular, 20px desde 640px.
+//   - Campos: 1 columna en celular, 2 desde 640px, 3 desde 1024px
+//     (antes saltaba de 1 a 3 en 768px).
+//   - El checkbox "trackea ciclos y aterrizajes": la aclaración gris
+//     "(algunas, como el BE90, no los usan)" baja a su propio renglón
+//     en celular, en vez de partirse a la mitad al lado del texto.
+
 import { useState } from "react"
 
 function minutosAHorasYMinutos(totalMinutos) {
@@ -11,11 +25,6 @@ function horasYMinutosAMinutos(horas, minutos) {
   return h * 60 + m
 }
 
-// CAMBIO: ahora recibe permisos y lo respeta de verdad — antes el
-// botón de Guardar se mostraba sin ninguna condición, y cualquiera
-// que entrara a Componentes (con solo permiso de Ver en SICEM) podía
-// intentar guardar. Los inputs también quedan deshabilitados, no solo
-// el botón, para que no parezca editable sin serlo.
 export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado, permisos }) {
 
   const puedeEditar = !!permisos?.puede_editar
@@ -66,7 +75,7 @@ export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado, perm
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 mb-4">
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
         Datos generales — {aeronave.matricula}
       </h3>
@@ -80,18 +89,18 @@ export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado, perm
         <div className="mb-3 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-md text-xs">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 mb-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 mb-3 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Horas totales de vuelo</label>
           <div className="flex gap-2">
             <input type="number" min="0" value={horasH} onChange={(e) => setHorasH(e.target.value)}
               disabled={!puedeEditar}
               placeholder="Horas"
-              className="w-1/2 border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
+              className="w-1/2 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
             <input type="number" min="0" max="59" value={horasM} onChange={(e) => setHorasM(e.target.value)}
               disabled={!puedeEditar}
               placeholder="Min"
-              className="w-1/2 border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
+              className="w-1/2 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
           </div>
         </div>
         <div className={trackea ? "" : "opacity-40 pointer-events-none"}>
@@ -108,20 +117,22 @@ export default function SicemDatosGeneralesAeronave({ aeronave, onGuardado, perm
         </div>
       </div>
 
-      <label className={`flex items-center gap-2 text-sm text-gray-700 mb-3 ${puedeEditar ? "cursor-pointer" : ""}`}>
+      <label className={`flex items-start gap-2 text-sm text-gray-700 mb-3 ${puedeEditar ? "cursor-pointer" : ""}`}>
         <input
           type="checkbox"
           checked={trackea}
           disabled={!puedeEditar}
           onChange={(e) => setTrackea(e.target.checked)}
-          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+          className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
         />
-        Esta aeronave trackea ciclos y aterrizajes
-        <span className="text-gray-400 font-normal">(algunas, como el BE90, no los usan)</span>
+        <span>
+          Esta aeronave trackea ciclos y aterrizajes
+          <span className="block text-gray-400 font-normal sm:inline sm:ml-1">(algunas, como el BE90, no los usan)</span>
+        </span>
       </label>
 
       {puedeEditar && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button onClick={handleGuardar} disabled={cargando}
             className="px-3.5 py-1.5 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50">
             {cargando ? "Guardando..." : "Guardar datos generales"}

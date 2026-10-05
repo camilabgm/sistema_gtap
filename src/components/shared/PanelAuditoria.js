@@ -1,20 +1,26 @@
 // src/components/shared/PanelAuditoria.js
 //
 // Muestra quién creó / editó / autorizó / cerró un registro — de solo
-// lectura, sin ningún botón ni acción adentro (según el principio que
-// ya establecimos: visualización y acción nunca se mezclan en el mismo
-// bloque). Se usa en Gestión de Escalas, Manifiesto y Post-Vuelo.
+// lectura, sin ningún botón ni acción adentro (visualización y acción
+// nunca se mezclan en el mismo bloque). Se usa en Gestión de Escalas,
+// Manifiesto y Post-Vuelo.
 //
 // Cada fila es opcional — si no se pasa un dato (ej. todavía no fue
 // autorizada), esa fila directamente no se dibuja.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle): la fecha usa el
+// formateador compartido de fechaHora.js (24 horas, hora de Paraguay),
+// en vez de uno propio en formato de 12 horas. Con "a. m."/"p. m.",
+// servidor y navegador ponen un espacio invisible distinto antes del
+// "a. m." y React da error de hidratación; además, así todas las
+// fechas de auditoría del sistema se ven con el mismo formato.
 
+import { formatearFechaHora } from "@/lib/fechaHora"
+
+// "24/09/2026, 09:32" — sin segundos.
 function formatearFecha(iso) {
   if (!iso) return null
-  return new Date(iso).toLocaleString("es-PY", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-    timeZone: "America/Asuncion",
-  })
+  return formatearFechaHora(iso, { second: undefined })
 }
 
 export default function PanelAuditoria({ items }) {

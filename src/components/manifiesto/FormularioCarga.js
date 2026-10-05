@@ -1,10 +1,20 @@
+// src/components/manifiesto/FormularioCarga.js
+//
 // Formulario inline para agregar o editar un ítem de carga. Mismo
 // patrón que FormularioPasajero, incluido el "seguir cargando" al crear.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle): cada campo tiene su
+// etiqueta visible arriba ("Tipo", "Descripción", "Peso (kg)"), igual
+// que FormularioPasajero — antes solo tenían placeholder, que se
+// cortaba en un panel angosto. 1 columna en celular, 3 desde 640px.
 
 import { useState } from "react"
 import { validarCarga } from "@/lib/manifiesto"
 
 const CAMPOS_VACIOS = { tipo: "", descripcion: "", peso: "" }
+
+const CLASE_LABEL = "mb-0.5 block text-[11px] text-gray-500"
+const CLASE_INPUT = "w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
 
 export default function FormularioCarga({ escalaId, carga, onCancelar, onGuardado }) {
   const esCreacion = !carga
@@ -54,27 +64,34 @@ export default function FormularioCarga({ escalaId, carga, onCancelar, onGuardad
 
   return (
     <div className="mb-3 rounded-md border border-gray-200 bg-gray-50 p-3">
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-        <input
-          placeholder="Tipo (ej. equipaje, correspondencia)"
-          value={datos.tipo}
-          onChange={(e) => actualizarCampo("tipo", e.target.value)}
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-        />
-        <input
-          placeholder="Descripción (opcional)"
-          value={datos.descripcion}
-          onChange={(e) => actualizarCampo("descripcion", e.target.value)}
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-        />
-        <input
-          type="number"
-          step="0.01"
-          placeholder="Peso en kg"
-          value={datos.peso}
-          onChange={(e) => actualizarCampo("peso", e.target.value)}
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-        />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div>
+          <label className={CLASE_LABEL}>Tipo</label>
+          <input
+            placeholder="Ej: equipaje, correspondencia"
+            value={datos.tipo}
+            onChange={(e) => actualizarCampo("tipo", e.target.value)}
+            className={CLASE_INPUT}
+          />
+        </div>
+        <div>
+          <label className={CLASE_LABEL}>Descripción (opcional)</label>
+          <input
+            value={datos.descripcion}
+            onChange={(e) => actualizarCampo("descripcion", e.target.value)}
+            className={CLASE_INPUT}
+          />
+        </div>
+        <div>
+          <label className={CLASE_LABEL}>Peso (kg)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={datos.peso}
+            onChange={(e) => actualizarCampo("peso", e.target.value)}
+            className={CLASE_INPUT}
+          />
+        </div>
       </div>
 
       {error && <div className="mt-2 text-xs text-red-600">{error}</div>}

@@ -4,13 +4,24 @@
 //
 // Pantalla consolidada de edición: sirve tanto para COMPLETAR un
 // borrador como para EDITAR una escala ya publicada.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle):
+//   - Padding de la pantalla: 16px en celular, 32px desde 640px (antes
+//     32px siempre — en 320px dejaba muy poco ancho útil).
+//   - Cartel "Aeronave y tripulación se actualizan solas…" + botón
+//     "Actualizar disponibilidad": apilados en celular, en fila desde
+//     640px. Antes compartían fila siempre, y en celular el cartel
+//     quedaba de una palabra por renglón.
+//   - Cada tramo del itinerario: 1 columna en celular, 2 desde 640px
+//     (Origen|Destino, Salida|Llegada) y 5 desde 1024px. Antes saltaba
+//     de 1 a 5 en 768px, y en tablet los campos de fecha y hora no
+//     entraban en su columna.
 
 import { useState, useEffect, useRef } from "react"
 import { parsearSubtipos } from "@/lib/tiposMision"
 import { puedeEditarAhora, motivoNoEditable } from "@/lib/escalas"
 import { fechaSoloDiaAInputValue } from "@/lib/fechaSoloDia"
 import { fechaUTCAInputParaguay } from "@/lib/fechaHora"
-// Import nuevo, arriba del archivo:
 import BotonVolver from "@/components/shared/BotonVolver"
 
 const ROLES_EN_VUELO = ["PILOTO", "COPILOTO", "TECNICO_DE_VUELO"]
@@ -197,8 +208,7 @@ export default function EditarEscala({ escalaId }) {
   const tripulacionCompletaLista = tripulacion.filter((t) => t.persona_id)
 
   // Igual criterio que FormularioEscala.js: un tramo solo cuenta como
-  // completo si tiene los 4 datos. Se usa tanto para decidir si mandar
-  // itinerarios en el body, como para saber si ya se puede publicar.
+  // completo si tiene los 4 datos.
   const itinerarioCompleto =
     tramos.length > 0 && tramos.every((t) => t.origen && t.destino && t.hora_estimada_salida && t.hora_estimada_llegada)
 
@@ -243,8 +253,7 @@ export default function EditarEscala({ escalaId }) {
     formData.append("tipo_mision_id", tipoMisionId || "")
     formData.append("subtipo_elegido", subtipoElegido || "")
     // El itinerario SOLO se manda si está completo. La fecha del vuelo
-    // (Escala.fecha) se recalcula sola en el servidor a partir de este
-    // itinerario, no se manda desde acá.
+    // (Escala.fecha) se recalcula sola en el servidor.
     if (itinerarioCompleto) {
       formData.append("itinerarios", JSON.stringify(tramos))
     }
@@ -302,16 +311,16 @@ export default function EditarEscala({ escalaId }) {
   }
 
   if (cargando) {
-    return <div className="p-8 max-w-3xl mx-auto text-sm text-gray-400">Cargando escala...</div>
+    return <div className="p-4 sm:p-8 max-w-3xl mx-auto text-sm text-gray-400">Cargando escala...</div>
   }
   if (errorCarga) {
-    return <div className="p-8 max-w-3xl mx-auto text-sm text-red-600">{errorCarga}</div>
+    return <div className="p-4 sm:p-8 max-w-3xl mx-auto text-sm text-red-600">{errorCarga}</div>
   }
 
   const editable = puedeEditarAhora(escala)
   if (!editable) {
     return (
-      <div className="p-8 max-w-3xl mx-auto">
+      <div className="p-4 sm:p-8 max-w-3xl mx-auto">
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center">
           <p className="text-sm font-medium text-amber-800">
             {motivoNoEditable(escala) || "Esta escala ya no se puede editar."}
@@ -326,7 +335,7 @@ export default function EditarEscala({ escalaId }) {
 
   if (escalaPublicada) {
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-8 max-w-2xl mx-auto">
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-lg font-semibold text-green-800">✓ Escala publicada</p>
           <p className="text-sm text-green-700 mt-1">La escala #{escalaId} quedó publicada correctamente.</p>
@@ -340,7 +349,7 @@ export default function EditarEscala({ escalaId }) {
 
   if (edicionGuardada) {
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-8 max-w-2xl mx-auto">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
           <p className="text-lg font-semibold text-blue-800">✓ Guardado</p>
           <p className="text-sm text-blue-700 mt-1">
@@ -363,10 +372,10 @@ export default function EditarEscala({ escalaId }) {
     : "Guardar cambios"
 
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 sm:p-8 max-w-3xl mx-auto space-y-6">
       <BotonVolver />
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           {esBorrador ? "Borrador de Escala" : `Edición de Escala N° ${escala.nro_orden || `#${escalaId}`}`}
         </h1>
         {!esBorrador && (
@@ -382,8 +391,7 @@ export default function EditarEscala({ escalaId }) {
         </div>
       )}
 
-
-      <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 space-y-4">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Solicitud</h2>
 
         <div>
@@ -398,7 +406,6 @@ export default function EditarEscala({ escalaId }) {
           />
         </div>
 
-        {/* FIX: apilado en mobile, en fila desde 768px */}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -424,7 +431,7 @@ export default function EditarEscala({ escalaId }) {
         </div>
 
         {escala.solicitudes?.[0]?.id && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 break-words">
             Archivo actual:{" "}
             {escala.solicitudes[0].nombre_archivo_original ? (
               <a
@@ -461,7 +468,7 @@ export default function EditarEscala({ escalaId }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 space-y-4">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Detalles de la escala</h2>
 
         <div>
@@ -508,8 +515,9 @@ export default function EditarEscala({ escalaId }) {
           </label>
           <div className="space-y-2">
             {tramos.map((t, i) => (
-              // FIX: apilado en mobile, en fila desde 768px
-              <div key={i} className="grid grid-cols-1 gap-2 items-end bg-gray-50 p-2 rounded-md md:grid-cols-5">
+              // 1 columna en celular, 2 desde 640px (Origen|Destino,
+              // Salida|Llegada), 5 desde 1024px.
+              <div key={i} className="grid grid-cols-1 gap-2 items-end bg-gray-50 p-2 rounded-md sm:grid-cols-2 lg:grid-cols-5">
                 <div>
                   <label className="block text-xs text-gray-500 mb-0.5">Origen</label>
                   <input type="text" value={t.origen} onChange={(e) => actualizarTramo(i, "origen", e.target.value)} placeholder="SGAS" className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
@@ -526,14 +534,15 @@ export default function EditarEscala({ escalaId }) {
                   <label className="block text-xs text-gray-500 mb-0.5">Llegada est.</label>
                   <input type="datetime-local" value={t.hora_estimada_llegada} onChange={(e) => actualizarTramo(i, "hora_estimada_llegada", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
                 </div>
-                <button type="button" onClick={() => quitarTramo(i)} disabled={tramos.length === 1} className="text-xs text-red-500 hover:text-red-700 disabled:opacity-30 pb-2">Quitar</button>
+                <button type="button" onClick={() => quitarTramo(i)} disabled={tramos.length === 1} className="justify-self-end text-xs text-red-500 hover:text-red-700 disabled:opacity-30 pb-2 sm:col-span-2 lg:col-span-1 lg:justify-self-start">Quitar</button>
               </div>
             ))}
           </div>
           <button type="button" onClick={agregarTramo} className="mt-2 text-xs text-blue-600 hover:underline font-medium">+ Agregar tramo</button>
         </div>
 
-        <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-md px-3 py-2">
+        {/* Cartel + botón: apilados en celular, en fila desde 640px */}
+        <div className="flex flex-col gap-1.5 bg-blue-50 border border-blue-100 rounded-md px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-blue-700">
             {cargandoCandidatos
               ? "Actualizando disponibilidad..."
@@ -543,7 +552,7 @@ export default function EditarEscala({ escalaId }) {
             type="button"
             onClick={buscarCandidatos}
             disabled={!ventanaLista || cargandoCandidatos}
-            className="text-xs text-blue-700 font-medium hover:underline disabled:opacity-50 disabled:no-underline shrink-0 ml-3"
+            className="self-start text-xs text-blue-700 font-medium hover:underline disabled:opacity-50 disabled:no-underline shrink-0 sm:self-auto sm:ml-3"
           >
             🔄 Actualizar disponibilidad
           </button>
@@ -568,13 +577,10 @@ export default function EditarEscala({ escalaId }) {
             <>
               <div className="space-y-2">
                 {tripulacion.map((t, i) => {
-                  // No repetir la misma persona en dos filas — si ya
-                  // está elegida como Piloto en la fila 1, no tiene
-                  // que aparecer también como candidata a Copiloto en
-                  // la fila 2. Se excluyen los ids ya usados en OTRAS
-                  // filas (no la propia — si no, la fila se quedaría
-                  // sin poder mostrar a la persona que ella misma ya
-                  // tiene seleccionada).
+                  // No repetir la misma persona en dos filas — se
+                  // excluyen los ids ya usados en OTRAS filas (no la
+                  // propia, o la fila no podría mostrar a quien ya
+                  // tiene seleccionado).
                   const idsYaElegidosEnOtrasFilas = tripulacion
                     .filter((_, otroIndex) => otroIndex !== i)
                     .map((otro) => otro.persona_id)
@@ -586,7 +592,6 @@ export default function EditarEscala({ escalaId }) {
                       !idsYaElegidosEnOtrasFilas.includes(String(p.id))
                   )
                   return (
-                    // FIX: apilado en mobile, en fila desde 768px
                     <div key={i} className="flex flex-col gap-2 bg-gray-50 p-2 rounded-md md:flex-row md:items-end">
                       <div className="flex-1 min-w-0">
                         <label className="block text-xs text-gray-500 mb-0.5">Persona</label>
@@ -651,7 +656,7 @@ export default function EditarEscala({ escalaId }) {
           </div>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={guardarCambios}

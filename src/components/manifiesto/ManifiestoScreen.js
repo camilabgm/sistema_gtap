@@ -1,5 +1,17 @@
 "use client"
 
+// src/components/manifiesto/ManifiestoScreen.js
+//
+// CAMBIO (rama fix/responsive-maestro-detalle):
+//   - Lista y detalle se muestran de a uno por debajo de 1024px
+//     (celular Y tablet), no solo en celular — ver
+//     useVistaMobileMaestroDetalle, que ahora devuelve "esCompacta".
+//   - Desde 1024px, lado a lado: la lista ocupa el 40% con un máximo
+//     de 384px (max-w-sm), y el detalle todo el resto. En pantallas
+//     grandes el detalle crece y la lista no.
+//   - "Volver a Inicio" solo en celular (md:hidden): en tablet ya está
+//     el sidebar para ir al Inicio.
+
 import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { usuarioPuedeGestionarManifiesto } from "@/lib/manifiesto"
@@ -25,7 +37,7 @@ export default function ManifiestoScreen({ session }) {
   const [cargandoDetalle, setCargandoDetalle] = useState(false)
   const [errorDetalle, setErrorDetalle] = useState(null)
 
-  const { esMobile, mostrarLista, mostrarDetalle, abrirDetalle, volverALista } =
+  const { esCompacta, mostrarLista, mostrarDetalle, abrirDetalle, volverALista } =
     useVistaMobileMaestroDetalle(!!idDesdeUrl)
 
   const cargarLista = useCallback(async (q) => {
@@ -36,9 +48,12 @@ export default function ManifiestoScreen({ session }) {
       if (!res.ok) throw new Error("No se pudo cargar la lista de escalas")
       const data = await res.json()
       setEscalas(data)
+      // Lado a lado (desde 1024px) se preselecciona la primera escala
+      // para que el detalle no arranque vacío. En pantalla compacta no:
+      // ahí se muestra la lista y la persona elige.
       setEscalaSeleccionadaId((actual) => {
         if (actual) return actual
-        if (esMobile === true) return actual
+        if (esCompacta === true) return actual
         return data.length > 0 ? data[0].id : null
       })
     } catch (err) {
@@ -47,7 +62,7 @@ export default function ManifiestoScreen({ session }) {
       setCargandoLista(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [esMobile])
+  }, [esCompacta])
 
   const cargarDetalle = useCallback(async (id) => {
     if (!id) return
@@ -92,16 +107,20 @@ export default function ManifiestoScreen({ session }) {
   const puedeGestionar = detalle ? usuarioPuedeGestionarManifiesto(session, detalle) : false
   const puedeEliminarManifiesto = !!session?.user?.permisos?.MANIFIESTO?.puede_eliminar
 
-  if (esMobile === null) return null
+  if (esCompacta === null) return null
 
   return (
     <div className="p-4">
-      {/* Lista: "Volver a Inicio" (fijo al Dashboard). */}
-      {esMobile === true && mostrarLista && <BotonVolverInicio />}
+      {/* Lista: "Volver a Inicio" (fijo al Dashboard), solo en celular. */}
+      {esCompacta === true && mostrarLista && (
+        <div className="md:hidden">
+          <BotonVolverInicio />
+        </div>
+      )}
 
       <div className="flex h-full gap-4">
         {mostrarLista && (
-          <div className={esMobile ? "w-full" : "w-full max-w-sm shrink-0"}>
+          <div className={esCompacta ? "w-full" : "w-2/5 max-w-sm shrink-0"}>
             <ListaEscalas
               escalas={escalas}
               cargando={cargandoLista}
@@ -116,7 +135,7 @@ export default function ManifiestoScreen({ session }) {
         {mostrarDetalle && (
           <div className="flex-1 min-w-0">
             {/* Detalle: "Volver a la lista" — se queda DENTRO del módulo. */}
-            {esMobile && <BotonVolver etiqueta="Volver a la lista" onClick={volverALista} />}
+            {esCompacta && <BotonVolver etiqueta="Volver a la lista" onClick={volverALista} />}
             {cargandoDetalle && (
               <div className="flex h-full items-center justify-center text-gray-400">Cargando…</div>
             )}

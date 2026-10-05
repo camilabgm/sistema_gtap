@@ -5,8 +5,19 @@
 // cliente como route.js del servidor, y un Hook de React acá adentro
 // rompe el build del lado servidor. El hook useTick() vive aparte, en
 // lib/useTick.js — NO reintroducir acá.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle): formatearHora y
+// formatearFechaHoraCompacta pasan a formato de 24 horas, reutilizando
+// formatearFechaHora de fechaHora.js en vez de llamar a
+// toLocaleString por su cuenta. Motivo: con el formato de 12 horas
+// ("09:32 a. m."), Node.js (servidor) y Chrome (navegador) ponen un
+// espacio invisible DISTINTO antes de "a. m." — el texto se ve igual
+// pero no es igual, y React tiraba un error de hidratación en cada
+// pantalla que dibuja estas fechas desde el servidor (ej. SICEM
+// Eventos). En 24 horas no hay "a. m."/"p. m.", así que el problema
+// desaparece de raíz. Ambas siguen fijando la hora de Paraguay.
 
-import { fechaUTCAInputParaguay } from "@/lib/fechaHora"
+import { fechaUTCAInputParaguay, formatearFechaHora } from "@/lib/fechaHora"
 
 export const ETIQUETAS_ESTADO = {
   PROGRAMADA: "Programada",
@@ -42,14 +53,13 @@ export const TOOLTIP_ESTADO_DETALLADO = {
   VENCIDA_SIN_AUTORIZAR: "Ya pasó la hora de despegue estimada y nadie la autorizó — no se puede autorizar así como está. Editala para reprogramarla, o eliminala si ya no corresponde.",
 }
 
-// Hora de despegue/llegada — SIEMPRE en hora de Paraguay explícita, sin
-// importar la zona horaria del navegador de quien mire la pantalla.
+// Hora de despegue/llegada ("09:32") — 24 horas, SIEMPRE en hora de
+// Paraguay explícita (lo garantiza formatearFechaHora), sin importar la
+// zona horaria de quien mire la pantalla. Se apagan día, mes, año y
+// segundos para que quede solo la hora.
 export function formatearHora(iso) {
   if (!iso) return "—"
-  return new Date(iso).toLocaleTimeString("es-PY", {
-    hour: "2-digit", minute: "2-digit",
-    timeZone: "America/Asuncion",
-  })
+  return formatearFechaHora(iso, { day: undefined, month: undefined, year: undefined, second: undefined })
 }
 
 export function calcularEstadoVisual(escala) {
@@ -127,8 +137,7 @@ export function motivoNoAbortable(escala) {
 
 // NOTA: puedeEliminarse() se sacó de acá — Eliminar ahora depende
 // únicamente del permiso ESCALAS.puede_eliminar de la matriz, sin
-// ninguna regla de estado adicional. La matriz ya define los 5 grupos
-// habilitados para esta acción, igual que para crear/editar/ver.
+// ninguna regla de estado adicional.
 
 export function calcularVentanaEnElDia(horaDespegueIso, horaArriboIso, fechaSeleccionadaISO) {
   if (!horaDespegueIso) return null
@@ -152,23 +161,21 @@ export function calcularVentanaEnElDia(horaDespegueIso, horaArriboIso, fechaSele
   }
 }
 
-// SIEMPRE en hora de Paraguay explícita — mismo motivo que formatearHora.
+// Día, mes y hora ("24/09, 09:32") — 24 horas, SIEMPRE en hora de
+// Paraguay explícita. Mismo patrón que ya usa PendientesAutorizar:
+// el formateador compartido sin año ni segundos.
 export function formatearFechaHoraCompacta(iso) {
   if (!iso) return "—"
-  return new Date(iso).toLocaleString("es-PY", {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-    timeZone: "America/Asuncion",
-  })
+  return formatearFechaHora(iso, { year: undefined, second: undefined })
 }
 
 export function formatearRangoVuelo(horaDespegueIso, horaArriboIso) {
   if (!horaDespegueIso) return "—"
   if (!horaArriboIso) return `${formatearHora(horaDespegueIso)} – —`
 
-  // "¿Mismo día?" comparado en hora de PARAGUAY explícitamente — antes
-  // usaba toDateString(), que depende de la zona horaria de la máquina
-  // que ejecuta el código, el mismo problema de fondo que ya venimos
-  // corrigiendo en todos lados.
+  // "¿Mismo día?" comparado en hora de PARAGUAY explícitamente — no con
+  // toDateString(), que depende de la zona horaria de la máquina que
+  // ejecuta el código.
   const diaDespegue = fechaUTCAInputParaguay(horaDespegueIso).slice(0, 10)
   const diaLlegada  = fechaUTCAInputParaguay(horaArriboIso).slice(0, 10)
   const mismoDia = diaDespegue === diaLlegada

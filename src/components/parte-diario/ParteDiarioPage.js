@@ -10,6 +10,9 @@
 //     salía de la tarjeta en un celular angosto.
 //   - Los tres contadores (Total / Disponibles / Con novedad) usan
 //     gap-4 en celular (gap-8 desde 640px), así entran en 320px.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle): la fecha de hoy del
+// encabezado se calcula con timeZone "America/Asuncion" explícito.
 
 import { useState } from "react"
 import { Plus, Pencil, Trash2, Search } from "lucide-react"
@@ -54,8 +57,13 @@ export default function ParteDiarioPage({ novedadesIniciales, personas, permisos
     )
   })
 
+  // timeZone explícito: este componente se dibuja primero en el
+  // servidor. Sin esto, con el servidor en UTC, entre las 21:00 y las
+  // 23:59 de Paraguay el servidor ya diría "mañana" y el navegador
+  // "hoy" — fecha equivocada y error de hidratación.
   const fechaHoy = new Date().toLocaleDateString("es-PY", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
+    timeZone: "America/Asuncion",
   })
 
   function handleAbrirCrear() {

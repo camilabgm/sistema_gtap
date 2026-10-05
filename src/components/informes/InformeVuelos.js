@@ -15,11 +15,16 @@
 //   - En la tabla, Aeronave·Ruta y Misión·Solicitante ya no tienen
 //     whitespace-nowrap: se parten en dos renglones si hace falta, en
 //     vez de obligar a la tabla a ser más ancha que la pantalla.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle): la fecha/hora de cada
+// vuelo usa el formateador compartido de fechaHora.js — 24 horas y
+// hora de Paraguay explícita, como el resto del sistema.
 
 import { useState, useEffect, useCallback } from "react"
 import { Download } from "lucide-react"
 import { exportarInformeVuelosPDF } from "@/lib/exportarInformeVuelosPDF"
 import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
+import { formatearFechaHora as formatearFechaHoraBase } from "@/lib/fechaHora"
 
 function primerDiaDelMes() {
   const hoy = new Date()
@@ -33,11 +38,12 @@ function formatearISO(fecha) {
   return `${y}-${m}-${d}`
 }
 
+// Formato "24/09/2026 09:32" — se envuelve el formateador compartido de
+// fechaHora.js (24 horas, hora de Paraguay explícita) en vez de tener
+// uno propio sin zona horaria, que dependía del reloj de la compu de
+// quien mirara el informe.
 function formatearFechaHora(iso) {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleString("es-PY", {
-    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-  })
+  return formatearFechaHoraBase(iso, { second: undefined })
 }
 
 function textoPaxCarga(f) {

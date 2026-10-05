@@ -1,14 +1,26 @@
 "use client"
 
+// src/components/manifiesto/PanelDetalle.js
+//
 // Panel derecho: info de la escala (pulida de Escala/Aeronave/Post-Vuelo,
 // sin re-cargar nada) + secciones editables de Pasajeros y Carga.
 //
-// CAMBIO: al agregar (no editar) un pasajero o una carga, el
-// formulario ya no se cierra solo al guardar — queda abierto y
-// limpio para cargar el siguiente. "Cancelar" sigue siendo el único
-// botón para cerrarlo, sin texto nuevo que se confunda con "Cerrar
-// manifiesto". También: breakpoints alineados a 768px y filas que se
-// apilan en mobile en vez de amontonarse en una línea.
+// Al agregar (no editar) un pasajero o una carga, el formulario no se
+// cierra solo al guardar — queda abierto y limpio para cargar el
+// siguiente. "Cancelar" es el único botón para cerrarlo.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle):
+//   - Padding del panel: 16px en celular, 20px desde 640px.
+//   - Aeronave / Tipo de misión / Capacidad / Ocupación: cada celda con
+//     min-w-0 y separación horizontal de 16px, para que las etiquetas
+//     en mayúscula no se pisen entre columnas.
+//   - "Cerrar manifiesto" y "Agregar persona": en celular quedan en una
+//     fila debajo del título, alineados a la izquierda junto con él
+//     (antes quedaban apilados a la derecha, desalineados del título).
+//     Desde 640px vuelven a la derecha.
+//   - Acciones de cada pasajero/carga a la derecha, con flex-wrap, igual
+//     que en el resto del sistema.
+//   - "Carga · N ítems" y "+ Agregar carga" con separación entre sí.
 
 import { useState } from "react"
 import { Pencil, Trash2, AlertTriangle } from "lucide-react"
@@ -142,9 +154,9 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto rounded-lg border border-gray-200 bg-white p-5">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
       <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 md:flex-row md:items-start md:justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
             <span>{formatearFechaCorta(detalle.fecha)}</span>
             <span
@@ -190,26 +202,26 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 border-b border-gray-100 pb-4 md:grid-cols-4">
-        <div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-gray-100 pb-4 md:grid-cols-4">
+        <div className="min-w-0">
           <div className="text-xs uppercase text-gray-400">Aeronave</div>
           <div className="text-sm font-medium text-gray-900">
             {detalle.aeronave ? `${detalle.aeronave.matricula} (${detalle.aeronave.tipo})` : "—"}
           </div>
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="text-xs uppercase text-gray-400">Tipo de misión</div>
           <div className="text-sm font-medium text-gray-900">
             {detalle.tipo_mision ? `${detalle.tipo_mision.codigo} · ${detalle.tipo_mision.nombre}` : "—"}
           </div>
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="text-xs uppercase text-gray-400">Capacidad</div>
           <div className="text-sm font-medium text-gray-900">
             {detalle.pasajeros.length} / {detalle.capacidad ?? "—"}
           </div>
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="text-xs uppercase text-gray-400">Ocupación</div>
           <div className="mt-1 h-2 w-full rounded-full bg-gray-100">
             <div
@@ -222,16 +234,16 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
       </div>
 
       {detalle.estado === "CUMPLIDA" && (
-        <div className="grid grid-cols-2 gap-4 border-b border-gray-100 pb-4 md:grid-cols-3">
-          <div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-gray-100 pb-4 md:grid-cols-3">
+          <div className="min-w-0">
             <div className="text-xs uppercase text-gray-400">Hs de vuelo</div>
             <div className="text-sm font-medium text-gray-900">{detalle.horas_vuelo ?? "—"}</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-xs uppercase text-gray-400">Hs en tierra</div>
             <div className="text-sm font-medium text-gray-900">{detalle.horas_tierra ?? "—"}</div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-xs uppercase text-gray-400">Combustible</div>
             <div className="text-sm font-medium text-gray-900">
               {detalle.combustible_consumido ? `${detalle.combustible_consumido} L` : "—"}
@@ -273,7 +285,7 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
             Manifiesto · {detalle.pasajeros.length} persona{detalle.pasajeros.length === 1 ? "" : "s"}
           </div>
           {puedeGestionar && !agregandoPasajero && (
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex flex-wrap gap-2 sm:justify-end">
               {!detalle.manifiesto_cerrado && (
                 <button
                   onClick={cerrarManifiesto}
@@ -339,12 +351,12 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
               </li>
             ) : (
               <li key={p.id} className="flex flex-col gap-1 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-                <div>
+                <div className="min-w-0">
                   <span className="font-medium text-gray-900">{p.nombre} {p.apellido}</span>
                   <span className="ml-2 text-gray-500">{p.nro_documento} · {p.nacionalidad}</span>
                 </div>
                 {puedeGestionar && (
-                  <div className="flex justify-end gap-1 sm:justify-start">
+                  <div className="flex flex-wrap justify-end gap-1 sm:shrink-0">
                     <AccionIcono
                       icono={Pencil}
                       etiqueta="Editar pasajero"
@@ -366,14 +378,14 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
       </div>
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-gray-900">
             Carga · {detalle.cargas.length} ítem{detalle.cargas.length === 1 ? "" : "s"}
           </div>
           {puedeGestionar && !agregandoCarga && (
             <button
               onClick={() => setAgregandoCarga(true)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="shrink-0 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               + Agregar carga
             </button>
@@ -425,13 +437,13 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
               </li>
             ) : (
               <li key={c.id} className="flex flex-col gap-1 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-                <div>
+                <div className="min-w-0">
                   <span className="font-medium text-gray-900">{c.tipo}</span>
                   {c.descripcion && <span className="ml-2 text-gray-500">{c.descripcion}</span>}
                   {c.peso && <span className="ml-2 text-gray-500">{c.peso} kg</span>}
                 </div>
                 {puedeGestionar && (
-                  <div className="flex justify-end gap-1 sm:justify-start">
+                  <div className="flex flex-wrap justify-end gap-1 sm:shrink-0">
                     <AccionIcono
                       icono={Pencil}
                       etiqueta="Editar carga"
@@ -452,11 +464,9 @@ export default function PanelDetalle({ detalle, puedeGestionar, puedeEliminar, o
         </ul>
       </div>
 
-      {/* Eliminar manifiesto completo — mismo lugar y mismo criterio
-          visual que "Eliminar post-vuelo" en PanelPostVuelo.js: al
-          final, después de la auditoría, separado de los botones de
-          arriba (que son de uso normal/frecuente; esto es excepcional
-          y solo para Comandante). */}
+      {/* Eliminar manifiesto completo — al final, separado de los
+          botones de arriba (que son de uso frecuente; esto es
+          excepcional y solo para Comandante). */}
       {puedeEliminar && (
         <button
           onClick={eliminarManifiestoCompleto}

@@ -1,16 +1,25 @@
 "use client"
 
+// src/components/postVuelo/PanelPostVuelo.js
+//
 // Panel de detalle propio de Post-Vuelo — a diferencia de
 // PanelDetalleEscala (compartido con Gestión y Agenda, con abortar y
 // acuse), este componente solo existe para reportar el post-vuelo de
-// UNA escala puntual, dejando bien claro a cuál pertenece. No toca ni
-// depende de PanelDetalleEscala — ningún cambio acá afecta Gestión ni
-// Agenda.
+// UNA escala puntual. Ningún cambio acá afecta Gestión ni Agenda.
 //
-// CAMBIO: grillas de inputs (tramos, cierre) apiladas en mobile y en
-// fila desde 768px — mismo estándar que el resto de la rama de
-// responsive. Breakpoint de "Datos de la escala" alineado de sm: a
-// md: por la misma razón.
+// CAMBIO (rama fix/responsive-maestro-detalle):
+//   - "Datos de la escala": 2 columnas en celular (Tripulación ocupa
+//     las dos), 3 desde 640px. Antes, en un panel angosto, las 3
+//     columnas se pisaban ("SOLICITANTE" encima de "TIPO DE MISIÓN").
+//   - Corrección de combustible: el campo se estira y se achica según
+//     el espacio (antes tenía 128px fijos y empujaba "Guardar" fuera
+//     de la tarjeta). El botón nunca se achica.
+//   - Formulario de cierre: el "(según Manifiesto)" pasa de la
+//     etiqueta a una línea chica DEBAJO del campo. Antes, en pantallas
+//     angostas, "Pasajeros (según Manifiesto)" ocupaba 3 renglones y
+//     "Aterrizajes" 1, y los tres campos quedaban a distinta altura.
+//   - Filas de botones con flex-wrap (Editar/Eliminar, Guardar/Cancelar).
+//   - Padding del panel: 16px en celular, 20px desde 640px.
 
 import { useState, useEffect, useCallback } from "react"
 import { formatearFechaHoraCompacta } from "@/lib/escalas"
@@ -109,10 +118,10 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
 
   async function guardarTramo(tramoId) {
     const mensaje = pvData?.postVuelo
-        ? "Este post-vuelo ya está cerrado. ¿Confirmás que querés guardar este tramo? Los valores ya cargados se van a sobrescribir."
-        : "¿Confirmás que querés guardar este tramo con estos valores?"
-      if (!window.confirm(mensaje)) return
-      
+      ? "Este post-vuelo ya está cerrado. ¿Confirmás que querés guardar este tramo? Los valores ya cargados se van a sobrescribir."
+      : "¿Confirmás que querés guardar este tramo con estos valores?"
+    if (!window.confirm(mensaje)) return
+
     setPvError(null)
     setTramoGuardando(tramoId)
     try {
@@ -236,13 +245,14 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
   }
 
   const completado = pvData ? !!pvData.postVuelo : !!e.tiene_post_vuelo
+  const mostrarSugerenciaManifiesto = !pvData?.postVuelo
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
       {/* Encabezado — a cuál escala pertenece este panel */}
       <div className="flex items-start justify-between border-b border-gray-100 pb-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span>{formatearFechaHoraCompacta(e.hora_despegue_estimada)}</span>
             {completado ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 font-medium text-green-700">
@@ -263,17 +273,17 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
         </div>
       </div>
 
-      {/* Datos de la escala */}
-      <div className="grid grid-cols-1 gap-3 border-b border-gray-100 py-4 md:grid-cols-3">
-        <div>
+      {/* Datos de la escala — 2 columnas en celular, 3 desde 640px */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-gray-100 py-4 sm:grid-cols-3">
+        <div className="min-w-0">
           <div className="text-xs uppercase text-gray-400">Solicitante</div>
-          <div className="text-sm font-medium text-gray-900">{e.solicitante || "—"}</div>
+          <div className="text-sm font-medium text-gray-900 break-words">{e.solicitante || "—"}</div>
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="text-xs uppercase text-gray-400">Tipo de misión</div>
           <div className="text-sm font-medium text-gray-900">{e.tipo_mision?.codigo || "—"}</div>
         </div>
-        <div>
+        <div className="col-span-2 min-w-0 sm:col-span-1">
           <div className="text-xs uppercase text-gray-400">Tripulación</div>
           <div className="text-sm font-medium text-gray-900">
             {(e.tripulacion || []).length > 0
@@ -320,7 +330,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
               {pvData.escala.itinerarios.map((t) => (
                 <div key={t.id} className="rounded-md border border-gray-100 bg-gray-50 p-3">
                   <p className="mb-2 text-sm font-medium text-gray-700">{t.origen} → {t.destino}</p>
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div>
                       <label className="mb-0.5 block text-[11px] text-gray-500">Salida real</label>
                       <input
@@ -405,6 +415,9 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                       ? "Corregir combustible consumido (L)"
                       : "Cargar combustible consumido (L)"}
                   </p>
+                  {/* El campo se estira o se achica según el espacio
+                      (min-w-0 flex-1), con un máximo de 160px desde
+                      640px. El botón nunca se achica (shrink-0). */}
                   <div className="flex gap-2">
                     <input
                       type="number"
@@ -413,12 +426,12 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                       value={pvCombustibleInput}
                       onChange={(ev) => setPvCombustibleInput(ev.target.value)}
                       placeholder={pvData.postVuelo.combustible_consumido != null ? `Actual: ${pvData.postVuelo.combustible_consumido}` : "Litros"}
-                      className="w-32 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                      className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm sm:max-w-[10rem]"
                     />
                     <button
                       onClick={handleGuardarCombustible}
                       disabled={pvGuardandoCombustible}
-                      className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-800 disabled:opacity-50"
+                      className="shrink-0 rounded-md bg-teal-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-800 disabled:opacity-50"
                     >
                       {pvGuardandoCombustible ? "…" : "Guardar"}
                     </button>
@@ -429,7 +442,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                 </div>
               )}
 
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {pvData.puedeEditar && (
                   <button
                     onClick={() => setPvEditandoCierre(true)}
@@ -450,8 +463,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
               </div>
 
               {/* Auditoría — al final de todo, con su propio separador,
-                  mismo patrón que Manifiesto: sin borde extra, el
-                  separador azul ya alcanza solo. */}
+                  mismo patrón que Manifiesto. */}
               <SeparadorSeccion texto="Auditoría" />
               <PanelAuditoria
                 items={[
@@ -493,7 +505,10 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+              {/* Las tres etiquetas tienen un solo renglón, así los tres
+                  campos quedan a la misma altura. "Sugerido por el
+                  Manifiesto" va debajo del campo, no en la etiqueta. */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <div>
                   <label className="mb-0.5 block text-[11px] text-gray-500">Aterrizajes</label>
                   <input
@@ -505,9 +520,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                   />
                 </div>
                 <div>
-                  <label className="mb-0.5 block text-[11px] text-gray-500">
-                    Pasajeros {!pvData.postVuelo && <span className="text-teal-600">(según Manifiesto)</span>}
-                  </label>
+                  <label className="mb-0.5 block text-[11px] text-gray-500">Pasajeros</label>
                   <input
                     type="number"
                     min="0"
@@ -515,11 +528,12 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                     onChange={(ev) => setPvPasajeros(ev.target.value)}
                     className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                   />
+                  {mostrarSugerenciaManifiesto && (
+                    <p className="mt-0.5 text-[11px] text-teal-600">Sugerido por el Manifiesto</p>
+                  )}
                 </div>
                 <div>
-                  <label className="mb-0.5 block text-[11px] text-gray-500">
-                    Carga (kg) {!pvData.postVuelo && <span className="text-teal-600">(según Manifiesto)</span>}
-                  </label>
+                  <label className="mb-0.5 block text-[11px] text-gray-500">Carga (kg)</label>
                   <input
                     type="number"
                     min="0"
@@ -528,13 +542,16 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                     onChange={(ev) => setPvCargaKg(ev.target.value)}
                     className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                   />
+                  {mostrarSugerenciaManifiesto && (
+                    <p className="mt-0.5 text-[11px] text-teal-600">Sugerido por el Manifiesto</p>
+                  )}
                 </div>
               </div>
-              {/* El campo de combustible ya NO va acá — lo cargan Jefe
-                  de Combustible o Supervisor de Semana, aparte, con su
-                  propio candado de una sola vez (ver bloque de abajo). */}
+              {/* El campo de combustible NO va acá — lo cargan Jefe de
+                  Combustible o Supervisor de Semana, aparte, con su
+                  propio candado de una sola vez. */}
 
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
                   <label className="mb-0.5 block text-[11px] text-gray-500">Novedad</label>
                   <select
@@ -570,7 +587,7 @@ export default function PanelPostVuelo({ escala, onActualizada }) {
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleGuardarCierre}
                   disabled={pvGuardando}

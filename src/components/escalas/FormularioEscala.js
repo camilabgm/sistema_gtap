@@ -1,10 +1,17 @@
 "use client"
 
 // src/components/escalas/FormularioEscala.js
+//
+// CAMBIO (rama fix/responsive-maestro-detalle) — mismos ajustes que
+// EditarEscala.js:
+//   - Padding de la pantalla: 16px en celular, 32px desde 640px.
+//   - Cartel de disponibilidad + botón "Actualizar disponibilidad":
+//     apilados en celular, en fila desde 640px.
+//   - Cada tramo del itinerario: 1 columna en celular, 2 desde 640px y
+//     5 desde 1024px.
 
 import { useState, useEffect, useRef } from "react"
 import { parsearSubtipos } from "@/lib/tiposMision"
-// Import nuevo, arriba del archivo:
 import BotonVolver from "@/components/shared/BotonVolver"
 
 const CANALES = ["PDF", "IMAGEN", "WORD", "VERBAL"]
@@ -177,9 +184,7 @@ export default function FormularioEscala() {
   // Guarda los detalles y, si ya está todo completo, publica en el mismo
   // paso. El itinerario SOLO se manda en el body si está completo — así,
   // el tramo vacío por defecto (o uno a medio llenar) nunca tira abajo
-  // el resto del guardado (como el número de orden), que puede
-  // completarse en cualquier momento de forma independiente. La fecha
-  // del vuelo la calcula sola el servidor a partir de este itinerario.
+  // el resto del guardado (como el número de orden).
   async function guardarYPublicar() {
     setErrorDetalles(null)
     setDetallesConflicto([])
@@ -243,7 +248,7 @@ export default function FormularioEscala() {
 
   if (escalaPublicada) {
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-8 max-w-2xl mx-auto">
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-lg font-semibold text-green-800">✓ Escala publicada</p>
           <p className="text-sm text-green-700 mt-1">La escala #{escalaId} quedó publicada correctamente.</p>
@@ -262,13 +267,13 @@ export default function FormularioEscala() {
     : datosCompletos
     ? "Guardar y publicar"
     : "Guardar detalles"
-      
-  return (
-    <div className="p-8 max-w-3xl mx-auto space-y-6">
-       <BotonVolver />
-      <h1 className="text-2xl font-bold text-gray-900">Nueva Escala de Vuelo</h1>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
+  return (
+    <div className="p-4 sm:p-8 max-w-3xl mx-auto space-y-6">
+      <BotonVolver />
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Nueva Escala de Vuelo</h1>
+
+      <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Solicitud</h2>
         <div className="space-y-3">
           <div>
@@ -285,8 +290,6 @@ export default function FormularioEscala() {
             />
           </div>
 
-          {/* FIX: apilado en mobile, en fila desde 768px — mismo
-              estándar que el resto del sistema. */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -355,11 +358,11 @@ export default function FormularioEscala() {
         </div>
       </div>
 
-      <div className={`bg-white rounded-lg border border-gray-200 p-5 ${!escalaId ? "opacity-50" : ""}`}>
+      <div className={`bg-white rounded-lg border border-gray-200 p-4 sm:p-5 ${!escalaId ? "opacity-50" : ""}`}>
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Detalles de la escala</h2>
         {!escalaId && <p className="text-sm text-gray-400 mb-3">Guardá la solicitud para habilitar esta parte.</p>}
 
-        <fieldset disabled={!escalaId} className="space-y-4">
+        <fieldset disabled={!escalaId} className="space-y-4 min-w-0">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nro. de orden <span className="text-gray-400 font-normal">(opcional — se puede completar en cualquier momento)</span>
@@ -405,10 +408,9 @@ export default function FormularioEscala() {
             </label>
             <div className="space-y-2">
               {tramos.map((t, i) => (
-                // FIX: apilado en mobile (1 columna), en fila desde
-                // 768px (5 columnas) — con 3-4 tramos, 5 campos
-                // angostos en una fila sería ilegible en un celular.
-                <div key={i} className="grid grid-cols-1 gap-2 items-end bg-gray-50 p-2 rounded-md md:grid-cols-5">
+                // 1 columna en celular, 2 desde 640px (Origen|Destino,
+                // Salida|Llegada), 5 desde 1024px.
+                <div key={i} className="grid grid-cols-1 gap-2 items-end bg-gray-50 p-2 rounded-md sm:grid-cols-2 lg:grid-cols-5">
                   <div>
                     <label className="block text-xs text-gray-500 mb-0.5">Origen</label>
                     <input type="text" value={t.origen} onChange={(e) => actualizarTramo(i, "origen", e.target.value)} placeholder="SGAS" className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
@@ -425,14 +427,15 @@ export default function FormularioEscala() {
                     <label className="block text-xs text-gray-500 mb-0.5">Llegada est.</label>
                     <input type="datetime-local" value={t.hora_estimada_llegada} onChange={(e) => actualizarTramo(i, "hora_estimada_llegada", e.target.value)} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
                   </div>
-                  <button type="button" onClick={() => quitarTramo(i)} disabled={tramos.length === 1} className="text-xs text-red-500 hover:text-red-700 disabled:opacity-30 pb-2">Quitar</button>
+                  <button type="button" onClick={() => quitarTramo(i)} disabled={tramos.length === 1} className="justify-self-end text-xs text-red-500 hover:text-red-700 disabled:opacity-30 pb-2 sm:col-span-2 lg:col-span-1 lg:justify-self-start">Quitar</button>
                 </div>
               ))}
             </div>
             <button type="button" onClick={agregarTramo} className="mt-2 text-xs text-blue-600 hover:underline font-medium">+ Agregar tramo</button>
           </div>
 
-          <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-md px-3 py-2">
+          {/* Cartel + botón: apilados en celular, en fila desde 640px */}
+          <div className="flex flex-col gap-1.5 bg-blue-50 border border-blue-100 rounded-md px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-blue-700">
               {cargandoCandidatos
                 ? "Actualizando disponibilidad..."
@@ -442,7 +445,7 @@ export default function FormularioEscala() {
               type="button"
               onClick={buscarCandidatos}
               disabled={!ventanaLista || cargandoCandidatos}
-              className="text-xs text-blue-700 font-medium hover:underline disabled:opacity-50 disabled:no-underline shrink-0 ml-3"
+              className="self-start text-xs text-blue-700 font-medium hover:underline disabled:opacity-50 disabled:no-underline shrink-0 sm:self-auto sm:ml-3"
             >
               🔄 Actualizar disponibilidad
             </button>
@@ -467,26 +470,19 @@ export default function FormularioEscala() {
               <>
                 <div className="space-y-2">
                   {tripulacion.map((t, i) => {
-                  // No repetir la misma persona en dos filas — si ya
-                  // está elegida como Piloto en la fila 1, no tiene
-                  // que aparecer también como candidata a Copiloto en
-                  // la fila 2. Se excluyen los ids ya usados en OTRAS
-                  // filas (no la propia — si no, la fila se quedaría
-                  // sin poder mostrar a la persona que ella misma ya
-                  // tiene seleccionada).
-                  const idsYaElegidosEnOtrasFilas = tripulacion
-                    .filter((_, otroIndex) => otroIndex !== i)
-                    .map((otro) => otro.persona_id)
-                    .filter(Boolean)
+                    // No repetir la misma persona en dos filas — se
+                    // excluyen los ids ya usados en OTRAS filas.
+                    const idsYaElegidosEnOtrasFilas = tripulacion
+                      .filter((_, otroIndex) => otroIndex !== i)
+                      .map((otro) => otro.persona_id)
+                      .filter(Boolean)
 
-                  const personasParaFila = candidatosPersonas.filter(
-                    (p) =>
-                      (p.especialidades || []).includes(t.rol_en_vuelo) &&
-                      !idsYaElegidosEnOtrasFilas.includes(String(p.id))
-                  )
+                    const personasParaFila = candidatosPersonas.filter(
+                      (p) =>
+                        (p.especialidades || []).includes(t.rol_en_vuelo) &&
+                        !idsYaElegidosEnOtrasFilas.includes(String(p.id))
+                    )
                     return (
-                      // FIX: apilado en mobile (Persona y Rol cada uno
-                      // en su propia fila), en fila desde 768px.
                       <div key={i} className="flex flex-col gap-2 bg-gray-50 p-2 rounded-md md:flex-row md:items-end">
                         <div className="flex-1 min-w-0">
                           <label className="block text-xs text-gray-500 mb-0.5">Persona</label>
@@ -551,7 +547,7 @@ export default function FormularioEscala() {
             </div>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={guardarYPublicar}

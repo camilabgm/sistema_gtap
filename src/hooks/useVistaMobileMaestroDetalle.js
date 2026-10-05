@@ -1,27 +1,36 @@
 "use client"
 
-import { useState } from "react"
-import { useDeviceType } from "@/hooks/useDeviceType"
-
+// src/hooks/useVistaMobileMaestroDetalle.js
+//
 // Coordina el patrón lista+detalle (Post-Vuelo, Manifiesto) según el
-// dispositivo. En desktop no cambia nada — lista y detalle conviven
-// lado a lado como siempre. En mobile, se muestran de a una: lista
-// sola, o detalle solo con botón de volver.
+// ancho de pantalla. En pantalla "compacta" (celular y tablet, menos
+// de 1024px) se muestran de a una: lista sola, o detalle solo con
+// botón de volver. Desde 1024px, lista y detalle conviven lado a lado.
+//
+// CAMBIO (rama fix/responsive-maestro-detalle): antes el corte era el
+// de celular (768px, useDeviceType). En una tablet de 768, con el
+// sidebar, lista y detalle quedaban mitad y mitad y el detalle tenía
+// unos 300px — menos que un celular. Ahora usa usePantallaCompacta()
+// (1024px), y el valor que devuelve se llama "esCompacta" en vez de
+// "esMobile", porque en tablet también es verdadero.
 //
 // hayIdDesdeUrl: true si la pantalla se abrió con ?escala=<id> en la
 // URL (ej. desde una tarjeta del dashboard) — en ese caso arranca
-// mostrando el detalle directo, incluso en mobile, porque la persona
-// ya eligió una escala puntual antes de llegar acá.
+// mostrando el detalle directo, porque la persona ya eligió una escala.
+
+import { useState } from "react"
+import { usePantallaCompacta } from "@/hooks/useDeviceType"
+
 export function useVistaMobileMaestroDetalle(hayIdDesdeUrl) {
-  const esMobile = useDeviceType()
+  const esCompacta = usePantallaCompacta()
   const [verDetalle, setVerDetalle] = useState(hayIdDesdeUrl)
 
   return {
-    esMobile,
-    // En desktop, los dos bloques se muestran siempre — estos 2
-    // valores solo determinan algo real en mobile.
-    mostrarLista: esMobile === false ? true : !verDetalle,
-    mostrarDetalle: esMobile === false ? true : verDetalle,
+    esCompacta,
+    // Desde 1024px los dos bloques se muestran siempre — estos 2
+    // valores solo deciden algo real en pantalla compacta.
+    mostrarLista: esCompacta === false ? true : !verDetalle,
+    mostrarDetalle: esCompacta === false ? true : verDetalle,
     abrirDetalle: () => setVerDetalle(true),
     volverALista: () => setVerDetalle(false),
   }

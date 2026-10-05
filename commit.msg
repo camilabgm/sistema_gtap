@@ -1,32 +1,40 @@
-fix: listados responsive en tres zonas + encabezado compartido
+fix: maestro-detalle en tablet, formularios internos y fechas en 24 h
 
-Los listados cambiaban de tarjetas a tabla en 768px, pero en tablet
-(y en notebooks de 1024 con el sidebar) las tablas no entraban: se
-pisaban encabezados, badges y acciones, o la columna de Acciones
-quedaba recortada sin aviso.
+Manifiesto y Post-Vuelo mostraban lista y detalle mitad y mitad en
+768px: con el sidebar, el detalle quedaba con unos 300px. Además,
+las fechas en formato de 12 horas daban errores de hidratación.
 
-EncabezadoPagina (shared, nuevo):
-- Título, subtítulo, acciones y contenido de la tarjeta superior
-- En celular el botón baja debajo del subtítulo (antes se salía)
-- Prop volverAInicio para el "Volver" de celular, siempre arriba
-- Aplicado en 15 módulos
+Maestro-detalle (useVistaMobileMaestroDetalle + 2 pantallas):
+- Usa usePantallaCompacta (1024px) en vez de useDeviceType (768px):
+  en celular Y tablet se ve lista o detalle de a uno
+- Devuelve "esCompacta" en vez de "esMobile"
+- Desde 1024px lado a lado: lista 40% con máximo de 384px, el
+  detalle con todo el resto
+- "Volver a Inicio" solo en celular
 
-Tablas desde 1024px, tarjetas por debajo:
-- Personas, Aeronaves, Tipos de Misión, Gestión de Escalas, SICEM
-  Eventos y Alertas, Informe de Vuelos (tarjetas nuevas)
-- AccionIcono y AbortarEscalaAccion: etiquetas visibles hasta 1024px
-- Personas y SICEM Eventos: entre 1024 y 1279px las columnas menos
-  importantes se pliegan debajo del nombre/matrícula
-- Gestión de Escalas: columna Acciones 26% -> 30%
-- overflow-hidden -> overflow-x-auto en tablas que recortaban la
-  última columna (Aeronaves, Tipos, Estadística SICEM, Totales)
+Manifiesto:
+- PanelDetalle: celdas que no se pisan, botones alineados con el
+  título, acciones de pasajero/carga con flex-wrap
+- FormularioPasajero y FormularioCarga: etiqueta visible en cada
+  campo (antes solo placeholder, que se cortaba)
 
-Ajustes puntuales:
-- Agenda: semana en grilla de 7 columnas iguales
-- Informe Totales: pestañas deslizables de costado
-- SICEM Componentes: grilla 1/2/3 columnas
-- Pendientes de Autorizar: botón Autorizar debajo en celular
-- Registro de Accesos: título dentro del componente, "Volver" arriba
-- Filtros con flex-wrap donde faltaba
+Post-Vuelo (PanelPostVuelo):
+- Datos de la escala en 2 columnas en celular
+- Corrección de combustible: el botón ya no se sale
+- Cierre: campos alineados, "Sugerido por el Manifiesto" debajo
 
-18 archivos (1 nuevo).
+Escala (FormularioEscala + EditarEscala):
+- Cartel de disponibilidad y su botón apilados en celular
+- Tramos del itinerario en 1/2/5 columnas
+- Padding de pantalla más chico en celular
+
+SICEM: SicemDatosGeneralesAeronave en 1/2/3 columnas.
+
+Fechas en 24 horas con el formateador compartido de fechaHora.js:
+- escalas.js (formatearHora, formatearFechaHoraCompacta),
+  PanelAuditoria, InformeVuelos
+- Corrige el error de hidratación por el espacio invisible antes
+  de "a. m." (Node y Chrome usan caracteres distintos)
+- ParteDiarioPage: fecha de hoy con hora de Paraguay explícita
+
+14 archivos modificados.
