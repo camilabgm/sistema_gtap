@@ -1,5 +1,10 @@
 "use client"
 // src/app/login/page.js
+//
+// CAMBIO (rama fix/responsive-base): el contenedor externo no tenía
+// padding, así que en un celular de 320px la tarjeta quedaba pegada a
+// los bordes de la pantalla. Ahora tiene p-4 alrededor, y la tarjeta
+// usa p-6 en celular (p-8 desde 640px, como antes).
 
 import { useState } from "react"
 import { signIn } from "next-auth/react"
@@ -43,8 +48,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md">
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-800">Sistema GTAP</h1>

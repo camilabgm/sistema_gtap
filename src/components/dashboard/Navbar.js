@@ -1,10 +1,28 @@
 "use client"
 
+// src/components/dashboard/Navbar.js
+//
+// CAMBIO (rama fix/responsive-base):
+//   - Cerrado, el sidebar pasa de 64px (w-16) a 80px (w-20) y cada ítem
+//     muestra el ícono con su nombre en letra chica debajo — antes solo
+//     el ícono, con el nombre únicamente en el tooltip nativo (title),
+//     que en una tablet táctil no existe. El title se mantiene igual,
+//     para quien tenga mouse.
+//   - Los ítems con nombre largo tienen un "corto" que entra en esos
+//     80px (Tipos de Misiones → Misiones, etc.). Los que no lo tienen
+//     usan su nombre completo.
+//   - Nueva prop "flotando": cuando el ancho es de menú flotante
+//     (menos de 1280px) y la persona lo abre, el sidebar se dibuja
+//     encima de la página con sombra (z-40) — DashboardShell decide
+//     cuándo, este componente solo cambia cómo se ve.
+//   - Abajo, cerrado: "Cambiar contraseña" y "Cerrar sesión" pasan a
+//     ícono + "Clave" / "Salir".
+
 import { signOut } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  Home, Tag, Plane, Users, CalendarCheck, CalendarDays, PlusCircle,
+  Home, Tag, Plane, Users, CalendarCheck, CalendarDays,
   ShieldCheck, UserCog, ClipboardList, FileText, BarChart3, Wrench, Lock,
   ScrollText, Menu, LogOut, KeyRound, PlaneLanding,
 } from "lucide-react"
@@ -14,30 +32,39 @@ import SubItemEscalas from "@/components/shared/SubItemEscalas"
 
 const modulosAntes = [
   { nombre: "Inicio",            ruta: "/dashboard",                Icono: Home  },
-  { nombre: "Tipos de Misiones", ruta: "/dashboard/tipos-misiones", Icono: Tag,   modulo: "TIPOS_MISIONES" },
+  { nombre: "Tipos de Misiones", corto: "Misiones", ruta: "/dashboard/tipos-misiones", Icono: Tag, modulo: "TIPOS_MISIONES" },
   { nombre: "Aeronaves",         ruta: "/dashboard/aeronaves",      Icono: Plane, modulo: "AERONAVES" },
   { nombre: "Personas",          ruta: "/dashboard/personas",       Icono: Users, modulo: "PERSONAS" },
 ]
 
 // SICEM salió de acá — pasó a ser una sección desplegable (como
-// Escalas), porque ahora tiene sub-páginas (Componentes, y más
-// adelante Eventos/Alertas) en vez de una sola pantalla.
+// Escalas), porque tiene sub-páginas (Alertas, Componentes, Eventos,
+// Estadística) en vez de una sola pantalla.
 const modulosDespues = [
   { nombre: "Manifiesto", ruta: "/dashboard/manifiesto", Icono: FileText,  modulo: "MANIFIESTO" },
   { nombre: "Informes",   ruta: "/dashboard/informes",   Icono: BarChart3, modulo: "INFORMES" },
 ]
 
-function ItemModulo({ nombre, ruta, Icono, activo, colapsado }) {
+// Clases compartidas por TODOS los ítems del sidebar cerrado (módulos
+// simples, módulos con badge, y los encabezados desplegables de
+// Escalas y SICEM) — así se ven idénticos sin repetir el mismo string
+// en cinco lugares.
+const CLASE_ITEM_CERRADO = "relative flex flex-col items-center justify-center gap-1 rounded-md px-1 py-2 transition-colors"
+const CLASE_ETIQUETA_CERRADO = "w-full truncate text-center text-[10px] leading-tight"
+const CLASE_PUNTO_BADGE = "absolute top-1 right-3 h-2 w-2 rounded-full bg-red-500"
+
+function ItemModulo({ nombre, corto, ruta, Icono, activo, colapsado }) {
   if (colapsado) {
     return (
       <Link
         href={ruta}
         title={nombre}
-        className={`flex items-center justify-center py-2.5 rounded-md transition-colors ${
+        className={`${CLASE_ITEM_CERRADO} ${
           activo ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"
         }`}
       >
-        <Icono size={18} />
+        <Icono size={18} className="shrink-0" />
+        <span className={CLASE_ETIQUETA_CERRADO}>{corto || nombre}</span>
       </Link>
     )
   }
@@ -54,18 +81,19 @@ function ItemModulo({ nombre, ruta, Icono, activo, colapsado }) {
   )
 }
 
-function ItemModuloConBadge({ nombre, ruta, Icono, activo, badge, colapsado }) {
+function ItemModuloConBadge({ nombre, corto, ruta, Icono, activo, badge, colapsado }) {
   if (colapsado) {
     return (
       <Link
         href={ruta}
         title={badge > 0 ? `${nombre} (${badge})` : nombre}
-        className={`relative flex items-center justify-center py-2.5 rounded-md transition-colors ${
+        className={`${CLASE_ITEM_CERRADO} ${
           activo ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"
         }`}
       >
-        <Icono size={18} />
-        {badge > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full" />}
+        <Icono size={18} className="shrink-0" />
+        <span className={CLASE_ETIQUETA_CERRADO}>{corto || nombre}</span>
+        {badge > 0 && <span className={CLASE_PUNTO_BADGE} />}
       </Link>
     )
   }
@@ -89,7 +117,7 @@ function ItemModuloConBadge({ nombre, ruta, Icono, activo, badge, colapsado }) {
   )
 }
 
-export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCascada, esSupervisorSemana, colapsado, onToggleColapsado }) {
+export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCascada, esSupervisorSemana, colapsado, flotando = false, onToggleColapsado }) {
   const pathname = usePathname()
 
   const { acusesParaMi, pendientesParaMi, postVueloParaMi, alertasSicem } = useBadgesDashboard(permisos, esCargoDeCascada)
@@ -112,8 +140,8 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
   return (
     <div
       className={`flex h-screen flex-col bg-gray-900 text-white fixed left-0 top-0 transition-all duration-200 ${
-        colapsado ? "w-16" : "w-64"
-      }`}
+        colapsado ? "w-20" : "w-64"
+      } ${flotando ? "z-40 shadow-2xl" : ""}`}
     >
 
       <div className={`border-b border-gray-700 flex items-center ${colapsado ? "justify-center py-4" : "justify-between px-4 py-4"}`}>
@@ -163,12 +191,13 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
                 <Link
                   href="/dashboard/escalas"
                   title={acusesParaMi > 0 ? `Escalas (${acusesParaMi} por acusar recibo)` : "Escalas"}
-                  className={`relative flex items-center justify-center py-2.5 rounded-md transition-colors ${
+                  className={`${CLASE_ITEM_CERRADO} ${
                     dentroDeEscalas ? "text-white bg-gray-800" : "text-gray-300 hover:bg-gray-700 hover:text-white"
                   }`}
                 >
-                  <CalendarDays size={18} />
-                  {acusesParaMi > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full" />}
+                  <CalendarDays size={18} className="shrink-0" />
+                  <span className={CLASE_ETIQUETA_CERRADO}>Escalas</span>
+                  {acusesParaMi > 0 && <span className={CLASE_PUNTO_BADGE} />}
                 </Link>
               ) : (
                 <Link
@@ -196,9 +225,9 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
               {dentroDeEscalas && (
                 <ul className="mt-1 space-y-0.5">
                   <li>
-                    {/* FIX: ahora también marca acá — mismo patrón que ya
-                        usa "Pendientes de autorizar" con el suyo. Así,
-                        una vez adentro de Escalas, queda claro que Agenda
+                    {/* Agenda también marca el acuse pendiente — mismo
+                        patrón que "Pendientes de autorizar" con el suyo.
+                        Una vez adentro de Escalas, queda claro que Agenda
                         es el lugar puntual para resolver el acuse. */}
                     <SubItemEscalas nombre="Agenda" ruta="/dashboard/escalas" Icono={CalendarDays}
                       activo={pathname === "/dashboard/escalas"} badge={acusesParaMi} colapsado={colapsado} />
@@ -209,13 +238,13 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
                   </li>
                   {esCargoDeCascada && (
                     <li>
-                      <SubItemEscalas nombre="Pendientes de autorizar" ruta="/dashboard/escalas/pendientes-autorizar" Icono={ShieldCheck}
+                      <SubItemEscalas nombre="Pendientes de autorizar" corto="Pendientes" ruta="/dashboard/escalas/pendientes-autorizar" Icono={ShieldCheck}
                         activo={pathname === "/dashboard/escalas/pendientes-autorizar"} badge={pendientesParaMi} colapsado={colapsado} />
                     </li>
                   )}
                   {ROLES_ADMIN.includes(rol) && (
                     <li>
-                      <SubItemEscalas nombre="Cargos de Autorización" ruta="/dashboard/escalas/cargos-autorizacion" Icono={UserCog}
+                      <SubItemEscalas nombre="Cargos de Autorización" corto="Cargos" ruta="/dashboard/escalas/cargos-autorizacion" Icono={UserCog}
                         activo={pathname === "/dashboard/escalas/cargos-autorizacion"} colapsado={colapsado} />
                     </li>
                   )}
@@ -244,19 +273,20 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
           {/* SICEM — desplegable, mismo patrón que Escalas. El enlace
               principal apunta a Componentes y lleva el badge general
               de alertas (igual criterio que Escalas con acusesParaMi);
-              el submenú tiene sus tres pantallas. */}
+              el submenú tiene sus cuatro pantallas. */}
           {veSicem && (
             <li>
               {colapsado ? (
                 <Link
                   href="/dashboard/sicem/componentes"
                   title={alertasSicem > 0 ? `SICEM (${alertasSicem} alertas)` : "SICEM"}
-                  className={`relative flex items-center justify-center py-2.5 rounded-md transition-colors ${
+                  className={`${CLASE_ITEM_CERRADO} ${
                     dentroDeSicem ? "text-white bg-gray-800" : "text-gray-300 hover:bg-gray-700 hover:text-white"
                   }`}
                 >
-                  <Wrench size={18} />
-                  {alertasSicem > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full" />}
+                  <Wrench size={18} className="shrink-0" />
+                  <span className={CLASE_ETIQUETA_CERRADO}>SICEM</span>
+                  {alertasSicem > 0 && <span className={CLASE_PUNTO_BADGE} />}
                 </Link>
               ) : (
                 <Link
@@ -308,11 +338,11 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
             )}
             <ul className="space-y-1">
               <li>
-                <ItemModulo nombre="Gestión de Permisos" ruta="/dashboard/administracion/permisos" Icono={Lock}
+                <ItemModulo nombre="Gestión de Permisos" corto="Permisos" ruta="/dashboard/administracion/permisos" Icono={Lock}
                   activo={pathname === "/dashboard/administracion/permisos"} colapsado={colapsado} />
               </li>
               <li>
-                <ItemModulo nombre="Registro de Accesos" ruta="/dashboard/administracion/log-intentos" Icono={ScrollText}
+                <ItemModulo nombre="Registro de Accesos" corto="Accesos" ruta="/dashboard/administracion/log-intentos" Icono={ScrollText}
                   activo={pathname === "/dashboard/administracion/log-intentos"} colapsado={colapsado} />
               </li>
             </ul>
@@ -342,16 +372,26 @@ export default function Navbar({ nombre, apellido, rol, permisos, esCargoDeCasca
           <Link
             href="/dashboard/perfil"
             title={colapsado ? "Cambiar contraseña" : undefined}
-            className={`text-gray-400 hover:text-white transition-colors ${colapsado ? "flex justify-center" : "block text-xs"}`}
+            className={`text-gray-400 hover:text-white transition-colors ${colapsado ? "flex flex-col items-center gap-0.5" : "block text-xs"}`}
           >
-            {colapsado ? <KeyRound size={16} /> : "Cambiar contraseña"}
+            {colapsado ? (
+              <>
+                <KeyRound size={16} />
+                <span className="text-[10px] leading-tight">Clave</span>
+              </>
+            ) : "Cambiar contraseña"}
           </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             title={colapsado ? "Cerrar sesión" : undefined}
-            className={`text-red-400 hover:text-red-300 transition-colors ${colapsado ? "flex justify-center" : "w-full text-xs text-left"}`}
+            className={`text-red-400 hover:text-red-300 transition-colors ${colapsado ? "flex flex-col items-center gap-0.5" : "w-full text-xs text-left"}`}
           >
-            {colapsado ? <LogOut size={16} /> : "Cerrar sesión"}
+            {colapsado ? (
+              <>
+                <LogOut size={16} />
+                <span className="text-[10px] leading-tight">Salir</span>
+              </>
+            ) : "Cerrar sesión"}
           </button>
         </div>
       </div>
