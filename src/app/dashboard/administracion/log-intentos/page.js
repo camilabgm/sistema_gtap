@@ -15,6 +15,8 @@
 //   - Filtra con Prisma (usuario sin distinguir mayúsculas, resultado
 //     exacto) y trae solo los 20 de la página pedida.
 //   - Se elimina el límite de 200: se puede llegar a todo el historial.
+//   - Los parámetros de texto se leen con leerTextoParam de
+//     lib/paginacion.js (compartida con SICEM Eventos).
 
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
@@ -22,7 +24,7 @@ import { authOptions } from "@/auth"
 import { redirect } from "next/navigation"
 import { ResultadoLogin } from "@prisma/client"
 import { esAdministrador } from "@/lib/autorizacion"
-import { leerPagina, datosPaginacion } from "@/lib/paginacion"
+import { leerPagina, leerTextoParam, datosPaginacion } from "@/lib/paginacion"
 import SinPermisos from "@/components/shared/SinPermisos"
 import TablaLogIntentos from "@/components/administracion/TablaLogIntentos"
 
@@ -31,12 +33,6 @@ import TablaLogIntentos from "@/components/administracion/TablaLogIntentos"
 // al enum, esta lista se actualiza sola.
 const RESULTADOS_VALIDOS = Object.values(ResultadoLogin)
 
-// Un parámetro de la URL puede llegar como texto, como lista (si se
-// repite: ?usuario=a&usuario=b) o no llegar. Siempre devuelve texto.
-function textoParam(valor) {
-  const texto = Array.isArray(valor) ? valor[0] : valor
-  return typeof texto === "string" ? texto.trim() : ""
-}
 
 export default async function LogIntentosPage({ searchParams }) {
   // Verificar que el usuario esté logueado
@@ -52,12 +48,12 @@ export default async function LogIntentosPage({ searchParams }) {
   const params = await searchParams
 
   const paginaPedida = leerPagina(params.pagina)
-  const usuario = textoParam(params.usuario)
+  const usuario = leerTextoParam(params.usuario)
 
   // Si alguien escribe a mano ?resultado=CUALQUIERCOSA, Prisma tiraría
   // un error 500 (ese valor no existe en el enum). Un valor inválido se
   // ignora y se muestran todos los resultados.
-  const resultadoPedido = textoParam(params.resultado)
+  const resultadoPedido = leerTextoParam(params.resultado)
   const resultado = RESULTADOS_VALIDOS.includes(resultadoPedido) ? resultadoPedido : ""
 
   const where = {}

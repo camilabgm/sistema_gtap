@@ -33,6 +33,8 @@
 // siguiente un registro podría repetirse o no aparecer nunca.
 //
 // CAMBIO (commit 2, Registro de Accesos): suma ESPERA_BUSQUEDA_MS.
+// CAMBIO (commit 3, SICEM Eventos): suma leerTextoParam, que antes
+// estaba copiada en cada page.js.
 
 // La cantidad por página, en un solo lugar: cambiarla es tocar esta
 // línea y nada más.
@@ -57,6 +59,17 @@ export function leerPagina(valor) {
   const texto = Array.isArray(valor) ? valor[0] : valor
   const numero = Number(texto)
   return Number.isInteger(numero) && numero >= 1 ? numero : 1
+}
+
+// Convierte un parámetro de texto de la URL (?usuario=, ?estado=...)
+// en un texto limpio. En una página del servidor, cada parámetro puede
+// llegar como texto, como lista (si se repite: ?estado=a&estado=b
+// llega como ["a", "b"]) o no llegar. Siempre devuelve texto, sin
+// espacios en los bordes:
+//   " gon " → "gon"     ["a", "b"] → "a"     undefined → ""
+export function leerTextoParam(valor) {
+  const texto = Array.isArray(valor) ? valor[0] : valor
+  return typeof texto === "string" ? texto.trim() : ""
 }
 
 // A partir de la página pedida y el total de registros (el count),
