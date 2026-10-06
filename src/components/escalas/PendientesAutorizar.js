@@ -25,6 +25,10 @@
 //   - La página se recuerda al ir y volver entre pestañas.
 //   - La pestaña Pendientes NO se pagina: son pocas a la vez y tienen
 //     que verse todas para autorizarlas.
+//   - Después de autorizar una escala, el historial guardado se
+//     descarta: al volver a Autorizadas se recarga desde la página 1 y
+//     la recién autorizada aparece primera (antes no aparecía hasta
+//     recargar el navegador).
 
 import { useState, useEffect, useRef } from "react"
 import { Pause, Play } from "lucide-react"
@@ -220,7 +224,13 @@ export default function PendientesAutorizar() {
     setAccionando(escalaId)
     const ok = await ejecutarAccion(`/api/escalas/${escalaId}/autorizar`)
     setAccionando(null)
-    if (ok) await cargarPendientes()
+    if (ok) {
+      // Descarta el historial de Autorizadas guardado: la próxima vez
+      // que se abra esa pestaña se vuelve a pedir desde la página 1,
+      // donde aparece primera la escala que se acaba de autorizar.
+      setAutorizadas(null)
+      await cargarPendientes()
+    }
   }
 
   async function handleAsumir() {
