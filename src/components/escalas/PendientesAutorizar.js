@@ -11,12 +11,27 @@
 //     angosta. Desde 640px vuelve a la derecha, como antes.
 //   - La línea "aeronave · solicitante · misión · orden" + el badge
 //     "Vencida" pueden partirse en dos renglones (flex-wrap).
+//
+// CAMBIO (rama feat/paginacion-servidor): la pestaña Autorizadas se
+// pagina desde el servidor (20 por página). La página vive en el
+// ESTADO del componente, no en la URL: la pestaña tampoco está en la
+// URL, y las filas de Autorizadas no llevan a otra pantalla, así que
+// no hay "volver atrás" que cuidar. Al recargar el navegador se vuelve
+// a Pendientes, como siempre.
+//   - "Cargando historial..." solo la primera vez; al cambiar de página
+//     la lista actual se atenúa mientras llega la nueva.
+//   - Al cambiar de página se vuelve al principio del panel (la barra
+//     está al final de la lista).
+//   - La página se recuerda al ir y volver entre pestañas.
+//   - La pestaña Pendientes NO se pagina: son pocas a la vez y tienen
+//     que verse todas para autorizarlas.
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Pause, Play } from "lucide-react"
 import { yaPasoLaHora } from "@/lib/escalas"
 import { formatearFechaHora as formatearFechaHoraBase } from "@/lib/fechaHora"
 import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
+import BarraPaginacion from "@/components/shared/BarraPaginacion"
 
 // Formato corto (día/mes/hora/minuto, sin año ni segundos) — el que ya
 // usaba esta pantalla. En vez de duplicar la función acá, se envuelve
@@ -69,8 +84,12 @@ export default function PendientesAutorizar() {
   const [cargandoPendientes, setCargandoPendientes] = useState(true)
   const [avisoRecalculo, setAvisoRecalculo] = useState(null)
 
+  // Autorizadas: lo que devuelve la API para la página actual —
+  // { escalas, total, pagina, totalPaginas } — o null si todavía no se
+  // cargó nunca.
   const [autorizadas, setAutorizadas] = useState(null)
   const [cargandoAutorizadas, setCargandoAutorizadas] = useState(false)
+  const panelRef = useRef(null)
 
   const [derivacion, setDerivacion] = useState(null)
   const [cargandoDerivacion, setCargandoDerivacion] = useState(true)
@@ -93,7 +112,7 @@ export default function PendientesAutorizar() {
 
   useEffect(() => {
     if (tab === "AUTORIZADAS" && autorizadas === null) {
-      cargarAutorizadas()
+      cargarAutorizadas(1)
     }
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -108,12 +127,18 @@ export default function PendientesAutorizar() {
     }
   }
 
-  async function cargarAutorizadas() {
+  // Trae una página del historial de autorizadas. Con desplazar = true
+  // (al tocar la barra de paginación), cuando llega la página nueva
+  // lleva la vista al principio del panel.
+  async function cargarAutorizadas(pagina, { desplazar = false } = {}) {
     setCargandoAutorizadas(true)
     try {
-      const res = await fetch("/api/escalas/autorizadas", { credentials: "include" })
+      const res = await fetch(`/api/escalas/autorizadas?pagina=${pagina}`, { credentials: "include" })
       const data = await res.json()
-      if (res.ok) setAutorizadas(data)
+      if (res.ok) {
+        setAutorizadas(data)
+        if (desplazar) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
     } finally {
       setCargandoAutorizadas(false)
     }
@@ -372,8 +397,10 @@ export default function PendientesAutorizar() {
       )}
 
       {/* Panel único con las tabs por dentro — mismo patrón que la tabla
-          de Gestión: encabezado gris, cuerpo blanco. */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          de Gestión: encabezado gris, cuerpo blanco. scroll-mt-4: al
+          volver arriba después de cambiar de página, deja un pequeño
+          margen sobre el panel. */}
+      <div ref={panelRef} className="scroll-mt-4 bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="flex bg-gray-50 border-b border-gray-200 p-1.5 gap-1">
           <button
             onClick={() => setTab("PENDIENTES")}
@@ -466,29 +493,50 @@ export default function PendientesAutorizar() {
               )}
             </>
           )
-        ) : cargandoAutorizadas ? (
-          <p className="p-4 text-sm text-gray-400">Cargando historial...</p>
-        ) : !autorizadas || autorizadas.length === 0 ? (
+        ) : !autorizadas ? (
+          // Primera carga: todavía no hay nada que mostrar.
+          <p className="p-4 text-sm text-gray-400">
+            {cargandoAutorizadas ? "Cargando historial..." : "Error al cargar."}
+          </p>
+        ) : autorizadas.total === 0 ? (
           <p className="p-4 text-sm text-gray-400">Todavía no hay escalas autorizadas.</p>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {autorizadas.map((e) => (
-              <div key={e.id} className="p-4 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
-                    {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
-                    {e.nro_orden && ` · Orden #${e.nro_orden}`}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Autorizada por {e.autorizada_por_nombre} ({etiquetaAutorizante(e.rol_autoriza, e.orden_autorizante)}) el {formatearFechaHora(e.fecha_autorizacion)}
-                  </p>
+          <>
+            {/* Al cambiar de página, la lista actual se atenúa mientras
+                llega la nueva (en vez de desaparecer y volver). */}
+            <div
+              aria-busy={cargandoAutorizadas}
+              className={`divide-y divide-gray-100 transition-opacity ${cargandoAutorizadas ? "opacity-60" : ""}`}
+            >
+              {autorizadas.escalas.map((e) => (
+                <div key={e.id} className="p-4 flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      {e.aeronave?.matricula || "Sin aeronave"} · {e.solicitante} · {e.tipo_mision?.codigo || "—"}
+                      {e.nro_orden && ` · Orden #${e.nro_orden}`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Autorizada por {e.autorizada_por_nombre} ({etiquetaAutorizante(e.rol_autoriza, e.orden_autorizante)}) el {formatearFechaHora(e.fecha_autorizacion)}
+                    </p>
+                  </div>
+                  <span className="px-2 py-1 text-xs rounded-full font-medium shrink-0 bg-green-100 text-green-700">
+                    Autorizada
+                  </span>
                 </div>
-                <span className="px-2 py-1 text-xs rounded-full font-medium shrink-0 bg-green-100 text-green-700">
-                  Autorizada
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            <div className="px-4 pb-4 border-t border-gray-100">
+              <BarraPaginacion
+                pagina={autorizadas.pagina}
+                totalPaginas={autorizadas.totalPaginas}
+                total={autorizadas.total}
+                unidad={{ singular: "escala autorizada", plural: "escalas autorizadas" }}
+                cargando={cargandoAutorizadas}
+                onCambiar={(nueva) => cargarAutorizadas(nueva, { desplazar: true })}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>
