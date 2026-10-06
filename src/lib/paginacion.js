@@ -31,10 +31,21 @@
 // orderBy con el id. Si dos registros tienen la misma fecha, la base
 // puede devolverlos en cualquier orden — y entre una página y la
 // siguiente un registro podría repetirse o no aparecer nunca.
+//
+// CAMBIO (commit 2, Registro de Accesos): suma ESPERA_BUSQUEDA_MS.
 
 // La cantidad por página, en un solo lugar: cambiarla es tocar esta
 // línea y nada más.
 export const REGISTROS_POR_PAGINA = 20
+
+// Pausa (en milisegundos) DESPUÉS DE LA ÚLTIMA TECLA antes de que un
+// buscador consulte al servidor. No es un límite para escribir: el
+// reloj se reinicia con cada letra, así que mientras se siga tecleando
+// no se consulta nada. Entre tecla y tecla pasan unos 150–250ms al
+// escribir normal; 400 deja margen para no consultar a mitad de una
+// palabra sin que el buscador se sienta trabado. La usan los buscadores
+// de Registro de Accesos y Gestión de Escalas.
+export const ESPERA_BUSQUEDA_MS = 400
 
 // Convierte lo que venga en la URL (?pagina=...) en un número de
 // página seguro. Cualquier cosa rara devuelve 1 en vez de romper la

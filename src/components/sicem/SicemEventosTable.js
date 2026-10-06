@@ -18,13 +18,32 @@
 //     "COMPONENTELUGAR") y los badges de Tipo se salían de su celda.
 //   - Los anchos pasan del colgroup a cada <th>: con columnas que
 //     aparecen y desaparecen según el ancho, un colgroup fijo no sirve.
+//
+// CAMBIO (rama feat/paginacion-servidor):
+//   - Ya no filtra ni guarda copia de los eventos: page.js le manda los
+//     20 de la página, ya filtrados. Antes hacía useState(datosIniciales)
+//     — useState toma el valor solo la PRIMERA vez, así que al llegar
+//     la página 2 seguiría mostrando su copia de la página 1.
+//   - Los dos selects cambian la URL (router.push, vuelven a la página 1)
+//     y page.js vuelve a consultar.
+//   - Recargar después de guardar/cerrar/eliminar es router.refresh():
+//     el servidor vuelve a ejecutar page.js con la MISMA URL (misma
+//     página, mismos filtros). Antes era un fetch a /api/sicem/eventos
+//     que traía todo y pisaba la página.
+//   - useTransition: mientras el servidor responde, el listado se
+//     atenúa y Cerrar/Eliminar quedan deshabilitados (evita que un
+//     doble toque mande la misma acción dos veces).
+//   - "X de Y eventos" → BarraPaginacion, una sola debajo de la tabla y
+//     de las tarjetas.
 
-import { useState } from "react"
+import { useState, useEffect, useTransition } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { Plus, CheckCircle2, Pencil, Trash2, Eye } from "lucide-react"
 import SicemEventosForm from "./SicemEventosForm"
 import PanelVerEvento from "./PanelVerEvento"
 import AccionIcono from "@/components/shared/AccionIcono"
 import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
+import BarraPaginacion from "@/components/shared/BarraPaginacion"
 import { formatearFechaHoraCompacta } from "@/lib/escalas"
 
 const ETIQUETAS_TIPO = {
@@ -65,50 +84,85 @@ function badgeEstado(cerrado) {
     : <span className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-amber-100 text-amber-700">● Abierto</span>
 }
 
-export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, componentes, permisos }) {
+export default function SicemEventosTable({
+  eventos,
+  aeronaves,
+  componentes,
+  permisos,
+  pagina,
+  totalPaginas,
+  total,
+  filtros,
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [pendiente, startTransition] = useTransition()
 
-  const [eventos,          setEventos]          = useState(datosIniciales)
-  const [filtroAeronave,   setFiltroAeronave]   = useState("TODAS")
-  const [filtroEstado,     setFiltroEstado]     = useState("TODOS")
+  // Lo que muestran los selects. Estado propio para que la elección se
+  // vea al instante, sin esperar la respuesta del servidor; se
+  // sincroniza con la URL cuando cambia (ej. botón Atrás).
+  const [filtroAeronave, setFiltroAeronave] = useState(filtros.aeronave)
+  const [filtroEstado,   setFiltroEstado]   = useState(filtros.estado)
+
+  useEffect(() => { setFiltroAeronave(filtros.aeronave) }, [filtros.aeronave])
+  useEffect(() => { setFiltroEstado(filtros.estado) }, [filtros.estado])
+
   const [modalAbierto,     setModalAbierto]     = useState(false)
   const [eventoSeleccionado, setEventoSeleccionado] = useState(null)
   const [cerrandoId,       setCerrandoId]       = useState(null)
   const [eliminandoId,     setEliminandoId]     = useState(null)
   const [eventoVer,        setEventoVer]        = useState(null)
 
-  const eventosFiltrados = eventos.filter((ev) => {
-    const pasaAeronave = filtroAeronave === "TODAS" || ev.aeronave_id === Number(filtroAeronave)
-    const pasaEstado =
-      filtroEstado === "TODOS" ||
-      (filtroEstado === "ABIERTOS" && !ev.cerrado) ||
-      (filtroEstado === "CERRADOS" && ev.cerrado)
-    return pasaAeronave && pasaEstado
-  })
+  // Arma la URL con los filtros y la página, y navega. Lo que no se
+  // pasa queda como está; la página, si no se indica, vuelve a 1.
+  function navegar({ aeronave = filtros.aeronave, estado = filtros.estado, pagina: nuevaPagina = 1 }) {
+    const params = new URLSearchParams()
+    if (aeronave) params.set("aeronave", aeronave)
+    if (estado) params.set("estado", estado)
+    if (nuevaPagina > 1) params.set("pagina", String(nuevaPagina))
+
+    const consulta = params.toString()
+    const url = consulta ? `${pathname}?${consulta}` : pathname
+    startTransition(() => router.push(url))
+  }
+
+  function handleCambiarAeronave(valor) {
+    setFiltroAeronave(valor)
+    navegar({ aeronave: valor })
+  }
+
+  function handleCambiarEstado(valor) {
+    setFiltroEstado(valor)
+    navegar({ estado: valor })
+  }
+
+  // Vuelve a pedirle a page.js la misma página con los mismos filtros.
+  function recargarDatos() {
+    startTransition(() => router.refresh())
+  }
 
   function handleNuevo()  { setEventoSeleccionado(null); setModalAbierto(true) }
   function handleEditar(ev) { setEventoSeleccionado(ev); setModalAbierto(true) }
   function handleCerrarModal() { setModalAbierto(false); setEventoSeleccionado(null) }
 
-  async function recargarDatos() {
-    const res = await fetch("/api/sicem/eventos", { credentials: "include" })
-    setEventos(await res.json())
-  }
-
-  async function handleGuardado() { handleCerrarModal(); await recargarDatos() }
+  function handleGuardado() { handleCerrarModal(); recargarDatos() }
 
   async function handleCerrarEvento(evento) {
     if (!window.confirm(`¿Cerrar este evento de ${evento.aeronave.matricula}? Si no le queda ningún otro evento abierto, la aeronave vuelve a Disponible.`)) return
     setCerrandoId(evento.id)
-    const res = await fetch(`/api/sicem/eventos/${evento.id}/cerrar`, {
-      method: "PATCH",
-      credentials: "include",
-    })
-    if (!res.ok) {
-      const datos = await res.json()
-      alert(datos.error || "Error al cerrar el evento")
+    try {
+      const res = await fetch(`/api/sicem/eventos/${evento.id}/cerrar`, {
+        method: "PATCH",
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const datos = await res.json()
+        alert(datos.error || "Error al cerrar el evento")
+      }
+      recargarDatos()
+    } finally {
+      setCerrandoId(null)
     }
-    await recargarDatos()
-    setCerrandoId(null)
   }
 
   async function handleEliminarEvento(evento) {
@@ -120,13 +174,16 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
       : ""
     if (!window.confirm(`¿Eliminar este evento de ${evento.aeronave.matricula}? Esto SÍ borra el registro para siempre.${avisoReset}${avisoAeronave}`)) return
     setEliminandoId(evento.id)
-    const res = await fetch(`/api/sicem/eventos/${evento.id}`, { method: "DELETE", credentials: "include" })
-    if (!res.ok) {
-      const datos = await res.json()
-      alert(datos.error || "Error al eliminar el evento")
+    try {
+      const res = await fetch(`/api/sicem/eventos/${evento.id}`, { method: "DELETE", credentials: "include" })
+      if (!res.ok) {
+        const datos = await res.json()
+        alert(datos.error || "Error al eliminar el evento")
+      }
+      recargarDatos()
+    } finally {
+      setEliminandoId(null)
     }
-    await recargarDatos()
-    setEliminandoId(null)
   }
 
   // Acciones — extraídas para no repetir la lógica de permisos entre
@@ -143,7 +200,7 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
             icono={CheckCircle2}
             etiqueta="Cerrar evento"
             onClick={() => handleCerrarEvento(ev)}
-            disabled={cerrandoId === ev.id}
+            disabled={cerrandoId === ev.id || pendiente}
           />
         )}
         {permisos?.puede_eliminar && (
@@ -151,13 +208,16 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
             icono={Trash2}
             etiqueta="Eliminar"
             onClick={() => handleEliminarEvento(ev)}
-            disabled={eliminandoId === ev.id}
+            disabled={eliminandoId === ev.id || pendiente}
             color="peligro"
           />
         )}
       </div>
     )
   }
+
+  const hayFiltros = Boolean(filtros.aeronave || filtros.estado)
+  const textoVacio = hayFiltros ? "No se encontraron eventos con estos filtros" : "Todavía no hay eventos de mantenimiento"
 
   return (
     <div className="p-4">
@@ -175,120 +235,128 @@ export default function SicemEventosTable({ eventos: datosIniciales, aeronaves, 
       >
         <div className="flex flex-wrap items-center gap-2">
           <select value={filtroAeronave}
-            onChange={(e) => setFiltroAeronave(e.target.value)}
+            onChange={(e) => handleCambiarAeronave(e.target.value)}
             className="h-9 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="TODAS">Todas las aeronaves</option>
+            <option value="">Todas las aeronaves</option>
             {aeronaves.map((a) => (
-              <option key={a.id} value={a.id}>{a.matricula}</option>
+              <option key={a.id} value={String(a.id)}>{a.matricula}</option>
             ))}
           </select>
           <select value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
+            onChange={(e) => handleCambiarEstado(e.target.value)}
             className="h-9 px-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="TODOS">Todos los estados</option>
+            <option value="">Todos los estados</option>
             <option value="ABIERTOS">Solo abiertos</option>
             <option value="CERRADOS">Solo cerrados</option>
           </select>
         </div>
       </EncabezadoPagina>
 
-      {/* ── Escritorio: tabla, visible desde 1024px. Componente y Lugar
-          tienen columna propia recién desde 1280px. ── */}
-      <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full table-fixed divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className={`${CLASE_TH} w-[10%]`}>Aeronave</th>
-              <th className={`${CLASE_TH} w-[12%]`}>Tipo</th>
-              <th className={`${CLASE_TH} w-[9%] hidden xl:table-cell`}>Componente</th>
-              <th className={`${CLASE_TH} w-[9%] hidden xl:table-cell`}>Lugar</th>
-              <th className={`${CLASE_TH} w-[22%]`}>Observación</th>
-              <th className={`${CLASE_TH} w-[12%]`}>Abierto el</th>
-              <th className={`${CLASE_TH} w-[11%]`}>Estado</th>
-              <th className={`${CLASE_TH} w-[15%] text-right`}>Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {eventosFiltrados.length === 0 ? (
+      <div aria-busy={pendiente} className={`transition-opacity ${pendiente ? "opacity-60" : ""}`}>
+
+        {/* ── Escritorio: tabla, visible desde 1024px. Componente y Lugar
+            tienen columna propia recién desde 1280px. ── */}
+        <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
+          <table className="w-full table-fixed divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan={8} className="text-center py-8 text-gray-400">No se encontraron eventos</td>
+                <th className={`${CLASE_TH} w-[10%]`}>Aeronave</th>
+                <th className={`${CLASE_TH} w-[12%]`}>Tipo</th>
+                <th className={`${CLASE_TH} w-[9%] hidden xl:table-cell`}>Componente</th>
+                <th className={`${CLASE_TH} w-[9%] hidden xl:table-cell`}>Lugar</th>
+                <th className={`${CLASE_TH} w-[22%]`}>Observación</th>
+                <th className={`${CLASE_TH} w-[12%]`}>Abierto el</th>
+                <th className={`${CLASE_TH} w-[11%]`}>Estado</th>
+                <th className={`${CLASE_TH} w-[15%] text-right`}>Acciones</th>
               </tr>
-            ) : (
-              eventosFiltrados.map((ev) => (
-                <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-3 py-4 text-sm">
-                    <p className="font-medium text-gray-900">{ev.aeronave.matricula}</p>
-                    {/* Entre 1024 y 1279px estas dos columnas no existen:
-                        se muestran acá, en chico, debajo de la matrícula. */}
-                    <p className="xl:hidden text-xs text-gray-500 mt-0.5">
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {eventos.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-8 text-gray-400">{textoVacio}</td>
+                </tr>
+              ) : (
+                eventos.map((ev) => (
+                  <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-3 py-4 text-sm">
+                      <p className="font-medium text-gray-900">{ev.aeronave.matricula}</p>
+                      {/* Entre 1024 y 1279px estas dos columnas no existen:
+                          se muestran acá, en chico, debajo de la matrícula. */}
+                      <p className="xl:hidden text-xs text-gray-500 mt-0.5">
+                        {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "Sin componente"}
+                        {ev.lugar ? ` · ${ETIQUETAS_LUGAR[ev.lugar]}` : ""}
+                      </p>
+                    </td>
+                    <td className="px-3 py-4 text-sm">{badgeTipo(ev.tipo)}</td>
+                    <td className="hidden xl:table-cell px-3 py-4 text-sm text-gray-700">
+                      {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "—"}
+                    </td>
+                    <td className="hidden xl:table-cell px-3 py-4 text-sm text-gray-700">{ev.lugar ? ETIQUETAS_LUGAR[ev.lugar] : "—"}</td>
+                    <td className="px-3 py-4 text-sm text-gray-700">
+                      <span className="block truncate" title={ev.observacion || ""}>
+                        {ev.observacion || "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-4 text-sm text-gray-700">{formatearFechaHoraCompacta(ev.created_at)}</td>
+                    <td className="px-3 py-4 text-sm">{badgeEstado(ev.cerrado)}</td>
+                    <td className="px-3 py-4 text-sm">
+                      <AccionesEvento ev={ev} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ── */}
+        <div className="lg:hidden space-y-2">
+          {eventos.length === 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
+              {textoVacio}
+            </div>
+          ) : (
+            eventos.map((ev) => (
+              <div key={ev.id} className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{ev.aeronave.matricula}</p>
+                    <p className="text-xs text-gray-500">
                       {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "Sin componente"}
                       {ev.lugar ? ` · ${ETIQUETAS_LUGAR[ev.lugar]}` : ""}
                     </p>
-                  </td>
-                  <td className="px-3 py-4 text-sm">{badgeTipo(ev.tipo)}</td>
-                  <td className="hidden xl:table-cell px-3 py-4 text-sm text-gray-700">
-                    {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "—"}
-                  </td>
-                  <td className="hidden xl:table-cell px-3 py-4 text-sm text-gray-700">{ev.lugar ? ETIQUETAS_LUGAR[ev.lugar] : "—"}</td>
-                  <td className="px-3 py-4 text-sm text-gray-700">
-                    <span className="block truncate" title={ev.observacion || ""}>
-                      {ev.observacion || "—"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-4 text-sm text-gray-700">{formatearFechaHoraCompacta(ev.created_at)}</td>
-                  <td className="px-3 py-4 text-sm">{badgeEstado(ev.cerrado)}</td>
-                  <td className="px-3 py-4 text-sm">
-                    <AccionesEvento ev={ev} />
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-          <p className="text-xs text-gray-500">{eventosFiltrados.length} de {eventos.length} eventos</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {badgeTipo(ev.tipo)}
+                    {badgeEstado(ev.cerrado)}
+                  </div>
+                </div>
+
+                {ev.observacion && (
+                  <p className="mt-2 text-xs text-gray-600 line-clamp-2">{ev.observacion}</p>
+                )}
+
+                <p className="mt-2 text-xs text-gray-400">
+                  Abierto el {formatearFechaHoraCompacta(ev.created_at)}
+                </p>
+
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <AccionesEvento ev={ev} />
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ── */}
-      <div className="lg:hidden space-y-2">
-        {eventosFiltrados.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
-            No se encontraron eventos
-          </div>
-        ) : (
-          eventosFiltrados.map((ev) => (
-            <div key={ev.id} className="bg-white rounded-lg border border-gray-200 p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">{ev.aeronave.matricula}</p>
-                  <p className="text-xs text-gray-500">
-                    {ev.componente ? ETIQUETAS_COMPONENTE[ev.componente.tipo] : "Sin componente"}
-                    {ev.lugar ? ` · ${ETIQUETAS_LUGAR[ev.lugar]}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  {badgeTipo(ev.tipo)}
-                  {badgeEstado(ev.cerrado)}
-                </div>
-              </div>
-
-              {ev.observacion && (
-                <p className="mt-2 text-xs text-gray-600 line-clamp-2">{ev.observacion}</p>
-              )}
-
-              <p className="mt-2 text-xs text-gray-400">
-                Abierto el {formatearFechaHoraCompacta(ev.created_at)}
-              </p>
-
-              <div className="mt-2 pt-2 border-t border-gray-100">
-                <AccionesEvento ev={ev} />
-              </div>
-            </div>
-          ))
-        )}
-        <p className="text-xs text-gray-500 text-center py-2">{eventosFiltrados.length} de {eventos.length} eventos</p>
-      </div>
+      <BarraPaginacion
+        pagina={pagina}
+        totalPaginas={totalPaginas}
+        total={total}
+        unidad={{ singular: "evento", plural: "eventos" }}
+        cargando={pendiente}
+        onCambiar={(nueva) => navegar({ pagina: nueva })}
+      />
 
       {modalAbierto && (
         <SicemEventosForm

@@ -1,18 +1,26 @@
-feat: piezas compartidas de paginación del lado del servidor
+feat: Registro de Accesos paginado y filtrado en el servidor
 
-lib/paginacion.js (nuevo):
-- REGISTROS_POR_PAGINA = 20, en un solo lugar
-- leerPagina: convierte ?pagina= de la URL en un número seguro
-  (valores inválidos → 1)
-- datosPaginacion: skip/take para Prisma y total de páginas; si la
-  página pedida no existe, devuelve la última que sí existe
+Antes traía los últimos 200 intentos (take: 200) y la tabla filtraba
+en el navegador: del intento 201 en adelante no se veía nada, ni
+buscándolo.
 
-components/shared/Paginacion.js (nuevo):
-- Barra común: "Mostrando 21–40 de 312" + Anterior / números /
-  Siguiente desde 640px; "Página X de Y" en celular, botones de 40px
-- Solo dibuja: avisa el cambio con onCambiar y cada módulo decide
-  (URL o estado)
-- Una sola página: solo el conteo; sin registros: nada
+page.js:
+- Lee ?pagina=, ?usuario= y ?resultado= de la URL (await, Next 16)
+- Valida el resultado contra el enum ResultadoLogin de Prisma (un
+  valor inválido se ignora en vez de dar error 500)
+- count + findMany con skip/take, orden por fecha con desempate por id
+- Sin el límite de 200: se llega a todo el historial
 
-Todavía no lo usa ningún módulo (empieza en el commit siguiente,
-Registro de Accesos).
+TablaLogIntentos.js:
+- Ya no filtra: los controles cambian la URL
+- Buscador con espera de 400ms después de la última tecla
+  (router.replace, sin mover el scroll); select y paginación con
+  router.push para que Atrás funcione
+- No pisa lo que se está escribiendo cuando llega la respuesta, y se
+  sincroniza con la URL al usar Atrás
+- useTransition: tabla atenuada y paginación deshabilitada mientras
+  carga
+- Barra de Paginacion debajo de la tabla; subtítulo "Historial
+  completo"
+
+lib/paginacion.js: suma ESPERA_BUSQUEDA_MS = 400.
