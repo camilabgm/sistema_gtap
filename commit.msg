@@ -22,5 +22,15 @@ TablaLogIntentos.js:
   carga
 - Barra de Paginacion debajo de la tabla; subtítulo "Historial
   completo"
+  chore: nombres de archivos de paginación sin choque de mayúsculas
+
+lib/paginacion.js y components/shared/Paginacion.js solo se
+diferenciaban en la mayúscula de la P. Windows los trata como el
+mismo nombre y Git terminó con el de lib registrado como
+Paginacion.js: en Windows funciona, pero en el servidor Linux el
+import "@/lib/paginacion" no lo encontraría.
+
+- lib/paginacion.js con su nombre en minúscula en Git
+- El componente pasa a llamarse BarraPaginacion.js
 
 lib/paginacion.js: suma ESPERA_BUSQUEDA_MS = 400.
