@@ -1,4 +1,4 @@
-// src/lib/pdf/basePDF.js
+// src/lib/basePDF.js
 //
 // Piezas compartidas por TODOS los exportadores de PDF del sistema.
 // Antes cada exportador tenía su propia copia de colores, encabezado,
@@ -19,6 +19,19 @@
 // Las tablas usan autoTable: ajusta el texto largo en varias líneas,
 // corta las páginas solo y repite el encabezado de la tabla en cada
 // hoja — antes eso se programaba a mano en cada exportador.
+//
+// CAMBIO (rama feat/pdf-manifiesto-memo40) — tablaPDF suma tres
+// opciones, todas opcionales (los exportadores que no las usan quedan
+// igual que antes):
+//   - variante: "informe" (azul marino + cebra, la de siempre) o
+//     "formulario" (grilla con bordes finos y encabezado gris claro,
+//     como un formulario en papel — la usa la Declaración General).
+//   - filaTotales: una última fila destacada, alineada con las
+//     columnas, que se imprime al final de la tabla.
+//   - personalizarCelda(celda): para pintar celdas puntuales (ej. la
+//     columna Misión en azul del Informe de Vuelos).
+// Y nombreArchivoPDF limpia caracteres que no van en un nombre de
+// archivo (ej. "GTAP/0001" → "GTAP-0001").
 
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -142,11 +155,51 @@ export function encabezadoPDF(doc, { titulo, filtros = [] }) {
 
 // ── Tabla ───────────────────────────────────────────────────────────
 //
-// columnas: [{ titulo, ancho (mm, opcional), alinear: "left"|"right"|"center" }]
-// filas:    arrays de valores, en el mismo orden que las columnas
+// columnas:    [{ titulo, ancho (mm, opcional), alinear: "left"|"right"|"center" }]
+// filas:       arrays de valores, en el mismo orden que las columnas
+// variante:    "informe" (por defecto) | "formulario"
+// filaTotales: opcional, una fila extra al final. Cada valor puede ser
+//              texto o una celda de autoTable ({ content, colSpan,
+//              styles }) — ej. "TOTAL" ocupando varias columnas.
+// personalizarCelda: opcional, (celda) => { ... } — recibe la celda de
+//              autoTable (celda.section, celda.column.index,
+//              celda.row.index, celda.cell.styles) y puede cambiarle
+//              el estilo antes de dibujarla.
 // Devuelve la "y" donde terminó la tabla.
 
-export function tablaPDF(doc, { startY, columnas, filas, tamanoLetra = 8.5 }) {
+// Limpia el texto de una celda que puede venir como texto simple o
+// como objeto de autoTable ({ content, colSpan, styles }).
+function limpiarCeldaPDF(valor) {
+  if (valor !== null && typeof valor === "object" && "content" in valor) {
+    return { ...valor, content: limpiarTextoPDF(valor.content) }
+  }
+  return limpiarTextoPDF(valor)
+}
+
+const ESTILOS_VARIANTE = {
+  informe: {
+    styles: { lineWidth: 0 },
+    headStyles: { fillColor: COLORES.banda, textColor: [255, 255, 255] },
+    alternateRowStyles: { fillColor: COLORES.cebra },
+  },
+  formulario: {
+    styles: { lineWidth: 0.2, lineColor: [120, 120, 120] },
+    headStyles: { fillColor: [235, 235, 235], textColor: COLORES.texto },
+    alternateRowStyles: {},
+  },
+}
+
+export function tablaPDF(doc, {
+  startY,
+  columnas,
+  filas,
+  tamanoLetra = 8.5,
+  variante = "informe",
+  filaTotales = null,
+  personalizarCelda = null,
+}) {
+  const estilo = ESTILOS_VARIANTE[variante] || ESTILOS_VARIANTE.informe
+
   const columnStyles = {}
   columnas.forEach((c, i) => {
     columnStyles[i] = {
@@ -159,23 +212,30 @@ export function tablaPDF(doc, { startY, columnas, filas, tamanoLetra = 8.5 }) {
     startY,
     head: [columnas.map((c) => limpiarTextoPDF(c.titulo))],
     body: filas.map((fila) => fila.map((valor) => limpiarTextoPDF(valor))),
+    foot: filaTotales ? [filaTotales.map(limpiarCeldaPDF)] : undefined,
+    showFoot: filaTotales ? "lastPage" : "never",
     margin: { left: MARGEN, right: MARGEN, top: MARGEN, bottom: MARGEN + 6 },
     styles: {
       font: "helvetica",
       fontSize: tamanoLetra,
       cellPadding: 2,
       textColor: COLORES.texto,
-      lineWidth: 0,
       valign: "top",
+      ...estilo.styles,
     },
     headStyles: {
-      fillColor: COLORES.banda,
-      textColor: [255, 255, 255],
       fontStyle: "bold",
       valign: "middle",
+      ...estilo.headStyles,
     },
-    alternateRowStyles: { fillColor: COLORES.cebra },
+    footStyles: {
+      fillColor: [225, 230, 238],
+      textColor: COLORES.texto,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: estilo.alternateRowStyles,
     columnStyles,
+    didParseCell: personalizarCelda || undefined,
   })
 
   return doc.lastAutoTable.finalY
@@ -228,7 +288,14 @@ export function pieDePaginaPDF(doc) {
 export function nombreArchivoPDF(...partes) {
   const limpias = partes
     .filter(Boolean)
-    .map((p) => String(p).trim().replace(/\s+/g, "-"))
+    .map((p) =>
+      String(p)
+        .trim()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // sin tildes
+        .replace(/[^A-Za-z0-9.-]+/g, "-")                 // "/", "'", espacios → "-"
+        .replace(/^-+|-+$/g, "")
+    )
+    .filter(Boolean)
   return `${limpias.join("_")}.pdf`
 }
 

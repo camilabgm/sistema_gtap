@@ -1,28 +1,25 @@
-fix: base común para los PDFs (encabezado, tabla, pie, márgenes)
+feat: Declaración General e Informe de Vuelos estilo Memo 40
 
-Cada exportador tenía su propia copia de colores, encabezado, pie y
-márgenes (12, 14 o 15mm), y Gestión de Escalas usaba otro color y
-otra técnica. La flecha "→" rompía la ruta ("S G A S").
+Manifiesto → Declaración General (Salida/Entrada), calcada del
+formulario del GTAP:
+- Datos del vuelo, "Apoyo a" (solicitante) y fecha
+- Tripulación, pasajeros y carga en grilla tipo formulario
+- Texto "DECLARO:" y firmas de "Verificado por" y del piloto
+- Una declaración por misión, sin horas ni combustible
 
-pdf/basePDF.js (nuevo, compartido):
-- limpiarTextoPDF: reemplaza o descarta caracteres que la fuente del
-  PDF no tiene (→, ✓, ✗, espacios raros)
-- encabezadoPDF: FAP / I Brigada Aérea / GTAP, título, filtros y
-  "Generado" en hora de Paraguay
-- tablaPDF: autoTable con estilo único (azul marino, filas cebra,
-  encabezado repetido en cada hoja)
-- pieDePaginaPDF: "Página X de Y"
-- nombreArchivoPDF / fechaHoyParaguayISO
-- Márgenes de 15mm en todos
+Informe de Vuelos → formato Memo 40 (horizontal):
+- Mes, día, avión, matrícula, solicitante, misión (celda azul),
+  tiempo de vuelo en hh:mm, ruta completa, tripulación, combustible,
+  pax/carga y observación del Post-Vuelo
+- Fila de totales al final (vuelos, horas, combustible, pax, carga)
+- Sin columna Código
+- Corrige la zona horaria en la API de informes
 
-Exportadores migrados (mismo contenido):
-- Gestión de Escalas: estilo de los Informes, ruta sin flecha,
-  misión solo con el código, anchos fijos, filtros aplicados
-- Informe de Totales y Progreso Anual: tabla con autoTable en vez
-  de dibujarla a mano, período en dd/mm/aaaa
-- HistorialEscalas: describirFiltros() le pasa los filtros al PDF
+API del Manifiesto: devuelve los itinerarios. Se pedían a la base
+pero no se mandaban, y por eso DESTINO salía "—" y la línea de ruta
+del panel nunca se mostraba.
 
-Manifiesto e Informe de Vuelos sin cambios (se rehacen en la rama
-siguiente sobre esta base).
-
-5 archivos (1 nuevo).
+basePDF.js:
+- tablaPDF: variante "formulario", filaTotales y personalizarCelda
+  (opcionales; los exportadores existentes quedan igual)
+- nombreArchivoPDF limpia caracteres inválidos ("GTAP/0001")

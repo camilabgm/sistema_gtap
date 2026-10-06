@@ -1,166 +1,180 @@
-// Destino: src/lib/exportarInformeVuelosPDF.js
+// src/lib/exportarInformeVuelosPDF.js
 //
-// v2 — arregla el bug real: la flecha "→" no existe en la fuente base
-// de jsPDF (Helvetica estándar de PDF, sin Unicode completo) y salía
-// mal codificada, rompiendo el cálculo de ancho de toda la fila. Se
-// reemplaza por un guión simple, que sí soporta.
+// Informe de Vuelos en el formato del Memo 40 del GTAP — una fila por
+// vuelo cumplido, con las columnas que ya usa el Memo 40 más
+// tripulación, combustible, pasajeros/carga y observación.
 //
-// De paso, mejora visual: encabezado con banda de color, filas cebra
-// para que se siga mejor la lectura, numeración de página, y las
-// filas con texto largo (Tripulación con varios nombres) ahora se
-// muestran completas en varias líneas en vez de cortarse a la primera.
+// CAMBIO (rama feat/pdf-manifiesto-memo40): reescrito sobre las piezas
+// compartidas de pdf/basePDF.js (encabezado institucional, tabla con
+// autoTable, "Página X de Y", márgenes de 15mm). Columnas nuevas:
+//   - Mes y Día separados (en hora de Paraguay), el mes en mayúsculas
+//     como en el Memo 40: ENE, FEB… SEPT, OCT…
+//   - Avión: el modelo corto (primera palabra del tipo: "C-208B",
+//     "BE-90", "C-680").
+//   - Misión: celda en azul.
+//   - T. vuelo en horas:minutos ("01:10").
+//   - Destino: la ruta completa con las escalas intermedias
+//     ("SGAS-PIRAJUI-SGAS"), no solo origen y destino final.
+//   - Observación: la del Post-Vuelo; si hubo incidente o accidente,
+//     va adelante.
+// Al final, una fila de TOTALES alineada con las columnas: vuelos,
+// horas de vuelo, combustible y pasajeros/carga — los acumulados del
+// Memo 40 salen de filtrar el informe (por aeronave, solicitante o
+// período) y leer esta fila.
 
-import { jsPDF } from "jspdf"
+import { fechaUTCAInputParaguay } from "@/lib/fechaHora"
+import { formatearFechaSoloDia } from "@/lib/fechaSoloDia"
+import {
+  nuevoDocumentoPDF,
+  encabezadoPDF,
+  tablaPDF,
+  pieDePaginaPDF,
+  nombreArchivoPDF,
+} from "@/lib/basePDF"
 
-function formatearFechaHora(iso) {
-  if (!iso) return "—"
-  return new Intl.DateTimeFormat("es-PY", {
-    timeZone: "America/Asuncion",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(iso))
+const MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEPT", "OCT", "NOV", "DIC"]
+
+const ETIQUETAS_NOVEDAD = {
+  INCIDENTE: "INCIDENTE",
+  ACCIDENTE: "ACCIDENTE",
 }
 
-// "→" no existe en la fuente base de PDF — un guión simple sí, y se
-// entiende igual de bien en un informe impreso.
-function rutaSegura(ruta) {
-  return String(ruta).replace(/→/g, "-")
-}
+// Azul de la celda de Misión — mismo tono que el Memo 40.
+const COLOR_MISION = [91, 141, 214]
 
+// A4 horizontal: 297mm - 2 × 15mm de margen = 267mm útiles.
 const COLUMNAS = [
-  { titulo: "Fecha/Hora", ancho: 30 },
-  { titulo: "Aeronave · Ruta", ancho: 46 },
-  { titulo: "Misión · Solicitante", ancho: 46 },
-  { titulo: "Tripulación", ancho: 62 },
-  { titulo: "Horas", ancho: 18 },
-  { titulo: "Comb.", ancho: 18 },
-  { titulo: "Pax · Carga", ancho: 22 },
+  { titulo: "Mes",          ancho: 11 },
+  { titulo: "Día",          ancho: 9,  alinear: "center" },
+  { titulo: "Avión",        ancho: 18 },
+  { titulo: "Matrícula",    ancho: 19 },
+  { titulo: "Solicitante",  ancho: 32 },
+  { titulo: "Misión",       ancho: 15, alinear: "center" },
+  { titulo: "T. vuelo",     ancho: 14, alinear: "center" },
+  { titulo: "Destino",      ancho: 38 },
+  { titulo: "Tripulación",  ancho: 46 },
+  { titulo: "Comb.",        ancho: 15, alinear: "right" },
+  { titulo: "Pax · Carga",  ancho: 18, alinear: "right" },
+  { titulo: "Observación",  ancho: 32 },
 ]
+const INDICE_MISION = 5
 
-const ALTO_LINEA = 4.5 // mm por línea de texto, a fontSize 8
-const COLOR_BANDA_ENCABEZADO = [30, 58, 95] // azul oscuro institucional
-const COLOR_CEBRA = [245, 246, 248]
+// "2026-09-26T14:40" (hora de Paraguay) → { mes: "SEPT", dia: "26" }
+function mesYDia(iso) {
+  const local = fechaUTCAInputParaguay(iso)
+  if (!local) return { mes: "—", dia: "—" }
+  return { mes: MESES[Number(local.slice(5, 7)) - 1], dia: String(Number(local.slice(8, 10))) }
+}
+
+// 70 → "01:10"
+function horasMinutos(minutos) {
+  if (minutos == null || isNaN(minutos)) return "—"
+  const h = Math.floor(minutos / 60)
+  const m = minutos % 60
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+}
+
+// "C-208B Caravan" → "C-208B"
+function modeloCorto(tipo) {
+  if (!tipo) return "—"
+  return String(tipo).trim().split(/\s+/)[0]
+}
+
+function textoDestino(f) {
+  if (Array.isArray(f.puntos_ruta) && f.puntos_ruta.length > 0) return f.puntos_ruta.join("-")
+  return f.ruta || "—"
+}
+
+function textoPaxCarga(pasajeros, cargaKg) {
+  if (pasajeros == null && cargaKg == null) return "—"
+  return `${pasajeros ?? 0} · ${redondear(cargaKg ?? 0)} kg`
+}
+
+function textoObservacion(f) {
+  const partes = []
+  if (f.novedad && ETIQUETAS_NOVEDAD[f.novedad]) {
+    partes.push(`${ETIQUETAS_NOVEDAD[f.novedad]}${f.detalle_novedad ? `: ${f.detalle_novedad}` : ""}`)
+  }
+  if (f.observaciones) partes.push(f.observaciones)
+  return partes.length > 0 ? partes.join(" — ") : "—"
+}
+
+// Hasta 2 decimales, sin ceros de más (480 → "480", 12.5 → "12.5")
+function redondear(n) {
+  return String(Math.round(Number(n) * 100) / 100)
+}
 
 export function exportarInformeVuelosPDF(filas, filtros) {
-  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" })
-  const margen = 12
-  const anchoUtil = 297 - margen * 2
-  const altoHoja = 210
-  let y = 18
-  let numeroPagina = 1
+  const doc = nuevoDocumentoPDF({ orientacion: "landscape" })
 
-  function dibujarEncabezadoPagina() {
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(15)
-    doc.setTextColor(20, 20, 20)
-    doc.text("INFORME DE VUELOS", margen, y)
+  const descripcionFiltros = [
+    `Período: ${formatearFechaSoloDia(filtros.desde)} al ${formatearFechaSoloDia(filtros.hasta)}`,
+  ]
+  if (filtros.aeronave) descripcionFiltros.push(`Aeronave: ${filtros.aeronave}`)
+  if (filtros.tipoMision) descripcionFiltros.push(`Tipo de misión: ${filtros.tipoMision}`)
+  if (filtros.solicitante) descripcionFiltros.push(`Solicitante: ${filtros.solicitante}`)
 
-    // Barra de acento debajo del título — simple, pero le da algo de
-    // identidad visual en vez de ser solo texto plano arriba de todo.
-    doc.setDrawColor(...COLOR_BANDA_ENCABEZADO)
-    doc.setLineWidth(0.8)
-    doc.line(margen, y + 2, margen + 55, y + 2)
-    doc.setLineWidth(0.2)
-    y += 9
+  const y = encabezadoPDF(doc, { titulo: "INFORME DE VUELOS", filtros: descripcionFiltros })
 
-    doc.setFontSize(9)
-    doc.setFont("helvetica", "normal")
-    doc.setTextColor(90, 90, 90)
-    const partesFiltro = [`Período: ${filtros.desde} al ${filtros.hasta}`]
-    if (filtros.aeronave) partesFiltro.push(`Aeronave: ${filtros.aeronave}`)
-    if (filtros.tipoMision) partesFiltro.push(`Tipo de misión: ${filtros.tipoMision}`)
-    if (filtros.solicitante) partesFiltro.push(`Solicitante: ${filtros.solicitante}`)
-    doc.text(partesFiltro.join("   ·   "), margen, y)
-    y += 8
-
-    dibujarEncabezadoTabla()
+  // Totales para la última fila
+  let totalMinutos = 0
+  let totalCombustible = 0
+  let totalPasajeros = 0
+  let totalCarga = 0
+  for (const f of filas) {
+    totalMinutos += f.horas_vuelo_minutos ?? 0
+    totalCombustible += f.combustible_litros ?? 0
+    totalPasajeros += f.pasajeros ?? 0
+    totalCarga += f.carga_kg ?? 0
   }
 
-  function dibujarEncabezadoTabla() {
-    // Banda de color detrás de los títulos de columna, en vez de una
-    // línea sola — se distingue mucho mejor dónde empieza la tabla.
-    doc.setFillColor(...COLOR_BANDA_ENCABEZADO)
-    doc.rect(margen, y - 4.5, anchoUtil, 7, "F")
+  // "TOTAL" ocupa las 4 primeras columnas (Mes, Día, Avión, Matrícula)
+  // para no partirse en la columna angosta de Mes. Cada total queda
+  // debajo de su columna y con su misma alineación.
+  const filaTotales = [
+    { content: "TOTAL", colSpan: 4 },
+    `${filas.length} vuelo${filas.length === 1 ? "" : "s"}`,
+    "",
+    { content: horasMinutos(totalMinutos), styles: { halign: "center" } },
+    "", "",
+    { content: `${redondear(totalCombustible)} L`, styles: { halign: "right" } },
+    { content: `${totalPasajeros} · ${redondear(totalCarga)} kg`, styles: { halign: "right" } },
+    "",
+  ]
 
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(8)
-    doc.setTextColor(255, 255, 255)
-    let x = margen
-    COLUMNAS.forEach((c) => {
-      doc.text(c.titulo, x + 1.5, y)
-      x += c.ancho
-    })
-    y += 6.5
-    doc.setTextColor(30, 30, 30)
-    doc.setFont("helvetica", "normal")
-  }
-
-  function dibujarPiePagina() {
-    doc.setFontSize(8)
-    doc.setFont("helvetica", "italic")
-    doc.setTextColor(140, 140, 140)
-    doc.text(`Página ${numeroPagina}`, 297 - margen - 15, altoHoja - 8)
-    doc.setTextColor(30, 30, 30)
-  }
-
-  dibujarEncabezadoPagina()
-
-  filas.forEach((f, idx) => {
-    const valores = [
-      formatearFechaHora(f.hora_despegue_estimada),
-      `${f.aeronave_matricula} · ${rutaSegura(f.ruta)}`,
-      `${f.tipo_mision_codigo} · ${f.solicitante}`,
-      f.tripulacion || "—",
-      f.horas_vuelo_texto,
-      f.combustible_litros != null ? `${f.combustible_litros} L` : "—",
-      f.pasajeros != null || f.carga_kg != null
-        ? `${f.pasajeros ?? 0} · ${f.carga_kg ?? 0}kg`
-        : "—",
-    ]
-
-    // Cada columna puede necesitar más de una línea (ej. Tripulación
-    // con 3 nombres) — la fila entera crece según la columna que más
-    // líneas necesite, así ninguna columna se corta ni pierde datos.
-    const lineasPorColumna = valores.map((v, i) =>
-      doc.splitTextToSize(String(v), COLUMNAS[i].ancho - 3)
-    )
-    const maxLineas = Math.max(...lineasPorColumna.map((l) => l.length))
-    const alturaFila = Math.max(maxLineas * ALTO_LINEA, ALTO_LINEA)
-
-    if (y + alturaFila > altoHoja - 15) {
-      dibujarPiePagina()
-      doc.addPage()
-      numeroPagina++
-      y = 18
-      dibujarEncabezadoPagina()
-    }
-
-    // Fila cebra — alterna un fondo gris clarito cada dos filas, para
-    // que el ojo no se pierda siguiendo una fila larga.
-    if (idx % 2 === 1) {
-      doc.setFillColor(...COLOR_CEBRA)
-      doc.rect(margen, y - 3.5, anchoUtil, alturaFila, "F")
-    }
-
-    doc.setFontSize(8)
-    let x = margen
-    lineasPorColumna.forEach((lineas, i) => {
-      doc.text(lineas, x + 1.5, y)
-      x += COLUMNAS[i].ancho
-    })
-    y += alturaFila + 1.5
+  tablaPDF(doc, {
+    startY: y,
+    columnas: COLUMNAS,
+    tamanoLetra: 7,
+    filaTotales,
+    filas: filas.map((f) => {
+      const { mes, dia } = mesYDia(f.hora_despegue_estimada)
+      return [
+        mes,
+        dia,
+        modeloCorto(f.aeronave_tipo),
+        f.aeronave_matricula,
+        f.solicitante || "—",
+        f.tipo_mision_codigo,
+        horasMinutos(f.horas_vuelo_minutos),
+        textoDestino(f),
+        f.tripulacion || "—",
+        f.combustible_litros != null ? `${redondear(f.combustible_litros)} L` : "—",
+        textoPaxCarga(f.pasajeros, f.carga_kg),
+        textoObservacion(f),
+      ]
+    }),
+    // Celda de Misión en azul, solo en las filas de datos.
+    personalizarCelda: (celda) => {
+      if (celda.section === "body" && celda.column.index === INDICE_MISION) {
+        celda.cell.styles.fillColor = COLOR_MISION
+        celda.cell.styles.textColor = [255, 255, 255]
+        celda.cell.styles.fontStyle = "bold"
+      }
+    },
   })
 
-  dibujarPiePagina()
+  pieDePaginaPDF(doc)
 
-  doc.setFontSize(8.5)
-  doc.setFont("helvetica", "italic")
-  doc.text(`${filas.length} vuelos en total`, margen, altoHoja - 8)
-
-  const nombreArchivo = `informe_vuelos_${filtros.desde}_a_${filtros.hasta}.pdf`
-  doc.save(nombreArchivo)
+  doc.save(nombreArchivoPDF("informe-vuelos", filtros.desde, "a", filtros.hasta))
 }

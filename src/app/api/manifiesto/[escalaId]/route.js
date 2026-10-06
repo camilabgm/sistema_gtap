@@ -7,6 +7,14 @@
 // quién vuela, no para decidir permisos (eso ya no depende de la
 // escala, ver usuarioPuedeGestionarManifiesto en manifiesto.js).
 // acuses se saca del select: ya no hace falta para nada acá.
+//
+// CAMBIO (rama feat/pdf-manifiesto-memo40): la respuesta ahora incluye
+// "itinerarios" (todos los tramos, en orden). Antes se pedían a la base
+// pero no se devolvían — solo viajaban origen y destino ya calculados.
+// Por eso la Declaración General imprimía "DESTINO: —" (el exportador
+// arma la ruta completa con los tramos) y la línea gris de ruta de
+// PanelDetalle (construirCadenaRuta) nunca se mostraba. origen y
+// destino se siguen mandando igual: los usa el título del panel.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -104,6 +112,9 @@ export const GET = conPermiso("MANIFIESTO", "puede_ver", async (request, context
     nro_orden: escala.nro_orden,
     origen: escala.itinerarios[0]?.origen ?? null,
     destino: escala.itinerarios[escala.itinerarios.length - 1]?.destino ?? null,
+    // Todos los tramos, en orden — los usan la Declaración General
+    // (DESTINO con la ruta completa) y la línea de ruta de PanelDetalle.
+    itinerarios: escala.itinerarios,
     hora_salida: horas.salida,
     hora_llegada: horas.llegada,
     hora_es_real: horas.esReal,
