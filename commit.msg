@@ -1,32 +1,28 @@
-fix: modales responsive con cáscara compartida (ModalBase)
+fix: base común para los PDFs (encabezado, tabla, pie, márgenes)
 
-En celular varios modales eran más altos que la pantalla, sin scroll
-interno (los últimos campos y el botón Guardar quedaban afuera), o
-tenían grillas de columnas fijas que se cortaban a la derecha.
+Cada exportador tenía su propia copia de colores, encabezado, pie y
+márgenes (12, 14 o 15mm), y Gestión de Escalas usaba otro color y
+otra técnica. La flecha "→" rompía la ruta ("S G A S").
 
-ModalBase (shared, nuevo):
-- Celular: pantalla completa, título y botones fijos, solo el
-  contenido se desplaza
-- Desde 640px: centrado, alto máximo 90%, ancho por modal
-- Esc cierra todos los modales
-- Tocar el fondo no cierra los formularios (sí los paneles de Ver)
-- Bloquea el scroll de la página de atrás
-- Portal a body con z-50
-- Error fuera del scroll, justo arriba de los botones
+pdf/basePDF.js (nuevo, compartido):
+- limpiarTextoPDF: reemplaza o descarta caracteres que la fuente del
+  PDF no tiene (→, ✓, ✗, espacios raros)
+- encabezadoPDF: FAP / I Brigada Aérea / GTAP, título, filtros y
+  "Generado" en hora de Paraguay
+- tablaPDF: autoTable con estilo único (azul marino, filas cebra,
+  encabezado repetido en cada hoja)
+- pieDePaginaPDF: "Página X de Y"
+- nombreArchivoPDF / fechaHoyParaguayISO
+- Márgenes de 15mm en todos
 
-Aplicado en 13 modales:
-- Aeronaves: AeronavesForm, AeronaveDisponibilidadModal,
-  PanelVerAeronave
-- Personas: PersonasForm, UsuarioModal, PermisosUsuarioModal,
-  HabilitacionesModal (solo la cáscara)
-- Tipos de Misión: TiposMisionesForm, PanelVerTipoMision
-- SICEM: SicemComponentesForm, SicemEventosForm, PanelVerEvento
-- Parte Diario: modal de novedad
+Exportadores migrados (mismo contenido):
+- Gestión de Escalas: estilo de los Informes, ruta sin flecha,
+  misión solo con el código, anchos fijos, filtros aplicados
+- Informe de Totales y Progreso Anual: tabla con autoTable en vez
+  de dibujarla a mano, período en dd/mm/aaaa
+- HistorialEscalas: describirFiltros() le pasa los filtros al PDF
 
-Grillas corregidas:
-- SicemComponentesForm: grid-cols-2/3 fijos -> 1 columna en celular
-- PersonasForm: datos institucionales a 1 columna en celular y
-  col-span-2 -> sm:col-span-2 (creaba una columna fantasma)
-- Parte Diario: lista del buscador de personas en el flujo normal
+Manifiesto e Informe de Vuelos sin cambios (se rehacen en la rama
+siguiente sobre esta base).
 
-14 archivos (1 nuevo).
+5 archivos (1 nuevo).

@@ -12,6 +12,10 @@
 //     en el 26% y se metían encima de la columna Estado.
 //   - Todo lo de AccionesEscala que antes cambiaba en 768 (md:) ahora
 //     cambia en 1024 (lg:), igual que AccionIcono.
+//
+// CAMBIO (rama fix/pdf-base-comun): "Descargar PDF" le pasa al
+// exportador la lista de filtros activos (describirFiltros), que se
+// imprime debajo del título del PDF.
 
 import { useState, useEffect, Fragment } from "react"
 import { Eye, Pencil, Trash2, Users, ClipboardCheck, Search, Download, ChevronDown, X } from "lucide-react"
@@ -256,8 +260,26 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
     .slice()
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
 
+  // Describe en texto los filtros activos, para imprimirlos debajo del
+  // título del PDF — así el papel dice qué se filtró, igual que los
+  // Informes. Las fechas "aaaa-mm-dd" del input se muestran dd/mm/aaaa.
+  function describirFiltros() {
+    const partes = []
+    if (busqueda.trim()) partes.push(`Búsqueda: "${busqueda.trim()}"`)
+    if (filtroEstados.length > 0) {
+      const textos = filtroEstados.map(
+        (clave) => ESTADOS_FILTRABLES.find((op) => op.clave === clave)?.texto || clave
+      )
+      partes.push(`Estado: ${textos.join(", ")}`)
+    }
+    if (filtroAeronave) partes.push(`Aeronave: ${filtroAeronave}`)
+    if (filtroFechaDesde) partes.push(`Desde: ${formatearFechaSoloDia(filtroFechaDesde)}`)
+    if (filtroFechaHasta) partes.push(`Hasta: ${formatearFechaSoloDia(filtroFechaHasta)}`)
+    return partes
+  }
+
   function descargarPDF() {
-    exportarGestionEscalasPDF(filtradas)
+    exportarGestionEscalasPDF(filtradas, describirFiltros())
   }
 
   return (
