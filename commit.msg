@@ -1,25 +1,18 @@
-feat: Declaración General e Informe de Vuelos estilo Memo 40
+feat: piezas compartidas de paginación del lado del servidor
 
-Manifiesto → Declaración General (Salida/Entrada), calcada del
-formulario del GTAP:
-- Datos del vuelo, "Apoyo a" (solicitante) y fecha
-- Tripulación, pasajeros y carga en grilla tipo formulario
-- Texto "DECLARO:" y firmas de "Verificado por" y del piloto
-- Una declaración por misión, sin horas ni combustible
+lib/paginacion.js (nuevo):
+- REGISTROS_POR_PAGINA = 20, en un solo lugar
+- leerPagina: convierte ?pagina= de la URL en un número seguro
+  (valores inválidos → 1)
+- datosPaginacion: skip/take para Prisma y total de páginas; si la
+  página pedida no existe, devuelve la última que sí existe
 
-Informe de Vuelos → formato Memo 40 (horizontal):
-- Mes, día, avión, matrícula, solicitante, misión (celda azul),
-  tiempo de vuelo en hh:mm, ruta completa, tripulación, combustible,
-  pax/carga y observación del Post-Vuelo
-- Fila de totales al final (vuelos, horas, combustible, pax, carga)
-- Sin columna Código
-- Corrige la zona horaria en la API de informes
+components/shared/Paginacion.js (nuevo):
+- Barra común: "Mostrando 21–40 de 312" + Anterior / números /
+  Siguiente desde 640px; "Página X de Y" en celular, botones de 40px
+- Solo dibuja: avisa el cambio con onCambiar y cada módulo decide
+  (URL o estado)
+- Una sola página: solo el conteo; sin registros: nada
 
-API del Manifiesto: devuelve los itinerarios. Se pedían a la base
-pero no se mandaban, y por eso DESTINO salía "—" y la línea de ruta
-del panel nunca se mostraba.
-
-basePDF.js:
-- tablaPDF: variante "formulario", filaTotales y personalizarCelda
-  (opcionales; los exportadores existentes quedan igual)
-- nombreArchivoPDF limpia caracteres inválidos ("GTAP/0001")
+Todavía no lo usa ningún módulo (empieza en el commit siguiente,
+Registro de Accesos).
