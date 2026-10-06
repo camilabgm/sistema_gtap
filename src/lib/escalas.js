@@ -16,6 +16,11 @@
 // pantalla que dibuja estas fechas desde el servidor (ej. SICEM
 // Eventos). En 24 horas no hay "a. m."/"p. m.", así que el problema
 // desaparece de raíz. Ambas siguen fijando la hora de Paraguay.
+//
+// CAMBIO (rama feat/paginacion-servidor): suma CLAVES_ESTADO_DETALLADO
+// y condicionEstadoDetallado(), al final del archivo, justo debajo de
+// estadoDetallado(). Son la MISMA regla escrita para la base de datos:
+// si cambia una, cambia la otra (ver el aviso de más abajo).
 
 import { fechaUTCAInputParaguay, formatearFechaHora } from "@/lib/fechaHora"
 
@@ -202,4 +207,133 @@ export function estadoDetallado(escala) {
   if (visual === "EN_DESARROLLO") return { clave: "EN_DESARROLLO", texto: "En vuelo" }
   if (visual === "SIN_REGISTRAR") return { clave: "SIN_REGISTRAR", texto: "Sin registrar" }
   return { clave: "PROGRAMADA_AUTORIZADA", texto: "Programada · Autorizada" }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ⚠ estadoDetallado() Y condicionEstadoDetallado() SE CAMBIAN JUNTAS ⚠
+// ─────────────────────────────────────────────────────────────────────
+//
+// Los estados de arriba NO están guardados en ninguna columna: se
+// calculan mirando varios campos y la hora actual. La base de datos no
+// puede ejecutar estadoDetallado(), así que para filtrar por estado en
+// el servidor (Gestión de Escalas, paginada) cada estado se traduce a
+// una condición de Prisma — un objeto "where".
+//
+// Son dos versiones de la MISMA regla. Si se toca la lógica de
+// estadoDetallado(), calcularEstadoVisual() o yaPasoLaHora(), hay que
+// revisar esta traducción en el mismo commit. Las 8 condiciones
+// funcionan como casilleros: cada escala cae en EXACTAMENTE UNO (si
+// cayera en ninguno, desaparecería de todos los filtros; si cayera en
+// dos, aparecería en filtros que no le corresponden).
+//
+// Cómo comprobar que siguen de acuerdo: en Gestión de Escalas, filtrar
+// por cada estado — TODAS las filas tienen que mostrar ese mismo badge
+// (el badge lo sigue calculando estadoDetallado() en el navegador).
+//
+// "ahora" se recibe como parámetro, no se calcula adentro: así todas
+// las condiciones de un mismo pedido (la lista, el total y los
+// contadores) miran el mismo instante y siempre cuadran entre sí.
+//
+// Ojo con los vacíos: en la base, una comparación como "mayor que
+// ahora" DESCARTA las filas con la hora vacía. Por eso Pendiente y
+// Programada · Autorizada piden el vacío explícitamente con un OR.
+
+export const CLAVES_ESTADO_DETALLADO = [
+  "BORRADOR",
+  "PENDIENTE",
+  "VENCIDA_SIN_AUTORIZAR",
+  "PROGRAMADA_AUTORIZADA",
+  "EN_DESARROLLO",
+  "SIN_REGISTRAR",
+  "CUMPLIDA",
+  "ABORTADA",
+]
+
+export function condicionEstadoDetallado(clave, ahora) {
+  // Publicada = ya no es borrador. Todo lo que sigue lo exige.
+  const publicada = { es_borrador: false }
+
+  // Sin autorizar y sin terminar: ni abortada ni cumplida. Incluye una
+  // escala con estado EN_DESARROLLO en la base pero sin autorizar
+  // (estadoDetallado mira "autorizada" antes que el estado visual).
+  const sinAutorizar = {
+    ...publicada,
+    autorizada: false,
+    estado: { notIn: ["ABORTADA", "CUMPLIDA"] },
+  }
+
+  // Autorizada y todavía PROGRAMADA en la base: de acá salen En vuelo,
+  // Sin registrar y Programada · Autorizada, según la hora.
+  const autorizadaProgramada = { ...publicada, autorizada: true, estado: "PROGRAMADA" }
+
+  switch (clave) {
+    case "BORRADOR":
+      return { es_borrador: true }
+
+    case "ABORTADA":
+      return { ...publicada, estado: "ABORTADA" }
+
+    case "CUMPLIDA":
+      return { ...publicada, estado: "CUMPLIDA" }
+
+    // yaPasoLaHora(): ahora >= despegue. Sin hora → "no pasó".
+    case "VENCIDA_SIN_AUTORIZAR":
+      return { ...sinAutorizar, hora_despegue_estimada: { lte: ahora } }
+
+    case "PENDIENTE":
+      return {
+        ...sinAutorizar,
+        OR: [
+          { hora_despegue_estimada: null },
+          { hora_despegue_estimada: { gt: ahora } },
+        ],
+      }
+
+    // calcularEstadoVisual(): un estado distinto de PROGRAMADA se
+    // devuelve tal cual (o sea, EN_DESARROLLO guardado en la base); si
+    // es PROGRAMADA con las dos horas, "en vuelo" es
+    // despegue <= ahora <= arribo.
+    case "EN_DESARROLLO":
+      return {
+        ...publicada,
+        autorizada: true,
+        OR: [
+          { estado: "EN_DESARROLLO" },
+          {
+            estado: "PROGRAMADA",
+            hora_despegue_estimada: { lte: ahora },
+            hora_arribo_estimada: { gte: ahora },
+          },
+        ],
+      }
+
+    // ahora > arribo, con las dos horas cargadas — aunque el despegue
+    // esté mal cargado DESPUÉS del arribo (así lo resuelve
+    // calcularEstadoVisual: pregunta "en vuelo" primero y "ya pasó el
+    // arribo" después).
+    case "SIN_REGISTRAR":
+      return {
+        ...autorizadaProgramada,
+        hora_despegue_estimada: { not: null },
+        hora_arribo_estimada: { lt: ahora },
+      }
+
+    // Todo lo demás de autorizadaProgramada: le falta alguna de las dos
+    // horas, o el despegue todavía no llegó (y el arribo tampoco pasó).
+    case "PROGRAMADA_AUTORIZADA":
+      return {
+        ...autorizadaProgramada,
+        OR: [
+          { hora_despegue_estimada: null },
+          { hora_arribo_estimada: null },
+          {
+            hora_despegue_estimada: { gt: ahora },
+            hora_arribo_estimada: { gte: ahora },
+          },
+        ],
+      }
+
+    default:
+      return null
+  }
 }

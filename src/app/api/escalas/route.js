@@ -7,6 +7,14 @@
 // para la misma regla de negocio; ahora es una sola, y de paso el
 // texto queda normalizado a mayúsculas desde el momento de creación,
 // no solo al editar.
+//
+// CAMBIO (rama feat/paginacion-servidor): el GET exige ?desde= y
+// ?hasta=. Lo usa solo la Agenda (AgendaEscalas.js), que siempre manda
+// las dos fechas de la semana visible. El modo "sin parámetros" traía
+// TODAS las escalas de la historia y lo usaba Gestión de Escalas, que
+// ahora tiene su propio endpoint paginado (/api/escalas/gestion). Con
+// las fechas obligatorias, un fetch("/api/escalas") olvidado responde
+// un error claro en vez de traer las ~1.800 escalas de golpe.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -34,25 +42,32 @@ export const GET = conPermiso("ESCALAS", "puede_ver", async (request, context, s
   const desde = searchParams.get("desde")
   const hasta = searchParams.get("hasta")
 
-  const where = { deleted_at: null }
-  if (desde && hasta) {
-    const fechaDesde = new Date(desde)
-    const fechaHasta = new Date(hasta)
-    if (isNaN(fechaDesde.getTime()) || isNaN(fechaHasta.getTime())) {
-      return NextResponse.json({ error: "Fechas de filtro inválidas" }, { status: 400 })
-    }
+  if (!desde || !hasta) {
+    return NextResponse.json(
+      { error: "Las fechas desde y hasta son obligatorias. El listado completo de Gestión está en /api/escalas/gestion." },
+      { status: 400 }
+    )
+  }
 
-    const finDelRango = new Date(fechaHasta)
-    finDelRango.setUTCHours(23, 59, 59, 999)
+  const fechaDesde = new Date(desde)
+  const fechaHasta = new Date(hasta)
+  if (isNaN(fechaDesde.getTime()) || isNaN(fechaHasta.getTime())) {
+    return NextResponse.json({ error: "Fechas de filtro inválidas" }, { status: 400 })
+  }
 
-    where.es_borrador = false
-    where.OR = [
+  const finDelRango = new Date(fechaHasta)
+  finDelRango.setUTCHours(23, 59, 59, 999)
+
+  const where = {
+    deleted_at: null,
+    es_borrador: false,
+    OR: [
       { fecha: { gte: fechaDesde, lte: fechaHasta } },
       {
         hora_despegue_estimada: { lte: finDelRango },
         hora_arribo_estimada: { gte: fechaDesde },
       },
-    ]
+    ],
   }
 
   const escalas = await prisma.escala.findMany({

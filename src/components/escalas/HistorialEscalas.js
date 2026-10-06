@@ -16,8 +16,36 @@
 // CAMBIO (rama fix/pdf-base-comun): "Descargar PDF" le pasa al
 // exportador la lista de filtros activos (describirFiltros), que se
 // imprime debajo del título del PDF.
+//
+// CAMBIO (rama feat/paginacion-servidor): paginado y filtrado en el
+// servidor. Antes pedía TODAS las escalas a GET /api/escalas y
+// filtraba, contaba y ordenaba en el navegador. Ahora:
+//   - La URL es la que manda: ?busqueda=&estado=&aeronave=&desde=
+//     &hasta=&pagina=. El componente la lee con useSearchParams y, cada
+//     vez que cambia (un filtro, una página, el botón Atrás), pide esa
+//     página a /api/escalas/gestion.
+//   - Los controles solo cambian la URL, con window.history.pushState /
+//     replaceState: Next los sincroniza con useSearchParams SIN volver
+//     a ejecutar el page.js en el servidor (con router.push, cada clic
+//     en un filtro rehacía la sesión y los permisos de page.js, y los
+//     datos los trae este componente igual).
+//   - Buscador: espera ESPERA_BUSQUEDA_MS y REEMPLAZA la URL (no llena
+//     el historial). Filtros y paginación AGREGAN (Atrás funciona).
+//     Todo filtro vuelve a la página 1.
+//   - AbortController: si salen dos pedidos seguidos, el anterior se
+//     cancela — una respuesta vieja que llega tarde nunca pisa a la
+//     nueva.
+//   - Contadores y select de aeronaves vienen del servidor (antes se
+//     calculaban sobre la lista cargada, que ahora son solo 20).
+//   - Eliminar / abortar / editar desde el panel → se vuelve a pedir la
+//     MISMA página (se rellena hasta 20 y los contadores se actualizan).
+//   - "Descargar PDF" pide ?exportar=1 con los mismos filtros: exporta
+//     TODO lo filtrado, no la página visible. exportarGestionEscalasPDF
+//     no cambia.
+//   - BarraPaginacion, una sola debajo de la tabla y de las tarjetas.
 
-import { useState, useEffect, Fragment } from "react"
+import { useState, useEffect, useRef, Fragment } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
 import { Eye, Pencil, Trash2, Users, ClipboardCheck, Search, Download, ChevronDown, X } from "lucide-react"
 import {
   estadoDetallado,
@@ -29,10 +57,12 @@ import {
 } from "@/lib/escalas"
 import { formatearFechaSoloDia } from "@/lib/fechaSoloDia"
 import { exportarGestionEscalasPDF } from "@/lib/exportarGestionEscalasPDF"
+import { leerPagina, ESPERA_BUSQUEDA_MS } from "@/lib/paginacion"
 import PanelDetalleEscala from "./PanelDetalleEscala"
 import AbortarEscalaAccion from "./AbortarEscalaAccion"
 import AccionIcono from "@/components/shared/AccionIcono"
 import EncabezadoPagina from "@/components/shared/EncabezadoPagina"
+import BarraPaginacion from "@/components/shared/BarraPaginacion"
 
 const ESTADOS_FILTRABLES = [
   { clave: "PENDIENTE", texto: "Programada · Pendiente" },
@@ -45,6 +75,8 @@ const ESTADOS_FILTRABLES = [
   { clave: "BORRADOR", texto: "Borrador" },
 ]
 
+const CLAVES_FILTRABLES = ESTADOS_FILTRABLES.map((op) => op.clave)
+
 // Colores de los puntos de la barra de contadores — mismos matices que
 // ya usa ESTADO_DETALLADO_CLASES, solo que acá se necesita el hex del
 // punto sólido, no la clase de fondo pastel.
@@ -55,21 +87,44 @@ const COLOR_PUNTO_BALDE = {
   ABORTADA: "#E24B4A",
 }
 
-// Agrupa el detalle fino de estadoDetallado() en los 4 baldes que
-// muestra la barra de contadores. "Programada" es el balde por
+// Los 4 baldes de la barra de contadores. "Programada" es el balde por
 // default — cubre Borrador, Pendiente, Vencida sin autorizar,
-// Programada·Autorizada y Sin registrar, o sea todo lo que todavía
-// no terminó (ni voló, ni se completó, ni se abortó).
-function contarPorBalde(escalas) {
-  const contadores = { PROGRAMADA: 0, EN_DESARROLLO: 0, CUMPLIDA: 0, ABORTADA: 0 }
-  for (const e of escalas) {
-    const clave = estadoDetallado(e).clave
-    if (clave === "EN_DESARROLLO") contadores.EN_DESARROLLO++
-    else if (clave === "CUMPLIDA") contadores.CUMPLIDA++
-    else if (clave === "ABORTADA") contadores.ABORTADA++
-    else contadores.PROGRAMADA++
+// Programada·Autorizada y Sin registrar, o sea todo lo que todavía no
+// terminó (ni voló, ni se completó, ni se abortó). Los números los
+// calcula ahora el servidor (/api/escalas/gestion → contadores).
+const ETIQUETAS_BALDE = {
+  PROGRAMADA: "Programada",
+  EN_DESARROLLO: "En vuelo",
+  CUMPLIDA: "Completada",
+  ABORTADA: "Abortada",
+}
+
+// Lee los filtros de la URL. Lo que no sea válido se descarta (un
+// estado inventado a mano no se marca en el filtro).
+function leerFiltros(searchParams) {
+  return {
+    busqueda: (searchParams.get("busqueda") || "").trim(),
+    estados: (searchParams.get("estado") || "")
+      .split(",")
+      .filter((c) => CLAVES_FILTRABLES.includes(c)),
+    aeronave: searchParams.get("aeronave") || "",
+    desde: searchParams.get("desde") || "",
+    hasta: searchParams.get("hasta") || "",
+    pagina: leerPagina(searchParams.get("pagina")),
   }
-  return contadores
+}
+
+// Arma el texto de la URL a partir de los filtros. Los vacíos no se
+// escriben: sin filtros, la URL queda limpia.
+function construirConsulta(f) {
+  const params = new URLSearchParams()
+  if (f.busqueda) params.set("busqueda", f.busqueda)
+  if (f.estados.length > 0) params.set("estado", f.estados.join(","))
+  if (f.aeronave) params.set("aeronave", f.aeronave)
+  if (f.desde) params.set("desde", f.desde)
+  if (f.hasta) params.set("hasta", f.hasta)
+  if (f.pagina > 1) params.set("pagina", String(f.pagina))
+  return params.toString()
 }
 
 function textoRuta(itinerarios) {
@@ -161,34 +216,118 @@ function AccionesEscala({ e, editable, motivo, puedeEditar, puedeEliminar, elimi
 }
 
 export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
-  const [escalas, setEscalas] = useState([])
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // La consulta tal cual está en la URL ("estado=PENDIENTE&pagina=2").
+  // Es la "llave" de los datos: cuando cambia, se pide de nuevo.
+  const consulta = searchParams.toString()
+  const filtros = leerFiltros(searchParams)
+
+  // Lo que devuelve /api/escalas/gestion: { escalas, total, pagina,
+  // totalPaginas, contadores, aeronaves } — o null antes de la primera
+  // carga.
+  const [datos, setDatos] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
-  const [busqueda, setBusqueda] = useState("")
+
+  // Sube para volver a pedir la MISMA página (después de eliminar,
+  // abortar o editar desde el panel), sin tocar la URL.
+  const [recarga, setRecarga] = useState(0)
+
   const [eliminandoId, setEliminandoId] = useState(null)
   const [errorEliminar, setErrorEliminar] = useState(null)
   const [filaExpandidaId, setFilaExpandidaId] = useState(null)
-
-  const [filtroEstados, setFiltroEstados] = useState([])
   const [estadoAbierto, setEstadoAbierto] = useState(false)
-  const [filtroAeronave, setFiltroAeronave] = useState("")
-  const [filtroFechaDesde, setFiltroFechaDesde] = useState("")
-  const [filtroFechaHasta, setFiltroFechaHasta] = useState("")
+  const [descargando, setDescargando] = useState(false)
+  const [errorPDF, setErrorPDF] = useState(null)
+
+  const listaRef = useRef(null)
+
+  // Texto del buscador: estado propio para poder escribir libremente.
+  // ultimaBusquedaEnviada distingue el "eco" de lo que este buscador
+  // mandó a la URL (no tocar el texto: la persona pudo seguir
+  // escribiendo) de un cambio que vino de afuera, como el botón Atrás
+  // (el buscador tiene que mostrar lo que dice la URL).
+  const [busqueda, setBusqueda] = useState(filtros.busqueda)
+  const ultimaBusquedaEnviada = useRef(filtros.busqueda)
 
   useEffect(() => {
-    cargarEscalas()
-  }, [])
+    if (filtros.busqueda !== ultimaBusquedaEnviada.current) {
+      ultimaBusquedaEnviada.current = filtros.busqueda
+      setBusqueda(filtros.busqueda)
+    }
+  }, [filtros.busqueda])
+
+  // ── Pedir los datos cada vez que cambia la URL ─────────────────────
+  useEffect(() => {
+    const controlador = new AbortController()
+    setCargando(true)
+    setError(null)
+
+    fetch(`/api/escalas/gestion${consulta ? `?${consulta}` : ""}`, {
+      credentials: "include",
+      signal: controlador.signal,
+    })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Error al cargar el listado")
+        setDatos(data)
+        setCargando(false)
+      })
+      .catch((err) => {
+        // Cancelado porque salió un pedido más nuevo: no es un error, y
+        // el pedido nuevo ya se encarga de "cargando".
+        if (err.name === "AbortError") return
+        setError(err.message || "Error al cargar el listado")
+        setCargando(false)
+      })
+
+    return () => controlador.abort()
+  }, [consulta, recarga])
+
+  // Al cambiar de página o de filtros, se cierra la fila expandida.
+  useEffect(() => {
+    setFilaExpandidaId(null)
+  }, [consulta])
+
+  // Cambia la URL con los filtros nuevos. Lo que no se pasa queda como
+  // está; la página, si no se indica, vuelve a 1.
+  function navegar(cambios, { reemplazar = false } = {}) {
+    const nuevos = { ...filtros, pagina: 1, ...cambios }
+    ultimaBusquedaEnviada.current = nuevos.busqueda
+
+    const q = construirConsulta(nuevos)
+    const url = q ? `${pathname}?${q}` : pathname
+    if (reemplazar) window.history.replaceState(null, "", url)
+    else window.history.pushState(null, "", url)
+  }
+
+  // Búsqueda diferida: cada tecla reinicia la cuenta; se consulta recién
+  // cuando pasan ESPERA_BUSQUEDA_MS sin escribir.
+  useEffect(() => {
+    const valor = busqueda.trim()
+    if (valor === ultimaBusquedaEnviada.current) return
+
+    const espera = setTimeout(() => {
+      navegar({ busqueda: valor }, { reemplazar: true })
+    }, ESPERA_BUSQUEDA_MS)
+    return () => clearTimeout(espera)
+  }, [busqueda]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Para los demás filtros: si había texto escrito que todavía no se
+  // mandó, va junto.
+  function cambiarFiltro(cambios) {
+    navegar({ busqueda: busqueda.trim(), ...cambios })
+  }
+
+  function cambiarPagina(nueva) {
+    navegar({ pagina: nueva })
+    listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
 
   function cargarEscalas() {
-    setCargando(true)
-    fetch("/api/escalas", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setEscalas(data)
-        else setError(data.error || "Error al cargar el listado")
-      })
-      .catch(() => setError("Error al cargar el listado"))
-      .finally(() => setCargando(false))
+    setRecarga((n) => n + 1)
   }
 
   async function handleEliminar(escala) {
@@ -205,7 +344,9 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Error al eliminar la escala")
 
-      setEscalas((prev) => prev.filter((e) => e.id !== escala.id))
+      // Se vuelve a pedir la misma página: se rellena hasta 20 y los
+      // contadores se actualizan.
+      cargarEscalas()
     } catch (err) {
       setErrorEliminar(err.message)
     } finally {
@@ -214,73 +355,63 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
   }
 
   function toggleEstadoFiltro(clave) {
-    setFiltroEstados((prev) =>
-      prev.includes(clave) ? prev.filter((c) => c !== clave) : [...prev, clave]
-    )
+    const nuevos = filtros.estados.includes(clave)
+      ? filtros.estados.filter((c) => c !== clave)
+      : [...filtros.estados, clave]
+    cambiarFiltro({ estados: nuevos })
   }
 
   function limpiarFiltros() {
     setBusqueda("")
-    setFiltroEstados([])
-    setFiltroAeronave("")
-    setFiltroFechaDesde("")
-    setFiltroFechaHasta("")
+    navegar({ busqueda: "", estados: [], aeronave: "", desde: "", hasta: "" })
   }
 
-  const hayFiltrosActivos =
-    busqueda.trim() || filtroEstados.length > 0 || filtroAeronave || filtroFechaDesde || filtroFechaHasta
-
-  const aeronaveOptions = [...new Set(escalas.map((e) => e.aeronave?.matricula).filter(Boolean))].sort()
-  const contadores = contarPorBalde(escalas)
-
-  const filtradas = escalas
-    .filter((e) => {
-      if (!busqueda.trim()) return true
-      const texto = busqueda.toLowerCase()
-      return (
-        (e.solicitante || "").toLowerCase().includes(texto) ||
-        (e.nro_orden || "").toLowerCase().includes(texto) ||
-        (e.tipo_mision?.codigo || "").toLowerCase().includes(texto)
-      )
-    })
-    .filter((e) => {
-      if (filtroEstados.length === 0) return true
-      return filtroEstados.includes(estadoDetallado(e).clave)
-    })
-    .filter((e) => {
-      if (!filtroAeronave) return true
-      return e.aeronave?.matricula === filtroAeronave
-    })
-    .filter((e) => {
-      const fechaISO = `${e.fecha}`.slice(0, 10)
-      if (filtroFechaDesde && fechaISO < filtroFechaDesde) return false
-      if (filtroFechaHasta && fechaISO > filtroFechaHasta) return false
-      return true
-    })
-    .slice()
-    .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+  const hayFiltrosActivos = Boolean(
+    busqueda.trim() || filtros.estados.length > 0 || filtros.aeronave || filtros.desde || filtros.hasta
+  )
 
   // Describe en texto los filtros activos, para imprimirlos debajo del
   // título del PDF — así el papel dice qué se filtró, igual que los
   // Informes. Las fechas "aaaa-mm-dd" del input se muestran dd/mm/aaaa.
+  // Usa los filtros de la URL: son los que se mandan al servidor.
   function describirFiltros() {
     const partes = []
-    if (busqueda.trim()) partes.push(`Búsqueda: "${busqueda.trim()}"`)
-    if (filtroEstados.length > 0) {
-      const textos = filtroEstados.map(
+    if (filtros.busqueda) partes.push(`Búsqueda: "${filtros.busqueda}"`)
+    if (filtros.estados.length > 0) {
+      const textos = filtros.estados.map(
         (clave) => ESTADOS_FILTRABLES.find((op) => op.clave === clave)?.texto || clave
       )
       partes.push(`Estado: ${textos.join(", ")}`)
     }
-    if (filtroAeronave) partes.push(`Aeronave: ${filtroAeronave}`)
-    if (filtroFechaDesde) partes.push(`Desde: ${formatearFechaSoloDia(filtroFechaDesde)}`)
-    if (filtroFechaHasta) partes.push(`Hasta: ${formatearFechaSoloDia(filtroFechaHasta)}`)
+    if (filtros.aeronave) partes.push(`Aeronave: ${filtros.aeronave}`)
+    if (filtros.desde) partes.push(`Desde: ${formatearFechaSoloDia(filtros.desde)}`)
+    if (filtros.hasta) partes.push(`Hasta: ${formatearFechaSoloDia(filtros.hasta)}`)
     return partes
   }
 
-  function descargarPDF() {
-    exportarGestionEscalasPDF(filtradas, describirFiltros())
+  // Pide TODAS las escalas que cumplen los filtros (no la página
+  // visible) y se las pasa al exportador.
+  async function descargarPDF() {
+    setErrorPDF(null)
+    setDescargando(true)
+    try {
+      const params = new URLSearchParams(consulta)
+      params.delete("pagina")
+      params.set("exportar", "1")
+      const res = await fetch(`/api/escalas/gestion?${params.toString()}`, { credentials: "include" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Error al generar el PDF")
+      exportarGestionEscalasPDF(data.escalas, describirFiltros())
+    } catch (err) {
+      setErrorPDF(err.message || "Error al generar el PDF")
+    } finally {
+      setDescargando(false)
+    }
   }
+
+  const escalas = datos?.escalas || []
+  const contadores = datos?.contadores
+  const aeronaveOptions = datos?.aeronaves || []
 
   return (
     <div className="p-4">
@@ -291,25 +422,23 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
         acciones={
           <button
             onClick={descargarPDF}
-            disabled={filtradas.length === 0}
+            disabled={!datos || datos.total === 0 || descargando}
             className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 h-9"
           >
             <Download className="h-4 w-4" />
-            Descargar PDF
+            {descargando ? "Generando..." : "Descargar PDF"}
           </button>
         }
       >
         {/* Contadores generales — sobre el total, sin importar filtros */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pb-4 border-b border-gray-100 text-sm">
-          {Object.entries({ PROGRAMADA: "Programada", EN_DESARROLLO: "En vuelo", CUMPLIDA: "Completada", ABORTADA: "Abortada" }).map(
-            ([clave, etiqueta]) => (
-              <span key={clave} className="flex items-center gap-1.5 text-gray-600">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_PUNTO_BALDE[clave] }} />
-                {etiqueta} · {contadores[clave]}
-              </span>
-            )
-          )}
-          <span className="text-gray-400">Total {escalas.length}</span>
+          {Object.entries(ETIQUETAS_BALDE).map(([clave, etiqueta]) => (
+            <span key={clave} className="flex items-center gap-1.5 text-gray-600">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_PUNTO_BALDE[clave] }} />
+              {etiqueta} · {contadores ? contadores[clave] : "—"}
+            </span>
+          ))}
+          <span className="text-gray-400">Total {contadores ? contadores.total : "—"}</span>
         </div>
 
         {/* Buscador con ícono */}
@@ -332,12 +461,12 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
               <button
                 onClick={() => setEstadoAbierto((v) => !v)}
                 className={`h-9 flex items-center gap-1.5 px-3 rounded-md border text-sm font-medium transition-colors ${
-                  filtroEstados.length > 0
+                  filtros.estados.length > 0
                     ? "bg-blue-50 border-blue-300 text-blue-700"
                     : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                Estado {filtroEstados.length > 0 && `(${filtroEstados.length})`}
+                Estado {filtros.estados.length > 0 && `(${filtros.estados.length})`}
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
               {estadoAbierto && (
@@ -349,7 +478,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                     <label key={op.clave} className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-50 rounded cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={filtroEstados.includes(op.clave)}
+                        checked={filtros.estados.includes(op.clave)}
                         onChange={() => toggleEstadoFiltro(op.clave)}
                         className="rounded border-gray-300"
                       />
@@ -362,7 +491,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                   ))}
                   <div className="border-t border-gray-100 mt-1 pt-1 flex justify-between px-2">
                     <button
-                      onClick={() => setFiltroEstados([])}
+                      onClick={() => cambiarFiltro({ estados: [] })}
                       className="text-xs text-gray-500 hover:text-gray-700"
                     >
                       Limpiar
@@ -379,10 +508,10 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
             </div>
 
             <select
-              value={filtroAeronave}
-              onChange={(e) => setFiltroAeronave(e.target.value)}
+              value={filtros.aeronave}
+              onChange={(e) => cambiarFiltro({ aeronave: e.target.value })}
               className={`h-9 px-3 rounded-md border text-sm font-medium ${
-                filtroAeronave ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-white border-gray-300 text-gray-600"
+                filtros.aeronave ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-white border-gray-300 text-gray-600"
               }`}
             >
               <option value="">Aeronave — todas</option>
@@ -402,8 +531,8 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
               <span>Desde</span>
               <input
                 type="date"
-                value={filtroFechaDesde}
-                onChange={(e) => setFiltroFechaDesde(e.target.value)}
+                value={filtros.desde}
+                onChange={(e) => cambiarFiltro({ desde: e.target.value })}
                 className="h-9 px-2.5 rounded-md border border-gray-300 text-sm"
               />
             </div>
@@ -411,8 +540,8 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
               <span>Hasta</span>
               <input
                 type="date"
-                value={filtroFechaHasta}
-                onChange={(e) => setFiltroFechaHasta(e.target.value)}
+                value={filtros.hasta}
+                onChange={(e) => cambiarFiltro({ hasta: e.target.value })}
                 className="h-9 px-2.5 rounded-md border border-gray-300 text-sm"
               />
             </div>
@@ -430,22 +559,42 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
         </div>
       </EncabezadoPagina>
 
+      {/* Ancla para volver arriba de la lista al cambiar de página.
+          scroll-mt-4 deja un pequeño margen arriba. */}
+      <div ref={listaRef} className="scroll-mt-4" />
+
       {errorEliminar && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
           {errorEliminar}
         </div>
       )}
 
-      {cargando ? (
-        <p className="text-sm text-gray-400">Cargando...</p>
-      ) : error ? (
-        <p className="text-sm text-red-600">{error}</p>
-      ) : filtradas.length === 0 ? (
+      {errorPDF && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+          {errorPDF}
+        </div>
+      )}
+
+      {/* Si falla una recarga habiendo datos en pantalla, se avisa
+          arriba y se deja la lista que ya estaba. */}
+      {error && datos && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+          {error}
+        </div>
+      )}
+
+      {!datos ? (
+        cargando ? (
+          <p className="text-sm text-gray-400">Cargando...</p>
+        ) : (
+          <p className="text-sm text-red-600">{error}</p>
+        )
+      ) : datos.total === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-400 text-sm">
           No se encontraron escalas{hayFiltrosActivos ? " con estos filtros" : ""}.
         </div>
       ) : (
-        <>
+        <div aria-busy={cargando} className={`transition-opacity ${cargando ? "opacity-60" : ""}`}>
           {/* ── Escritorio: tabla, visible desde 1024px ───────────── */}
           <div className="hidden lg:block bg-white rounded-lg border border-gray-200 overflow-x-auto">
            <table className="w-full table-fixed divide-y divide-gray-200">
@@ -466,7 +615,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filtradas.map((e) => {
+                {escalas.map((e) => {
                   const estado = estadoDetallado(e)
                   const editable = puedeEditarAhora(e)
                   const motivo = motivoNoEditable(e)
@@ -530,14 +679,11 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                 })}
               </tbody>
             </table>
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-              <p className="text-xs text-gray-500">{filtradas.length} de {escalas.length} escalas</p>
-            </div>
           </div>
 
           {/* ── Celular y tablet: tarjetas, ocultas desde 1024px ──── */}
           <div className="lg:hidden space-y-2">
-            {filtradas.map((e) => {
+            {escalas.map((e) => {
               const estado = estadoDetallado(e)
               const editable = puedeEditarAhora(e)
               const motivo = motivoNoEditable(e)
@@ -603,9 +749,17 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
                 </div>
               )
             })}
-            <p className="text-xs text-gray-500 text-center py-2">{filtradas.length} de {escalas.length} escalas</p>
           </div>
-        </>
+
+          <BarraPaginacion
+            pagina={datos.pagina}
+            totalPaginas={datos.totalPaginas}
+            total={datos.total}
+            unidad={{ singular: "escala", plural: "escalas" }}
+            cargando={cargando}
+            onCambiar={cambiarPagina}
+          />
+        </div>
       )}
     </div>
   )
