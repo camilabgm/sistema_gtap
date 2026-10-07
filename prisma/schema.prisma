@@ -417,8 +417,16 @@ model LogIntentoLogin {
 // ─────────────────────────────  MODELO M4  ────────────────────────────
 
 model Escala {
-  id                     Int             @id @default(autoincrement())
-  nro_orden              String?         @unique
+  id Int @id @default(autoincrement())
+
+  // CAMBIO (rama fix/nro-orden-reutilizable): ya NO es @unique. La
+  // Primera Brigada puede reutilizar un número de orden, y el @unique
+  // lo impedía — incluso contra escalas BORRADAS, porque el borrado es
+  // lógico (la fila sigue en la base con deleted_at). En su lugar va un
+  // @@index común (abajo, junto al @@map): el @unique creaba un índice
+  // por debajo que usa la búsqueda de Gestión de Escalas, y así se
+  // conserva.
+  nro_orden              String?
   fecha                  DateTime?       @db.Date
   hora_despegue_estimada DateTime?
   hora_arribo_estimada   DateTime?
@@ -466,6 +474,7 @@ model Escala {
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
 
+  @@index([nro_orden])
   @@map("escalas")
 }
 

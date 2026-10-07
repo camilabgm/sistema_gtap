@@ -3,6 +3,12 @@
 // GET    /api/escalas/<id>     → detalle completo, para precargar edición
 // PUT    /api/escalas/<id>     → completa el borrador
 // DELETE /api/escalas/<id>     → borrado lógico EN CASCADA
+//
+// CAMBIO (rama fix/nro-orden-reutilizable): se saca del catch del PUT el
+// manejo del error P2002 por nro_orden duplicado. nro_orden ya no es
+// @unique en el schema (la Primera Brigada puede reutilizar un número
+// de orden), así que la base nunca más va a rechazar un número
+// repetido — ese bloque quedaba como código muerto.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -347,9 +353,6 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
     console.error("Error interno PUT escalas:", error)
     if (rutaGuardadaNueva) {
       await borrarArchivoSolicitud(rutaGuardadaNueva).catch(() => {})
-    }
-    if (error.code === "P2002" && error.meta?.target?.includes("nro_orden")) {
-      return NextResponse.json({ error: "Ese número de orden ya está en uso por otra escala" }, { status: 409 })
     }
     return NextResponse.json({ error: "Error interno al completar la escala" }, { status: 500 })
   }
