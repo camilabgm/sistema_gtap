@@ -1,6 +1,24 @@
 // Destino: src/app/api/escalas/[id]/editar/route.js
 //
 // PUT /api/escalas/<id>/editar — edita una escala YA PUBLICADA.
+//
+// FIX (rama fix/editar-escala-tramos-duplicados): al editar el
+// itinerario, los tramos viejos NO se borraban — la línea que debía
+// borrarlos había quedado reemplazada por un updateMany sobre
+// acuseRecibo. Resultado: los tramos nuevos se SUMABAN a los viejos
+// (una escala de 2 tramos editada quedaba con 4), y Post-Vuelo pedía
+// horas reales de tramos fantasma.
+//
+// Ahora borra los tramos viejos con deleteMany antes de crear los
+// nuevos — mismo patrón que completar borrador (escalas/[id]/route.js)
+// y que la tripulación en este mismo endpoint. Borrado físico y no
+// lógico a propósito: solo se puede editar antes del despegue, así que
+// esos tramos no tienen datos operativos que conservar, y así ninguna
+// consulta que se olvide el filtro deleted_at puede volver a mostrarlos.
+//
+// El updateMany de acuses se saca sin reemplazo: era redundante, más
+// abajo este mismo endpoint ya borra todos los acuses de la escala
+// (se vuelven a crear al re-autorizar).
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -262,10 +280,9 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
       }
 
       if (itinerarios !== undefined) {
-        await tx.acuseRecibo.updateMany({
-        where: { escala_id: escalaId, deleted_at: null },
-        data: { deleted_at: new Date(), eliminado_por: session.user.id },
-        })
+        // FIX: primero se borran los tramos viejos, recién después se
+        // crean los nuevos (ver comentario de cabecera).
+        await tx.escalaItinerario.deleteMany({ where: { escala_id: escalaId } })
         for (const t of itinerarios) {
           await tx.escalaItinerario.create({
             data: {

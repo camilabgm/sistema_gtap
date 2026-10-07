@@ -490,6 +490,12 @@ model EscalaItinerario {
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
 
+  // FIX (rama fix/editar-escala-tramos-duplicados): candado en la
+  // base — una escala no puede tener dos tramos en la misma posición.
+  // A propósito NO incluye horas: los duplicados que generaba el bug de
+  // editar tenían la MISMA posición pero OTRA hora; con la hora en el
+  // candado, la base los habría dejado pasar.
+  @@unique([escala_id, orden])
   @@map("escala_itinerarios")
 }
 

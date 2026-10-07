@@ -14,6 +14,13 @@
 // Esto corrige el dato desde el ORIGEN — antes solo se corregía al
 // leer, en el informe de Totales. Aplica automáticamente a los 3
 // flujos que llaman a esta función: crear, completar borrador, editar.
+//
+// FIX (rama fix/editar-escala-tramos-duplicados): validarItinerarios()
+// ahora exige que el orden de cada tramo sea un entero positivo y que
+// no se repita dentro de la misma escala. Es el espejo de
+// @@unique([escala_id, orden]) en EscalaItinerario: sin esto, dos
+// tramos con el mismo orden llegarían hasta la base y fallarían con un
+// error 500 genérico, en vez de un mensaje claro acá.
 
 import prisma from "@/lib/prisma"
 import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
@@ -23,8 +30,13 @@ const ROLES_EN_VUELO = ["PILOTO", "COPILOTO", "TECNICO_DE_VUELO"]
 
 export function validarItinerarios(itinerarios) {
   if (!Array.isArray(itinerarios)) return "El itinerario debe ser una lista"
+  const ordenesVistos = new Set()
   for (const t of itinerarios) {
     if (t.orden === undefined || t.orden === null) return "Cada tramo necesita un orden"
+    const orden = Number(t.orden)
+    if (!Number.isInteger(orden) || orden < 1) return "Hay un tramo con un orden inválido"
+    if (ordenesVistos.has(orden)) return "Hay dos tramos con el mismo orden"
+    ordenesVistos.add(orden)
     if (!t.origen || !`${t.origen}`.trim())   return "Cada tramo necesita un origen"
     if (!t.destino || !`${t.destino}`.trim())  return "Cada tramo necesita un destino"
     if (!t.hora_estimada_salida || !t.hora_estimada_llegada) {
