@@ -750,6 +750,14 @@ model ComponenteMantenimiento {
 
   activo Boolean @default(true)
 
+  // SICEM (rama fix/sicem-sincronizacion-post-vuelo): cuándo se
+  // reactivó por última vez (activo false → true). Mientras estuvo
+  // desactivado no recibió horas de los vuelos, así que los vuelos
+  // cerrados antes de esta fecha no lo ajustan si se editan o se
+  // borran (ver lib/sicemSincronizacion.js). null = nunca se reactivó:
+  // cuenta desde created_at.
+  activo_desde DateTime?
+
   eventos   EventoMantenimiento[]
   historial HistorialComponenteMantenimiento[]
 
@@ -823,7 +831,14 @@ model HistorialComponenteMantenimiento {
   componente    ComponenteMantenimiento @relation(fields: [componente_id], references: [id])
 
   // "Foto" de cómo estaba el componente INMEDIATAMENTE ANTES de este
-  // cambio — nunca se sobrescribe ni se actualiza, es historia.
+  // cambio — es historia, no se reescribe a mano.
+  //
+  // ÚNICA excepción (rama fix/sicem-sincronizacion-post-vuelo): en una
+  // fila RESET_POR_EVENTO, horas_acumuladas_minutos se CORRIGE si se
+  // edita o se borra un vuelo cerrado ANTES del reset — esas horas las
+  // voló el componente que se retiró, y viven en esta foto. Si no se
+  // corrigiera, borrar el evento del reset (que restaura desde esta
+  // foto) arrastraría el error. Ver lib/sicemSincronizacion.js.
   horas_acumuladas_minutos Int
   umbral_horas_minutos     Int?
   fecha_proxima_inspeccion DateTime? @db.Date

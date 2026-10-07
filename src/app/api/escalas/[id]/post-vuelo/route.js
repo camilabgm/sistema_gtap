@@ -9,12 +9,21 @@
 //
 // CAMBIO (SICEM): al crear, editar o eliminar el cierre, se sincroniza
 // el "odómetro" de la aeronave (horas_vuelo_totales_minutos) y sus
-// componentes auto-actualizables (motor, hélice) vía
-// sincronizarSicemPorTramo(). Editar suma solo la DIFERENCIA entre el
-// valor nuevo y el anterior — no el valor completo de nuevo, para no
-// duplicar horas ya contadas. Eliminar resta lo que se había sumado,
-// porque el post-vuelo vuelve la escala a PROGRAMADA (como si el
-// tramo nunca se hubiera cerrado).
+// componentes auto-actualizables (motor, hélice). Editar suma solo la
+// DIFERENCIA entre el valor nuevo y el anterior — no el valor completo
+// de nuevo, para no duplicar horas ya contadas. Eliminar resta lo que
+// se había sumado, porque el post-vuelo vuelve la escala a PROGRAMADA
+// (como si el tramo nunca se hubiera cerrado).
+//
+// CAMBIO (rama fix/sicem-sincronizacion-post-vuelo):
+//   - La sincronización con SICEM ya no vive acá: pasa por
+//     lib/sicemSincronizacion.js, la misma puerta que usan el borrado
+//     de escalas, la corrección de tramos y los Eventos. Editar y
+//     eliminar ya no ajustan "a ciegas" el motor/hélice de hoy: ajustan
+//     donde viven HOY las horas de este vuelo (el componente, la foto
+//     de un reset posterior, o nada si hubo una corrección manual).
+//   - DELETE se bloquea si este post-vuelo originó un Evento de
+//     Mantenimiento en SICEM (el evento quedaría huérfano).
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -26,31 +35,15 @@ import {
   calcularHorasDesdeTramosReales,
   ROLES_GLOBAL_POST_VUELO,
 } from "@/lib/postVuelo"
-import { COMPONENTES_AUTO_ACTUALIZABLES } from "@/lib/sicem"
+import {
+  sumarHorasDeVueloNuevo,
+  ajustarHorasDeVueloCerrado,
+  buscarEventoOriginado,
+  mensajeEventoOriginado,
+} from "@/lib/sicemSincronizacion"
 import { resolverNombresUsuarios } from "@/lib/auditoria"
 
 const NOVEDADES_VALIDAS = ["SIN_NOVEDAD", "INCIDENTE", "ACCIDENTE"]
-
-// SICEM — ver comentario de cabecera. Si la escala no tiene aeronave
-// asignada (aeronave_id null) o el delta es 0, no hay nada que hacer.
-async function sincronizarSicemPorTramo(tx, aeronaveId, deltaMinutos) {
-  if (!aeronaveId || !deltaMinutos) return
-
-  await tx.aeronave.update({
-    where: { id: aeronaveId },
-    data: { horas_vuelo_totales_minutos: { increment: deltaMinutos } },
-  })
-
-  await tx.componenteMantenimiento.updateMany({
-    where: {
-      aeronave_id: aeronaveId,
-      tipo: { in: COMPONENTES_AUTO_ACTUALIZABLES },
-      deleted_at: null,
-      activo: true,
-    },
-    data: { horas_acumuladas_minutos: { increment: deltaMinutos } },
-  })
-}
 
 async function cargarEscalaConDatos(escalaId) {
   return prisma.escala.findFirst({
@@ -259,7 +252,7 @@ export const POST = conSesion("POST_VUELO", async (request, context, session) =>
     })
 
     // SICEM — recién ahora existen horas de vuelo reales para sumar.
-    await sincronizarSicemPorTramo(tx, escala.aeronave_id, calculo.horas_vuelo_minutos)
+    await sumarHorasDeVueloNuevo(tx, escala.aeronave_id, calculo.horas_vuelo_minutos)
 
     return nuevo
   })
@@ -305,7 +298,7 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
 
   // SICEM — solo se sincroniza la DIFERENCIA respecto de lo que ya
   // estaba sumado. Si las horas del tramo no cambiaron, delta es 0 y
-  // sincronizarSicemPorTramo no toca nada.
+  // no se toca nada.
   const deltaMinutos = calculo.horas_vuelo_minutos - postVuelo.horas_vuelo_minutos
 
   const actualizado = await prisma.$transaction(async (tx) => {
@@ -327,7 +320,11 @@ export const PUT = conSesion("POST_VUELO", async (request, context, session) => 
       },
     })
 
-    await sincronizarSicemPorTramo(tx, postVuelo.escala.aeronave_id, deltaMinutos)
+    await ajustarHorasDeVueloCerrado(tx, {
+      aeronaveId: postVuelo.escala.aeronave_id,
+      cerradoEn: postVuelo.created_at,
+      deltaMinutos,
+    })
 
     return actualizado
   })
@@ -347,6 +344,12 @@ export const DELETE = conPermiso("POST_VUELO", "puede_eliminar", async (request,
     return NextResponse.json({ error: "Esta escala no tiene post-vuelo cargado" }, { status: 404 })
   }
 
+  // Caso 8 — si este post-vuelo originó un Evento en SICEM, no se borra.
+  const evento = await buscarEventoOriginado(postVuelo.id)
+  if (evento) {
+    return NextResponse.json({ error: mensajeEventoOriginado(evento, "este post-vuelo") }, { status: 409 })
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.postVuelo.update({
       where: { id: postVuelo.id },
@@ -358,10 +361,14 @@ export const DELETE = conPermiso("POST_VUELO", "puede_eliminar", async (request,
       data: { estado: "PROGRAMADA", editado_por: session.user.id },
     })
 
-    // SICEM — revierte lo que este tramo había sumado, como si nunca
-    // se hubiera cerrado (mismo criterio que el estado de la escala,
-    // que vuelve a PROGRAMADA).
-    await sincronizarSicemPorTramo(tx, postVuelo.escala.aeronave_id, -postVuelo.horas_vuelo_minutos)
+    // SICEM — revierte lo que este vuelo había sumado, ahí donde vivan
+    // hoy esas horas (mismo criterio que el estado de la escala, que
+    // vuelve a PROGRAMADA).
+    await ajustarHorasDeVueloCerrado(tx, {
+      aeronaveId: postVuelo.escala.aeronave_id,
+      cerradoEn: postVuelo.created_at,
+      deltaMinutos: -postVuelo.horas_vuelo_minutos,
+    })
   })
 
   return NextResponse.json({ ok: true })

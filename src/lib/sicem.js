@@ -4,6 +4,13 @@
 // lib/postVuelo.js: sin dependencias de React ni de Prisma, para que
 // route.js orqueste las escrituras reales (prisma.update, prisma.count,
 // transacciones) y estas funciones queden fáciles de testear solas.
+//
+// Las ESCRITURAS de horas (sumar, restar, ajustar por vuelos) viven en
+// lib/sicemSincronizacion.js, que usa COMPONENTES_AUTO_ACTUALIZABLES de
+// acá.
+//
+// CAMBIO (rama fix/sicem-sincronizacion-post-vuelo): se sacó
+// esComponenteAutoActualizable() — no tenía ningún uso en el sistema.
 
 // Componentes que se actualizan solos al cerrar un tramo de Post-Vuelo.
 // El APU queda afuera a propósito: no corre necesariamente cuando
@@ -13,10 +20,6 @@
 // ciclos y aterrizajes, hasta validar con datos reales que el campo
 // `aterrizajes` de Post-Vuelo equivale al ATZ del SICEM.
 export const COMPONENTES_AUTO_ACTUALIZABLES = ["MOTOR", "HELICE"]
-
-export function esComponenteAutoActualizable(tipo) {
-  return COMPONENTES_AUTO_ACTUALIZABLES.includes(tipo)
-}
 
 // Horas disponibles de un componente hasta su próximo overhaul/OVH.
 // null si todavía no se le cargó un umbral (componente recién creado

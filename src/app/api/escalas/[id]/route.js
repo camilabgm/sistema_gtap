@@ -9,6 +9,14 @@
 // @unique en el schema (la Primera Brigada puede reutilizar un número
 // de orden), así que la base nunca más va a rechazar un número
 // repetido — ese bloque quedaba como código muerto.
+//
+// CAMBIO (rama fix/sicem-sincronizacion-post-vuelo): el DELETE ahora
+//   - descuenta de SICEM las horas que había sumado el post-vuelo de
+//     esta escala (antes se borraba el post-vuelo pero las horas
+//     quedaban sumadas en la aeronave, el motor y la hélice), usando la
+//     misma puerta que el resto: lib/sicemSincronizacion.js.
+//   - se bloquea si ese post-vuelo originó un Evento de Mantenimiento
+//     en SICEM (el evento quedaría huérfano).
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -18,6 +26,11 @@ import { parsearSubtipos } from "@/lib/tiposMision"
 import { guardarArchivoSolicitud, borrarArchivoSolicitud } from "@/lib/almacenamiento"
 import { paraguayInputAFechaUTC, fechaEnParaguayDesdeInstante } from "@/lib/fechaHora"
 import { normalizarFechaSoloDia } from "@/lib/fechaSoloDia"
+import {
+  ajustarHorasDeVueloCerrado,
+  buscarEventoOriginado,
+  mensajeEventoOriginado,
+} from "@/lib/sicemSincronizacion"
 import {
   validarItinerarios,
   validarTripulacion,
@@ -359,7 +372,9 @@ export const PUT = conPermiso("ESCALAS", "puede_editar", async (request, context
 })
 
 // DELETE — borrado lógico EN CASCADA. Depende únicamente del permiso
-// ESCALAS.puede_eliminar — sin ninguna restricción de estado.
+// ESCALAS.puede_eliminar — sin ninguna restricción de estado, salvo
+// una: si su post-vuelo originó un Evento de Mantenimiento en SICEM,
+// no se borra (ver buscarEventoOriginado).
 export const DELETE = conPermiso("ESCALAS", "puede_eliminar", async (request, context, session) => {
   const { id } = await context.params
   const escalaId = parseInt(id, 10)
@@ -369,15 +384,37 @@ export const DELETE = conPermiso("ESCALAS", "puede_eliminar", async (request, co
 
   const escala = await prisma.escala.findFirst({
     where: { id: escalaId, deleted_at: null },
-    select: { id: true },
+    select: { id: true, aeronave_id: true },
   })
   if (!escala) {
     return NextResponse.json({ error: "Escala no encontrada" }, { status: 404 })
   }
 
+  // SICEM — si la escala tiene un post-vuelo cerrado, sus horas están
+  // sumadas en la aeronave y sus componentes.
+  const postVuelo = await prisma.postVuelo.findFirst({
+    where: { escala_id: escalaId, deleted_at: null },
+    select: { id: true, horas_vuelo_minutos: true, created_at: true },
+  })
+
+  if (postVuelo) {
+    const evento = await buscarEventoOriginado(postVuelo.id)
+    if (evento) {
+      return NextResponse.json({ error: mensajeEventoOriginado(evento, "esta escala") }, { status: 409 })
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     const ahora = new Date()
     const dataBorrado = { deleted_at: ahora, eliminado_por: session.user.id }
+
+    if (postVuelo) {
+      await ajustarHorasDeVueloCerrado(tx, {
+        aeronaveId: escala.aeronave_id,
+        cerradoEn: postVuelo.created_at,
+        deltaMinutos: -postVuelo.horas_vuelo_minutos,
+      })
+    }
 
     await tx.escala.update({ where: { id: escalaId }, data: dataBorrado })
     await tx.escalaItinerario.updateMany({ where: { escala_id: escalaId, deleted_at: null }, data: dataBorrado })

@@ -21,10 +21,21 @@
 // durante la edición (ej. "ahora que inspeccionamos, sí hubo que
 // cambiar la hélice"), recién ahí se aplica el reseteo — con su
 // snapshot de historial, igual que si hubiera pasado al crear.
+//
+// CAMBIO (rama fix/sicem-sincronizacion-post-vuelo) en el DELETE:
+// borrar un evento que había reseteado un componente ya NO vuelve el
+// componente a la "foto" tal cual. Desde el reset el componente siguió
+// volando, y esas horas se perdían. Ahora las horas de la foto se le
+// DEVUELVEN a donde viven hoy las horas del componente (el componente
+// mismo, o la foto de un reset posterior, o nada si después hubo una
+// corrección manual de horas) — ver lib/sicemSincronizacion.js. Y solo
+// se tocan las horas: umbral y fecha de calendario no los había
+// cambiado el reset, así que restaurarlos borraría ajustes posteriores.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { conPermiso } from "@/lib/api-helpers"
+import { ajustarHorasEnComponente } from "@/lib/sicemSincronizacion"
 
 const TIPOS_VALIDOS = ["PROGRAMADO", "NO_PROGRAMADO", "CALENDARIO"]
 const LUGARES_VALIDOS = ["INTERNO", "TERCERIZADO"]
@@ -132,10 +143,12 @@ export const PUT = conPermiso("SICEM", "puede_editar", async (request, { params 
 // ============================================
 // DELETE — borra el evento de verdad, deshaciendo en cadena todo lo
 // que causó al abrirse:
-//   1. Si reseteó un componente, lo restaura al valor que tenía justo
-//      antes (usando la foto guardada en el historial) y borra esa
-//      fila de historial — dejó de tener sentido, el reseteo nunca
-//      "pasó" si el evento que lo originó tampoco existe.
+//   1. Si reseteó un componente, borra esa fila de historial (el reset
+//      nunca "pasó" si el evento que lo originó tampoco existe) y le
+//      devuelve al componente las horas que tenía antes del reset,
+//      SUMADAS a las que voló desde entonces (caso 7). Primero se borra
+//      la fila y después se ajusta: así la regla de sincronización
+//      busca el próximo corte sin encontrarse con este mismo reset.
 //   2. Si el evento seguía abierto y era el único motivo de que la
 //      aeronave estuviera No disponible, la devuelve a Disponible.
 // ============================================
@@ -158,16 +171,17 @@ export const DELETE = conPermiso("SICEM", "puede_eliminar", async (request, { pa
 
   await prisma.$transaction(async (tx) => {
     if (historialDelReset) {
-      await tx.componenteMantenimiento.update({
-        where: { id: historialDelReset.componente_id },
-        data: {
-          horas_acumuladas_minutos: historialDelReset.horas_acumuladas_minutos,
-          umbral_horas_minutos: historialDelReset.umbral_horas_minutos,
-          fecha_proxima_inspeccion: historialDelReset.fecha_proxima_inspeccion,
-          editado_por: session.user.id,
-        },
-      })
       await tx.historialComponenteMantenimiento.delete({ where: { id: historialDelReset.id } })
+
+      // Las horas que el componente tenía justo antes del reset vuelven
+      // a donde viven hoy sus horas — en el caso normal, el componente
+      // mismo: foto + horas voladas desde el reset.
+      await ajustarHorasEnComponente(tx, {
+        componenteId: historialDelReset.componente_id,
+        desde: historialDelReset.created_at,
+        deltaMinutos: historialDelReset.horas_acumuladas_minutos,
+        usuarioId: session.user.id,
+      })
     }
 
     await tx.eventoMantenimiento.delete({ where: { id: eventoId } })

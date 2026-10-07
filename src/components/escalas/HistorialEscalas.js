@@ -43,6 +43,12 @@
 //     TODO lo filtrado, no la página visible. exportarGestionEscalasPDF
 //     no cambia.
 //   - BarraPaginacion, una sola debajo de la tabla y de las tarjetas.
+//
+// CAMBIO (rama fix/sicem-sincronizacion-post-vuelo): la confirmación de
+// "Eliminar" avisa que también se descuentan de SICEM las horas del
+// vuelo. Si el servidor rechaza el borrado porque el post-vuelo originó
+// un Evento de Mantenimiento, el mensaje llega por el mismo cuadro rojo
+// de errorEliminar que ya existía — no hizo falta otro cambio.
 
 import { useState, useEffect, useRef, Fragment } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
@@ -333,7 +339,7 @@ export default function HistorialEscalas({ puedeEditar, puedeEliminar }) {
   async function handleEliminar(escala) {
     const referencia = escala.nro_orden ? `#${escala.nro_orden}` : `#${escala.id}`
     const confirmar = window.confirm(
-      `¿Eliminar la escala ${referencia}? Esto también borra su itinerario, tripulación, solicitud, autorizaciones y post-vuelo si tiene. Esta acción no se puede deshacer desde la interfaz.`
+      `¿Eliminar la escala ${referencia}? Esto también borra su itinerario, tripulación, solicitud, autorizaciones, manifiesto y post-vuelo si tiene, y descuenta de SICEM las horas de ese vuelo. Esta acción no se puede deshacer desde la interfaz.`
     )
     if (!confirmar) return
 

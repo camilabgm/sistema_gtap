@@ -22,6 +22,10 @@
 // horas" y no corta la sincronización de vuelos anteriores (ver
 // lib/sicemSincronizacion.js).
 //
+// Al REACTIVAR (activo false → true) se guarda activo_desde: mientras
+// estuvo desactivado no recibió horas de los vuelos, así que los
+// vuelos cerrados antes de esa fecha ya no lo ajustan.
+//
 // DELETE es un borrado REAL (no soft) — se permite si el componente
 // nunca tuvo un Evento de Mantenimiento real. Ediciones manuales
 // (correcciones de tipeo mientras se está configurando) NO cuentan
@@ -86,6 +90,8 @@ export const PUT = conPermiso("SICEM", "puede_editar", async (request, { params 
 
   const cambiaronHoras = horasNuevas !== existente.horas_acumuladas_minutos
 
+  const seReactiva = existente.activo === false && body.activo === true
+
   const actualizado = await prisma.$transaction(async (tx) => {
     if (esEdicionDeDatos) {
       await tx.historialComponenteMantenimiento.create({
@@ -113,6 +119,7 @@ export const PUT = conPermiso("SICEM", "puede_editar", async (request, { params 
           ? new Date(body.fecha_proxima_inspeccion)
           : existente.fecha_proxima_inspeccion,
         activo: body.activo !== undefined ? !!body.activo : existente.activo,
+        ...(seReactiva ? { activo_desde: new Date() } : {}),
         editado_por: session.user.id,
       },
     })
