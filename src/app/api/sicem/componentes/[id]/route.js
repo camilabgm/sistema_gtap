@@ -13,6 +13,15 @@
 // de "activo" (desactivar/reactivar desde la tabla) NO genera
 // historial, porque no cambió ningún dato real del componente.
 //
+// CAMBIO (rama fix/sicem-sincronizacion-post-vuelo): la fila de
+// historial ahora dice si las HORAS cambiaron de verdad
+// (cambiaron_horas), comparando el valor nuevo contra el anterior — no
+// alcanza con que el campo venga en el body, porque el formulario
+// manda los tres campos siempre. Si solo cambió el umbral o la fecha,
+// cambiaron_horas = false: esa edición no es una "corrección de
+// horas" y no corta la sincronización de vuelos anteriores (ver
+// lib/sicemSincronizacion.js).
+//
 // DELETE es un borrado REAL (no soft) — se permite si el componente
 // nunca tuvo un Evento de Mantenimiento real. Ediciones manuales
 // (correcciones de tipeo mientras se está configurando) NO cuentan
@@ -68,6 +77,15 @@ export const PUT = conPermiso("SICEM", "puede_editar", async (request, { params 
     body.horas_acumuladas_minutos !== undefined ||
     body.fecha_proxima_inspeccion !== undefined
 
+  // El valor que va a quedar guardado — se calcula una sola vez y se
+  // usa tanto para el update como para saber si las horas cambiaron.
+  const horasNuevas =
+    body.horas_acumuladas_minutos !== undefined && body.horas_acumuladas_minutos !== null
+      ? Number(body.horas_acumuladas_minutos)
+      : existente.horas_acumuladas_minutos
+
+  const cambiaronHoras = horasNuevas !== existente.horas_acumuladas_minutos
+
   const actualizado = await prisma.$transaction(async (tx) => {
     if (esEdicionDeDatos) {
       await tx.historialComponenteMantenimiento.create({
@@ -77,6 +95,7 @@ export const PUT = conPermiso("SICEM", "puede_editar", async (request, { params 
           umbral_horas_minutos: existente.umbral_horas_minutos,
           fecha_proxima_inspeccion: existente.fecha_proxima_inspeccion,
           motivo: "EDICION_MANUAL",
+          cambiaron_horas: cambiaronHoras,
           registrado_por: session.user.id,
         },
       })
@@ -89,10 +108,7 @@ export const PUT = conPermiso("SICEM", "puede_editar", async (request, { params 
           body.umbral_horas_minutos !== undefined && body.umbral_horas_minutos !== null
             ? Number(body.umbral_horas_minutos)
             : existente.umbral_horas_minutos,
-        horas_acumuladas_minutos:
-          body.horas_acumuladas_minutos !== undefined && body.horas_acumuladas_minutos !== null
-            ? Number(body.horas_acumuladas_minutos)
-            : existente.horas_acumuladas_minutos,
+        horas_acumuladas_minutos: horasNuevas,
         fecha_proxima_inspeccion: body.fecha_proxima_inspeccion
           ? new Date(body.fecha_proxima_inspeccion)
           : existente.fecha_proxima_inspeccion,

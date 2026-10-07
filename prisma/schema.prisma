@@ -371,6 +371,14 @@ model Aeronave {
   ciclos_acumulados           Int     @default(0)
   aterrizajes_acumulados      Int     @default(0)
 
+  // SICEM (rama fix/sicem-sincronizacion-post-vuelo): cuándo se
+  // corrigió A MANO el odómetro (datos-generales), solo si el valor
+  // realmente cambió. Sirve para saber si las horas de un vuelo
+  // cerrado ANTES de esta fecha siguen "viviendo" en el odómetro: si
+  // alguien lo corrigió después, el valor corregido manda y borrar o
+  // editar ese vuelo ya no lo ajusta (ver lib/sicemSincronizacion.js).
+  horas_totales_ajustadas_en DateTime?
+
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   deleted_at    DateTime?
@@ -821,6 +829,15 @@ model HistorialComponenteMantenimiento {
   fecha_proxima_inspeccion DateTime? @db.Date
 
   motivo MotivoHistorialComponente
+
+  // SICEM (rama fix/sicem-sincronizacion-post-vuelo): ¿esta fila
+  // cambió las horas acumuladas? Un RESET siempre las cambia (a 0).
+  // Una EDICION_MANUAL puede haber cambiado solo el umbral o la fecha:
+  // en ese caso es false, y no cuenta como "corrección de horas".
+  // Default true a propósito: ante la duda, el sistema asume que las
+  // horas se tocaron y NO ajusta el componente — equivocarse para ese
+  // lado deja horas de más (avisa ANTES del overhaul, nunca después).
+  cambiaron_horas Boolean @default(true)
 
   // Solo se completa cuando motivo = RESET_POR_EVENTO.
   evento_mantenimiento_id Int?

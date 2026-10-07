@@ -10,6 +10,15 @@
 // separada, con permiso SICEM, es la única forma de que esa persona
 // pueda cargar estos datos sin también poder editar el resto de la
 // aeronave.
+//
+// CAMBIO (rama fix/sicem-sincronizacion-post-vuelo): si el odómetro
+// (horas_vuelo_totales_minutos) cambió DE VERDAD — comparando el valor
+// nuevo contra el anterior, no solo que el campo venga en el body —
+// se guarda horas_totales_ajustadas_en con la fecha de hoy. Marca que
+// el valor fue verificado a mano: los vuelos cerrados antes de esta
+// fecha ya no lo ajustan si se editan o se borran (ver
+// lib/sicemSincronizacion.js). Cambiar solo ciclos, aterrizajes o el
+// checkbox NO toca esta fecha.
 
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
@@ -56,13 +65,17 @@ export const PATCH = conPermiso("SICEM", "puede_editar", async (request, { param
 
   const trackea = !!body.trackea_ciclos_aterrizajes
 
+  const horasNuevas =
+    body.horas_vuelo_totales_minutos !== undefined
+      ? Number(body.horas_vuelo_totales_minutos)
+      : existente.horas_vuelo_totales_minutos
+
+  const cambioOdometro = horasNuevas !== existente.horas_vuelo_totales_minutos
+
   const actualizada = await prisma.aeronave.update({
     where: { id: aeronaveId },
     data: {
-      horas_vuelo_totales_minutos:
-        body.horas_vuelo_totales_minutos !== undefined
-          ? Number(body.horas_vuelo_totales_minutos)
-          : existente.horas_vuelo_totales_minutos,
+      horas_vuelo_totales_minutos: horasNuevas,
       trackea_ciclos_aterrizajes: trackea,
       // Si se destildó el checkbox, no se borran los valores que ya
       // hubiera — simplemente se deja de pedirlos/mostrarlos en la
@@ -75,6 +88,7 @@ export const PATCH = conPermiso("SICEM", "puede_editar", async (request, { param
         trackea && body.aterrizajes_acumulados !== undefined
           ? Number(body.aterrizajes_acumulados)
           : existente.aterrizajes_acumulados,
+      ...(cambioOdometro ? { horas_totales_ajustadas_en: new Date() } : {}),
       editado_por: session.user.id,
     },
   })
